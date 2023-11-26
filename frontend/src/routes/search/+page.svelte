@@ -4,49 +4,30 @@
     import ResultTable from '../../lib/components/resulttable.svelte'
     import ResultGraph from '../../lib/components/resultgraph.svelte'
     import { createParam, createIntParam, createListParam } from '../../lib/stores/param'
+    import { createCombinedStore, createFilteredStore } from '../../lib/stores/results'
     import { getContext } from "svelte";
     import { derived, writable } from 'svelte/store';
     import { Button, Tabs, TabItem, Search, Breadcrumb, BreadcrumbItem  } from 'flowbite-svelte';
     import ProgressHeader from '../../lib/components/progress.svelte'
 
-    
-    
-    // This component reponds to search parameters, not props
-    /*
-    let params = {}
-    $: {
-        const newParams = $page.url.searchParams
-        if(newParams !== undefined) {
-            const pageInt = parseInt(newParams.get('page'))
-            params = {...Object.fromEntries(newParams.entries()), page: pageInt}
-        }
-        
-                    let query = new URLSearchParams($page.url.searchParams.toString());
-                    query.set('page', );
-                    goto(`?${query.toString()}`);
-                }
-            }
-        
-    }*/
+    const customDatasets = writable(['Custom dataset 1', 'Custom dataset 2']);
 
+    let paramPage = createIntParam('page', 1)
+    let paramSearch = createParam('terms', '', v=>v, true)
+    let paramVisible = createListParam('visible', ',', true)
 
-    let currentPage = createIntParam('page', 1)
-    let currentSearch = createParam('terms', '', v=>v, true)
-    let currentVisible = createListParam('visible', ',', true)
-
-    // Fast searches shouldn't polute browser query params/history
-    let currentSearchFast = writable([''])
-    currentSearch.subscribe(v => currentSearchFast.set(v))
-
-    page.subscribe(p => {
-        const newPage = parseInt(p.url.searchParams.get('page'))
-        if(!isNaN(newPage) && newPage !== currentPage) currentPage.set(newPage)
-    });
-
-    ///derived(page, ($page) => parseInt($page.url.searchParams.get('page')) || 1, 1)
-    //const currentSearch = derived(page, ($page) => $page.url.searchParams.get('search') || '', '')
+    let currentSearch = writable('')
+    paramSearch.subscribe(v => currentSearch.set(v))
 
     const {data, getMatrixStore} = getContext('core')
+    const combinedStore = createCombinedStore(data, customDatasets)
+
+    let currentVisibleCombined = ({
+        set: paramVisible.set,
+        subscribe: derived([paramVisible, combinedStore], ([$v, $c]) => $v?.length ? $v : $c?.headingsDefaultVisible || [], []).subscribe
+    })
+
+    const filteredStore = createFilteredStore(combinedStore, currentSearch, currentVisibleCombined)
 
     let dataset = 'BrainSeq'
     let matrix = 'RPKM'
@@ -66,7 +47,6 @@
 <ProgressHeader/>
 
 <div class='m-12 mt-4'>
-
     <div class='pb-4'>
         <Breadcrumb aria-label="Home breadcrumbs">
             <BreadcrumbItem href="/" home>Home</BreadcrumbItem>
@@ -74,13 +54,11 @@
         </Breadcrumb>
     </div>
 
-
     <div class="flex items-center gap-2 items-stretch pb-4">
-        <Search on:blur={(e) => currentSearch.set(e.target.value)} bind:value={$currentSearchFast}/>
+        <Search on:blur={(e) => paramSearch.set(e.target.value)} bind:value={$currentSearch}/>
         <Button color='light'><i class='fas fa-file-lines'/></Button>
         <Button color='light'><i class='fas fa-plus'/></Button>
     </div>
-
 
     <Tabs contentClass='bg-white mt-0 shadow-lg sm:rounded-lg'>
         
@@ -89,7 +67,7 @@
                 <i class='fas fa-table-list'></i>
                 Results Table
             </div>
-            <ResultTable bind:currentPage={currentPage} bind:currentSearch={currentSearchFast} bind:currentVisible={currentVisible}/>
+            <ResultTable filteredStore={filteredStore} bind:currentPage={paramPage} bind:currentVisible={currentVisibleCombined}/>
         </TabItem>
 
         <TabItem>
@@ -97,7 +75,7 @@
                 <i class='fas fa-chart-line'></i>
                 Results Graph
             </div>
-            <ResultGraph bind:currentSearch={currentSearchFast}/>
+            <ResultGraph filteredStore={filteredStore}/>
         </TabItem>
     </Tabs>
 </div>

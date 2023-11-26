@@ -6,7 +6,7 @@
     import { Button } from 'flowbite-svelte';
     import { writable, derived } from 'svelte/store';
 
-    export let currentSearch;
+    export let filteredStore;
 
     const { data } = getContext('core')
 </script>

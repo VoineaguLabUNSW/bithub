@@ -1,24 +1,12 @@
 <script>
-    import { getContext } from "svelte";
     import Dropdown from './dropdown.svelte'
     import { paginate, LightPaginationNav } from 'svelte-paginate'
     import chroma from "chroma-js";
     import { Button } from 'flowbite-svelte';
-    import { writable, derived } from 'svelte/store';
 
-    export let customDatasets = writable(['Custom dataset 1', 'Custom dataset 2']);
+    export let filteredStore;
     export let currentPage;
-    export let currentSearch;
     export let currentVisible;
-
-    // Prevent loaded default from triggering currentVisible.set (query parameters should only be from user action)
-    const currentVisibleDefault = writable([]);
-    const currentVisibleCombined = ({
-        set: currentVisible.set,
-        subscribe: derived([currentVisible, currentVisibleDefault], ([$v, $d]) => $v?.length ? $v : $d, []).subscribe
-    })
-
-    const { data } = getContext('core')
 
     // Heatmap setup
     const scale = chroma.scale(['purple', 'orange']);
@@ -43,80 +31,12 @@
         currSort = {...currSort}
     }
 
-    // Main table loading
-    let tableSource = undefined
-    $: {
-        if($data?.value) {
-            const headings = $data.value.get('data').attrs.order;
-            const original = headings.map(k => $data.value.get('data/' + k).value);
-            const [isDs, isDb] = [$data.value.get('data').attrs.isDataset, $data.value.get('data').attrs.isDatabase]
-            const indices = headings.map((h, i) => (isDs[i] || isDb[i]) ? $data.value.get('metadata/' + h + '/scaled').value : undefined)
-            const columnStringSizes = headings.map(k => $data.value.get('data/' + k).dtype).map(dt => dt.startsWith('S') ? parseInt(dt.slice(1)) : undefined);
-            currentVisibleDefault.set($data.value.get('data').attrs.defaultVisible.map(i => headings[i]))
-
-            for(let h of $customDatasets) {
-                const insertPoint = isDs.indexOf(1)
-                headings.splice(insertPoint, 0, h)
-                original.splice(insertPoint, 0, new Array(original[0].length).fill(0))
-                isDs.splice(insertPoint, 0, 1)
-                indices.splice(insertPoint, 0, [3.8])
-                columnStringSizes.splice(insertPoint, 0, undefined)
-            }
-
-            const boolToIndices = (array) => array.map((v, i) => v ? i : undefined).filter(x => x !== undefined);
-            const datasetIndices = boolToIndices(isDs)
-            const databaseIndices = boolToIndices(isDb)
-            const generalIndices = boolToIndices(headings.map((_, i) => !isDs[i] && !isDb[i]))
-            
-            const columns = [...generalIndices.map(i => original[i]), ...datasetIndices.concat(databaseIndices).map(col_i => original[col_i].map(v => v === -1 ? Number.NEGATIVE_INFINITY : indices[col_i][v]))]
-            const headingGroups = new Map([['', generalIndices.map(i => headings[i])], ['Datasets', datasetIndices.map(i => headings[i])], ['Databases', databaseIndices.map(i => headings[i])]])
-            tableSource = {headings, columns, generalIndices, datasetIndices, databaseIndices, columnStringSizes, headingGroups}
-        }
-    }
-
-    // Main table filtering and sorting
+    // Takes the filteredStore and sorts based on visible selected columns
     let tableData = undefined;
     $: {
-        if ( tableSource) {
-            const columns = tableSource.columns;
-            let sorted = Array.from(Array(columns[0].length).keys());
-
-            // Filter before sorting
-            const newSearch = $currentSearch
-            if(newSearch) {
-                const searchTerms = newSearch.split(',').map(st => st.trim().toLowerCase())
-                searchTerms.sort()
-
-                if(searchTerms.length == 1) {
-                    const searchable = tableSource.columns.map((_, col_i) => col_i).filter(col_i => tableSource.columnStringSizes[col_i]).filter(col_i => $currentVisibleCombined.includes(tableSource.headings[col_i]))
-                    sorted = sorted.filter(row_i => searchable.some(col_i => tableSource.columns[col_i][row_i].toLowerCase().includes(searchTerms[0])))
-                } else {
-                    function findMatchesSorted(arrays, searches) {
-                        searches.sort();
-                        arrays.forEach(a => a.sort());
-                        let indices = new Array(arrays.length).fill(0)
-                        let ret = []
-                        for(const term of searches) {
-                            for(const [i, arr] of arrays.entries()) {
-                                let cmp = -1;
-                                while(indices[i]<arr.length && cmp < 0) {
-                                    cmp = arr[indices[i]].localeCompare(term, undefined, { sensitivity: 'accent' })
-                                    if(cmp < 0) indices[i]++;
-                                }
-                                if (cmp === 0) {
-                                    ret.push(indices[i]);
-                                    break;
-                                }
-                            }
-                        }
-                        return ret;
-                    }
-                    const exactSearchable = [0, 1].filter(col_i => $currentVisibleCombined.includes(tableSource.headings[col_i])).map(col_i => columns[col_i])
-                    sorted = findMatchesSorted(exactSearchable, searchTerms);
-                }
-            }
-
-            // ----- From here on should be inside table component
+        if ( $filteredStore) {
+            let sorted = [...$filteredStore.results]
+            let columns = $filteredStore.columns
 
             // Custom sorting based on either single columns (string comparison) or range of columns (numerical sum)
             if(currSort.id !== undefined && currSort.type) {
@@ -124,7 +44,7 @@
                     const col_i = currSort.list[0];
                     sorted.sort((row_a, row_b) => columns[col_i][row_a] > columns[col_i][row_b] ? -1 : 1)
                 } else {
-                    const cols = currSort.list.filter(i => $currentVisibleCombined.includes(tableSource.headings[i])).map(i => columns[i])
+                    const cols = currSort.list.filter(i => $currentVisible.includes($filteredStore.headings[i])).map(i => columns[i])
                     const avgs = columns[0].map((_, row_i) => cols.map(col => col[row_i]).filter(x => x !== Number.NEGATIVE_INFINITY).reduce((acc, val, i, arr) => (i<arr.length-1) ? acc+val : (acc+val)/arr.length, 0))
                     sorted.sort((row_a, row_b) => avgs[row_b] - avgs[row_a])
                 }
@@ -133,14 +53,14 @@
 
             // We aren't modifying the actual page, just truncating the view
             const page = paginate({items: sorted, pageSize: 50, currentPage: $currentPage > 1 && $currentPage * 50 > sorted.length ? Math.floor(sorted.length/50 + 1) : $currentPage})
-            tableData = {...tableSource, page, tableSize: sorted.length}
+            tableData = {...$filteredStore, page, tableSize: sorted.length}
         }
     }
 </script>
 
 <div class="relative overflow-x-auto">
     {#if tableData }
-        {@const currentVisibleIndices = $currentVisibleCombined.map(h => tableData.headings.indexOf(h))}
+        {@const currentVisibleIndices = $currentVisible.map(h => tableData.headings.indexOf(h))}
         {@const generalIndicesFiltered = tableData.generalIndices.filter(v => currentVisibleIndices.includes(v))}
         {@const datasetIndicesFiltered = tableData.datasetIndices.filter(v => currentVisibleIndices.includes(v))}
         {@const databaseIndicesFiltered = tableData.databaseIndices.filter(v => currentVisibleIndices.includes(v))}
@@ -148,7 +68,7 @@
             <span class="absolute m-4 gap-4 flex items-center justify-between items-stretch">
                 <Button color="light"><i class="fas fa-upload"/></Button>
                 <Button color="light"><i class="fas fa-download"/></Button>
-                <span class="w-64"><Dropdown title="Columns" groups={tableData.headingGroups} selected={currentVisibleCombined} disabled={tableData.headings[0]}/></span>
+                <span class="w-64"><Dropdown title="Columns" groups={tableData.headingGroups} selected={currentVisible} disabled={tableData.headings[0]}/></span>
             </span>
             <table class="table-fixed w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
                 <thead class="text-xs text-gray-700 uppercase bg-white dark:bg-gray-700 dark:text-gray-400">

@@ -47,7 +47,7 @@ function createCombinedStore(data, customDatasets) {
             
             const columns = [...generalIndices.map(i => original[i]), ...datasetIndices.concat(databaseIndices).map(col_i => original[col_i].map(v => v === -1 ? Number.NEGATIVE_INFINITY : indices[col_i][v]))]
             const headingGroups = new Map([['', generalIndices.map(i => headings[i])], ['Datasets', datasetIndices.map(i => headings[i])], ['Databases', databaseIndices.map(i => headings[i])]])
-            set({headings, headingsDefaultVisible, columns, generalIndices, datasetIndices, databaseIndices, columnStringSizes, headingGroups})
+            set({headings, headingsDefaultVisible, original, columns, generalIndices, datasetIndices, databaseIndices, columnStringSizes, headingGroups})
         }
     });
 }

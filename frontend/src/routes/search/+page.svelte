@@ -10,7 +10,7 @@
     import { Button, Tabs, TabItem, Search, Breadcrumb, BreadcrumbItem  } from 'flowbite-svelte';
     import ProgressHeader from '../../lib/components/progress.svelte'
 
-    const customDatasets = writable(['Custom dataset 1', 'Custom dataset 2']);
+    const customDatasets = writable([]);//['Custom dataset 1', 'Custom dataset 2']
 
     let paramPage = createIntParam('page', 1)
     let paramSearch = createParam('terms', '', v=>v, true)

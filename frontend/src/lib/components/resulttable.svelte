@@ -1,5 +1,5 @@
 <script>
-    import Dropdown from './dropdown.svelte'
+    import Dropdown from './dropdowncheck.svelte'
     import { paginate, LightPaginationNav } from 'svelte-paginate'
     import chroma from "chroma-js";
     import { Button } from 'flowbite-svelte';

@@ -1,12 +1,12 @@
 <style>
     rect.st0 {
-    animation: blinker 1.3s cubic-bezier(.7,0,.3,1) infinite;
+        animation: blinker 1.3s cubic-bezier(.7,0,.3,1) infinite;
     }
 
     @keyframes blinker {
-    50% {
-        opacity: 0;
-    }
+        50% {
+            opacity: 0;
+        }
     }
 </style>
 

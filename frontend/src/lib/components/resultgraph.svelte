@@ -1,6 +1,6 @@
 <script>
-    import Dropdown from '../components/dropdown.svelte'
-    import Plot from '../components/plot.svelte'
+    import Dropdown from '../components/dropdown.svelte';
+    import Plot from '../components/plot.svelte';
     import { writable } from "@square/svelte-store";
    
 
@@ -8,28 +8,28 @@
 
     let datasetsAll;
 
-    let datasetsSelect1 = writable('')
-    let datasetsSelect2 = writable('')
+    let datasetsSelect1 = writable('');
+    let datasetsSelect2 = writable('');
 
-    let plotlyArgs = writable(undefined)
+    let plotlyArgs = writable(undefined);
 
     // Initial data parse
     filteredStore.subscribe(fs => {
         if(fs && !datasetsAll) {
-            const { headingGroups } = fs
-            datasetsAll = headingGroups.get('Datasets')
-            datasetsSelect1.set(datasetsAll[0])
-            datasetsSelect2.set(datasetsAll[1])
+            const { headingGroups } = fs;
+            datasetsAll = headingGroups.get('Datasets');
+            datasetsSelect1.set(datasetsAll[0]);
+            datasetsSelect2.set(datasetsAll[1]);
         }
     });
 
     $: {
         if($filteredStore && $datasetsSelect1 && $datasetsSelect2) {
 
-            const inds = [$datasetsSelect1, $datasetsSelect2].map(h => $filteredStore.headings.indexOf(h))
-            const cols = inds.map(i => $filteredStore.columns[i])
-            const filteredInd = inds.map((col_i, d_i) => $filteredStore.results.map(row_i => cols[d_i][row_i]))
-            const filteredNames = $filteredStore.results.map(row_i => $filteredStore.columns[1][row_i])
+            const inds = [$datasetsSelect1, $datasetsSelect2].map(h => $filteredStore.headings.indexOf(h));
+            const cols = inds.map(i => $filteredStore.columns[i]);
+            const filteredInd = inds.map((col_i, d_i) => $filteredStore.results.map(row_i => cols[d_i][row_i]));
+            const filteredNames = $filteredStore.results.map(row_i => $filteredStore.columns[1][row_i]);
             
             plotlyArgs.set({
                 plotData: [

@@ -11,7 +11,7 @@ import { asyncDerived, asyncReadable, writable } from "@square/svelte-store";
  * @returns {Object}
  */
 function createTransparentStore(id, onSubscriberCountChange) {
-    const subscribers = new Set()
+    const subscribers = new Set();
     const helper = (subscribeMutator) => {
         const prevSize = subscribers.size;
         subscribeMutator();
@@ -20,7 +20,7 @@ function createTransparentStore(id, onSubscriberCountChange) {
 
     const subscribe = (cb) => {
         helper(() => subscribers.add(cb));
-        return (cb) => helper(() => subscribers.delete(cb))
+        return (cb) => helper(() => subscribers.delete(cb));
     }
     return {
         id,
@@ -56,14 +56,14 @@ const timeout = (ms) => {
 };
 
 async function singleReqToBuffer(res) {
-    const ret = new Uint8Array(await res.arrayBuffer())
-    console.log(ret)
+    const ret = new Uint8Array(await res.arrayBuffer());
+    console.log(ret);
     return ret
 }
 
 async function multipartReqToBuffer(res) {
     const ret = new Uint8Array([...res.body].map(char => char.charCodeAt(0)))
-    console.log(ret)
+    console.log(ret);
     return ret;
 }
 
@@ -76,11 +76,11 @@ function bufferToRow(buffer, knownLen) {
     if(is_sparse) {
         for(let i=1; i<inflated.byteLength; i+=(4 + 4)) {
             let index = dataView.getInt32(i, true)
-            array[index] = dataView.getFloat32(i+4, true)
+            array[index] = dataView.getFloat32(i+4, true);
         }
     } else {
         for(let i=0; i<knownLen; ++i) {
-            array[i] = dataView.getFloat32(1 + i*4, true)
+            array[i] = dataView.getFloat32(1 + i*4, true);
         }
     }
     return array
@@ -93,13 +93,13 @@ function parseMultipart(body) {
 
     for (i=0;i<body.length;i++){
         if (body[i] !== '\n'){
-        str += body[i];
+            str += body[i];
         } else {
-        str = str.replace("\r","");
-        if (str.trim() !== "") {
-            arrayList.push(str);
-        }
-        str = '';
+            str = str.replace("\r","");
+            if (str.trim() !== "") {
+                arrayList.push(str);
+            }
+            str = '';
         }
     }
 
@@ -111,11 +111,10 @@ function parseMultipart(body) {
 
     // arrayList is an array of all the lines in the file
     console.log(arrayList); 
-
 }
 
 async function getJSON(url) {
-    const req = await fetch(url)
+    const req = await fetch(url);
     await timeout(2000);
     return await req.json();
 }
@@ -137,9 +136,9 @@ function createCore(url) {
         undefined, 
         async () => {
             try {
-                return {value: await getJSON(url)}
+                return {value: await getJSON(url)};
             } catch(e) {
-                return {error: e}
+                return {error: e};
             }
         }
     );
@@ -148,33 +147,33 @@ function createCore(url) {
         (metadata),
         async ($metadata) => {
             try {
-                const obj = await getHDF5(/*$metadata.value.data_url*/'https://d33ldq8s2ek4w8.cloudfront.net/combined/out.hdf5', progress.set)
+                const obj = await getHDF5(/*$metadata.value.data_url*/'https://d33ldq8s2ek4w8.cloudfront.net/combined/out.hdf5', progress.set);
                 const updateLazy = async (id, prev, curr) => (!prev && curr) && await update(_row, obj, [id]);
-                const md = obj.get('metadata')
+                const md = obj.get('metadata');
                 for(let d of md.keys.filter(d => md.get(d).keys.includes('matrices'))) {
                     for(let m of md.get(d + '/matrices').keys) {
-                        const id = d + ':' + m
-                        matrixLoaders[id] = createTransparentStore(id, updateLazy)
+                        const id = d + ':' + m;
+                        matrixLoaders[id] = createTransparentStore(id, updateLazy);
                     }
                 }
-                _data = obj
-                return {value: obj}
+                _data = obj;
+                return {value: obj};
             } catch (e) {
-                return {error: e}
+                return {error: e};
             }
         },
     );
 
     async function update(latest_row, latest_data, ids) {
-        if(latest_data === undefined || latest_row === undefined) return
+        if(latest_data === undefined || latest_row === undefined) return;
 
         const requests = []
         for(let id of ids) {
             matrixLoaders[id].set({loading: true});
 
             // Create inclusive byte requests
-            const [d, m] = id.split(':')
-            const index = latest_data.get(`metadata/${d}/matrices/${m}/index`).value
+            const [d, m] = id.split(':');
+            const index = latest_data.get(`metadata/${d}/matrices/${m}/index`).value;
             requests.push({
                 id,
                 length: latest_data.get(`metadata/${d}/matrices/${m}`).attrs.shape[1],
@@ -192,7 +191,7 @@ function createCore(url) {
         if(response.status !== 206) {
             controller.abort();
             for(let id of ids) {
-                matrixLoaders[id].set({error: Error('Invalid response, 206 expected')})
+                matrixLoaders[id].set({error: Error('Invalid response, 206 expected')});
             }
         } else {
             // Stream range results reactively
@@ -200,32 +199,32 @@ function createCore(url) {
             let parts = ids.length > 1 ? await meros(response) : [response]
             for await (const part of parts) {
                 const r = requests[i++];
-                if(i==1) continue
-                console.log(r)
+                if(i==1) continue;
+                console.log(r);
                 try {
                     if(ids.length == 1) {
-                        const content_header = part.headers.get('content-length')
-                        if (content_header != (r.byteEnd - r.byteStart + 1)) throw Error('Unexpected single range: ' + e)
-                        matrixLoaders[r.id].set({data: bufferToRow(await singleReqToBuffer(part), r.length)})
+                        const content_header = part.headers.get('content-length');
+                        if (content_header != (r.byteEnd - r.byteStart + 1)) throw Error('Unexpected single range: ' + e);
+                        matrixLoaders[r.id].set({data: bufferToRow(await singleReqToBuffer(part), r.length)});
                     } else {
-                        parseMultipart(part.body)
-                        const content_header = part.headers['content-range']
-                        if (!content_header.startsWith(`bytes ${r.byteStart}-${r.byteEnd}/`)) throw Error('Unexpected multipart range: ' + e)
-                        matrixLoaders[r.id].set({data: bufferToRow(multipartReqToBuffer(part), r.length)})
+                        parseMultipart(part.body);
+                        const content_header = part.headers['content-range'];
+                        if (!content_header.startsWith(`bytes ${r.byteStart}-${r.byteEnd}/`)) throw Error('Unexpected multipart range: ' + e);
+                        matrixLoaders[r.id].set({data: bufferToRow(multipartReqToBuffer(part), r.length)});
                     }
                 } catch(e) {
-                    matrixLoaders[r.id].set({error: e})
-                    throw e
+                    matrixLoaders[r.id].set({error: e});
+                    throw e;
                 }
             }
         }
     }
 
     row.subscribe(async (newRow) => {
-        if(newRow === undefined) return
-        console.log(Object.keys(matrixLoaders).filter(k => matrixLoaders[k].subscriberCount() > 0))
-        update(newRow, _data, Object.keys(matrixLoaders).filter(k => matrixLoaders[k].subscriberCount() > 0))
-        _row = newRow
+        if(newRow === undefined) return;
+        console.log(Object.keys(matrixLoaders).filter(k => matrixLoaders[k].subscriberCount() > 0));
+        update(newRow, _data, Object.keys(matrixLoaders).filter(k => matrixLoaders[k].subscriberCount() > 0));
+        _row = newRow;
     })
 
     return {
@@ -234,4 +233,4 @@ function createCore(url) {
     }
 }
 
-export { createCore }
+export { createCore };

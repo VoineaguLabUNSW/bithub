@@ -3,8 +3,7 @@
     import { sineIn } from 'svelte/easing';
     import { createEventDispatcher } from 'svelte';
     import { writable, get } from "@square/svelte-store";
-    import debounce from '../../utils/debounce'
-    import Plotly from 'plotly.js-dist-min'
+    import Plotly from 'plotly.js-dist-min';
 
     export let plotlyArgs;
 
@@ -13,9 +12,9 @@
 
     const dispatch = createEventDispatcher();
 
-    let plotContainer = writable(undefined)
+    let plotContainer = writable(undefined);
     let isHovering = false;
-    let toggleOn = writable()
+    let toggleOn = writable();
     let hoverOn = writable();
 
     let firstRender = true;
@@ -79,7 +78,7 @@
     }
 
     plotContainer.subscribe((pc) => {
-        if(!pc) return
+        if(!pc) return;
         pc.onmouseleave = () => isHovering = false;
         pc.onmousemove = function(e) {
             const plotRect = pc.getBoundingClientRect();
@@ -90,10 +89,10 @@
         }
     });
 
-    $: document.querySelector('[data-attr="sidebar_hover"]')?.classList.toggle('active', $hoverOn)
-    $: document.querySelector('[data-attr="sidebar_toggle"]')?.classList.toggle('active', $toggleOn)
-    toggleOn.subscribe(v => v && hoverOn.set(false))
-    hoverOn.subscribe(v => v && toggleOn.set(false))
+    $: document.querySelector('[data-attr="sidebar_hover"]')?.classList.toggle('active', $hoverOn);
+    $: document.querySelector('[data-attr="sidebar_toggle"]')?.classList.toggle('active', $toggleOn);
+    toggleOn.subscribe(v => v && hoverOn.set(false));
+    hoverOn.subscribe(v => v && toggleOn.set(false));
 </script>
 
 <!--Force plotly controls to top middle, fix tailwindcss incompatibility (https://github.com/plotly/plotly.js/issues/5828) -->
@@ -111,12 +110,10 @@
     :global(.js-plotly-plot .plotly .modebar svg) {
         display: inline;
     }
-
     :global(.modebar-btn > .icon) {
         height: 1.5em;
         width: 1.5em;
     }
-
     :global(div.plotly-notifier) {
         visibility: hidden;
     }

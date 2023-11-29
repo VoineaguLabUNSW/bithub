@@ -1,6 +1,6 @@
 <script>
-    import Dropdown from './dropdowncheck.svelte'
-    import { paginate, LightPaginationNav } from 'svelte-paginate'
+    import Dropdown from './dropdowncheck.svelte';
+    import { paginate, LightPaginationNav } from 'svelte-paginate';
     import chroma from "chroma-js";
     import { Button } from 'flowbite-svelte';
 
@@ -12,21 +12,21 @@
     // Heatmap setup
     const scale = chroma.scale(['purple', 'orange']);
     function toColorScale(v, min, max) {
-        v = Math.max(Math.min(v, max), min)
-        return scale((v-min)/max).hex()
+        v = Math.max(Math.min(v, max), min);
+        return scale((v-min)/max).hex();
     }
 
     // Custom sorting setup
-    let currSort = {list: [], type: 0, id: undefined}
+    let currSort = {list: [], type: 0, id: undefined};
     function toggleSort(e) {
         const newList =  e.target.getAttribute('data-sort-list');
-        const newId = e.target.getAttribute('data-sort-id')
-        if(newList === null) return
+        const newId = e.target.getAttribute('data-sort-id');
+        if(newList === null) return;
         if(newId === currSort.id) {
-            currSort.type = (currSort.type+1)%3
+            currSort.type = (currSort.type+1)%3;
         } else {
-            currSort.id = newId
-            currSort.list = newList.split(',').map(x => parseInt(x))
+            currSort.id = newId;
+            currSort.list = newList.split(',').map(x => parseInt(x));
             currSort.type = 1;
         }
         currSort = {...currSort}
@@ -34,32 +34,32 @@
 
     function selectRow(e) {
         const row = parseInt(e.target.parentNode.getAttribute('data-row'));
-        if(!isNaN(row)) currentRow.set(row)
+        if(!isNaN(row)) currentRow.set(row);
     }
 
     // Takes the filteredStore and sorts based on visible selected columns
     let tableData = undefined;
     $: {
         if ( $filteredStore) {
-            let sorted = [...$filteredStore.results]
-            let columns = $filteredStore.columns
+            let sorted = [...$filteredStore.results];
+            let columns = $filteredStore.columns;
 
             // Custom sorting based on either single columns (string comparison) or range of columns (numerical sum)
             if(currSort.id !== undefined && currSort.type) {
                 if(currSort.list.length == 1) {
                     const col_i = currSort.list[0];
-                    sorted.sort((row_a, row_b) => columns[col_i][row_a] > columns[col_i][row_b] ? -1 : 1)
+                    sorted.sort((row_a, row_b) => columns[col_i][row_a] > columns[col_i][row_b] ? -1 : 1);
                 } else {
-                    const cols = currSort.list.filter(i => $currentVisible.includes($filteredStore.headings[i])).map(i => columns[i])
-                    const avgs = columns[0].map((_, row_i) => cols.map(col => col[row_i]).filter(x => x !== Number.NEGATIVE_INFINITY).reduce((acc, val, i, arr) => (i<arr.length-1) ? acc+val : (acc+val)/arr.length, 0))
-                    sorted.sort((row_a, row_b) => avgs[row_b] - avgs[row_a])
+                    const cols = currSort.list.filter(i => $currentVisible.includes($filteredStore.headings[i])).map(i => columns[i]);
+                    const avgs = columns[0].map((_, row_i) => cols.map(col => col[row_i]).filter(x => x !== Number.NEGATIVE_INFINITY).reduce((acc, val, i, arr) => (i<arr.length-1) ? acc+val : (acc+val)/arr.length, 0));
+                    sorted.sort((row_a, row_b) => avgs[row_b] - avgs[row_a]);
                 }
                 if(currSort.type == 2) sorted.reverse();
             }
 
             // We aren't modifying the actual page, just truncating the view
-            const page = paginate({items: sorted, pageSize: 50, currentPage: $currentPage > 1 && $currentPage * 50 > sorted.length ? Math.floor(sorted.length/50 + 1) : $currentPage})
-            tableData = {...$filteredStore, page, tableSize: sorted.length}
+            const page = paginate({items: sorted, pageSize: 50, currentPage: $currentPage > 1 && $currentPage * 50 > sorted.length ? Math.floor(sorted.length/50 + 1) : $currentPage});
+            tableData = {...$filteredStore, page, tableSize: sorted.length};
         }
     }
 </script>

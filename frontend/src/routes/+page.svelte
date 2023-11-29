@@ -1,11 +1,11 @@
 <script>    
     import Card from '../lib/components/card.svelte';
-    import Logo from '../lib/components/logo.svelte'
-    import ProgressHeader from '../lib/components/progress.svelte'
+    import Logo from '../lib/components/logo.svelte';
+    import ProgressHeader from '../lib/components/progress.svelte';
     import { fade } from 'svelte/transition';
     import { getContext } from 'svelte';
     import { goto } from '$app/navigation';
-    import { page } from '$app/stores'
+    import { page } from '$app/stores';
     
     const { metadata } = getContext('core')
 
@@ -22,10 +22,10 @@
         }
     }
 
-    let labelElement = undefined
+    let labelElement = undefined;
     $: {
         if(labelElement && $metadata?.value?.count) {
-            labelElement.classList.remove('inactive')
+            labelElement.classList.remove('inactive');
             labelElement.setAttribute('data-domain', $metadata?.value?.count + " results");
         }
     }

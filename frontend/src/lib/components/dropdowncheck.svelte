@@ -8,18 +8,18 @@
     export let selected = [];
 
     let open = false;
-    let filter = ''
-    $: if(!open) filter = ''
+    let filter = '';
+    $: if(!open) filter = '';
 
-    if(!title) title = 'Select:'
-    if(!groups) groups = new Map([['first', ['one', 'two', 'three', 'four']], ['second', ['one']]])
-    if(Array.isArray(groups)) groups = new Map([['', groups]])
-  </script>
+    if(!title) title = 'Select:';
+    if(!groups) groups = new Map([['first', ['one', 'two', 'three', 'four']], ['second', ['one']]]);
+    if(Array.isArray(groups)) groups = new Map([['', groups]]);
+</script>
   
-  <Button color="light">{title}<ChevronDownSolid class="w-3 h-3 ml-2 text-gray-200 dark:text-white" /></Button>
-  <Dropdown bind:open class="overflow-y-auto px-3 pb-3 text-sm h-44 divide-y divide-gray-100">
+<Button color="light">{title}<ChevronDownSolid class="w-3 h-3 ml-2 text-gray-200 dark:text-white" /></Button>
+<Dropdown bind:open class="overflow-y-auto px-3 pb-3 text-sm h-44 divide-y divide-gray-100">
     <div slot="header" class="p-3">
-      <Search placeholder='Filter...' bind:value={filter} size="md" />
+        <Search placeholder='Filter...' bind:value={filter} size="md" />
     </div>
     {#each [...groups].map(([key, values]) => [key, values.filter(v => v.toLowerCase().includes(filter.toLowerCase()))]).filter(([_, values]) => values.length) as [key, values]}
         {key}
@@ -31,4 +31,4 @@
             {/key}
         {/each}
     {/each}
-  </Dropdown>
+</Dropdown>

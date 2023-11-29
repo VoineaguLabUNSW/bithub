@@ -3,9 +3,8 @@
     import { Progressbar } from 'flowbite-svelte';
     import { fade } from 'svelte/transition';
     import { sineOut } from 'svelte/easing';
-    const { progress, data } = getContext('core')
+    const { progress, data } = getContext('core');
 </script>
-
 
 <div class="sticky top-0 h-0">
     {#if !$data?.value}

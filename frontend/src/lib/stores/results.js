@@ -75,4 +75,4 @@ function createFilteredStore(columnStore, currentSearch, currentVisibleCombined)
     })
 }
 
-export { createCombinedStore, createFilteredStore }
+export { createCombinedStore, createFilteredStore };

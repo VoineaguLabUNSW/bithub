@@ -27,10 +27,11 @@ def calc_s3_etag(path, multipart_threshold, multipart_chunksize):
             chunks_hashes.append(hashlib.md5(chunk).digest())
         return hashlib.md5(b''.join(chunks_hashes)).hexdigest() + '-' + str(len(chunks_hashes))
       
-def manage_deploy_cloudfront(asset_paths, cloudfront_url=None, chunk_size=8388608):
+def manage_deploy_cloudfront(asset_paths, cloudfront_url=None, chunk_size=8388608, prefix='bithub'):
     '''Upload list of files and return URL mapping'''
     s3 = boto3.client('s3')
     for path, name in zip(asset_paths, map(os.path.basename, asset_paths)):
+        name = prefix + '/' + name
         s3_hash = None
         with contextlib.suppress(s3.exceptions.ClientError):
             s3_head = s3.head_object(Bucket='bithub-bucket', Key=name)
@@ -40,7 +41,7 @@ def manage_deploy_cloudfront(asset_paths, cloudfront_url=None, chunk_size=838860
             s3.upload_file(path, 'bithub-bucket', name, ExtraArgs={'CacheControl': 'max-age=3600'},
                            Config=boto3.s3.transfer.TransferConfig(multipart_threshold=chunk_size, multipart_chunksize=chunk_size))
 
-    return {n: f'https://{cloudfront_url}/{n}' for n in map(os.path.basename, asset_paths)}
+    return {n: f'https://{cloudfront_url}/{prefix}/{n}' for n in map(os.path.basename, asset_paths)}
 
 def pad_elipses(string, length=20):
     '''Transform strings to constant length in a presentable way'''
@@ -153,7 +154,7 @@ def write_compressed_ranges(path: str, dtype: str='f'):
                 row_bytes = row_bytes + struct.pack(f'<{len(values)}{dtype}', *values)
             f.write(zlib.compress(row_bytes, level=-1))
             return start, f.tell()
-        yield write_row
+        yield write_row, f.tell
 
 @contextlib.contextmanager
 def read_compressed_ranges(path: str, dtype: str='f'):
@@ -162,7 +163,8 @@ def read_compressed_ranges(path: str, dtype: str='f'):
         def read_row(start, end, row_length):
             f.seek(start)
             values = None
-            row_bytes = zlib.decompress(f.read(end - start))
+            vals = f.read(end - start)
+            row_bytes = zlib.decompress(vals)
             used_sparse = row_bytes[0]
             if used_sparse:
                 offset = 1
@@ -568,7 +570,8 @@ def test_compressed_ranges():
         path = os.path.join(tmpdirname, 'binary.bin')
         ranges = []
         data = range(10000)
-        with write_compressed_ranges(path, dtype='f') as writer:
+        with write_compressed_ranges(path, dtype='f') as writer_utils:
+            writer, teller = writer_utils
             for _ in range(20):
                 ranges.append(writer(data))
         with read_compressed_ranges(path, dtype='f') as reader:
@@ -581,7 +584,8 @@ def test_compressed_ranges_sparse():
         path = os.path.join(tmpdirname, 'binary.bin')
         ranges = []
         data = [0.0 if i%30 else 1.0 for i in range(10000)]
-        with write_compressed_ranges(path, dtype='f') as writer:
+        with write_compressed_ranges(path, dtype='f') as writer_utils:
+            writer, teller = writer_utils
             for _ in range(20):
                 ranges.append(writer(data))
         with read_compressed_ranges(path, dtype='f') as reader:
@@ -610,6 +614,8 @@ if __name__ == '__main__':
             
         OUTPUT_FOLDER = inputObj['output_external']
         OUTPUT_RESOURCES = inputObj['output_resources']
+        EXPRESSION_PATH = os.path.join(OUTPUT_FOLDER, 'expression.bin')
+
         for p in [OUTPUT_FOLDER, OUTPUT_RESOURCES]:
             os.makedirs(p, exist_ok=True)
 
@@ -622,9 +628,13 @@ if __name__ == '__main__':
 
         # Load gene mappings/annotations into memory
         gene_to_gene, transcript_to_transcript, transcript_to_gene = get_ncbi_annotator(inputObj.get('ncbi_gene_info', None), inputObj.get('ncbi_gtf'), inputObj.get('genenames_alias', None))
-        
+        all_ranges = []
+
         with h5py.File(os.path.join(OUTPUT_FOLDER, 'out.hdf5'), 'w') as root:
             with context_closer() as contexts:
+                contexts.append(write_compressed_ranges(EXPRESSION_PATH))
+                writer, teller = contexts[-1].__enter__()
+                last_range_end = 0
 
                 # Iterate over all annotated genes in all datasets in alphanumeric order
                 annots_written = []
@@ -670,9 +680,6 @@ if __name__ == '__main__':
                         
                         for matrix, samples in zip(dataset['matrices'], matrix_headers):
                             ranges, logs = [], []
-                            contexts.append(write_compressed_ranges(os.path.join(OUTPUT_FOLDER, get_matrix_name(dataset, matrix) + '.matrix')))
-                            writer = contexts[-1].__enter__()
-
                             # Initialize re-order buffer
                             reorder_indices = get_reorder_indices(sample_whitelist_ordered, samples)
                             reorder_buffer = [None] * len(sample_whitelist_ordered)
@@ -686,7 +693,7 @@ if __name__ == '__main__':
                                     if fv is not None: filter_indices[fv].append(i)
                                 logs_filter_enum = (filter_factors_enum, filter_indices, [[] for _ in filter_factors_enum[1]])
 
-                            matrix['_internal'] = (ranges, writer, reorder_indices, reorder_buffer, logs, logs_filter_enum)
+                            matrix['_internal'] = (ranges, reorder_indices, reorder_buffer, logs, logs_filter_enum)
 
                         if not (transcript_matrices := dataset.get('transcript_matrices', None)): continue
                         
@@ -726,7 +733,7 @@ if __name__ == '__main__':
                             for m in matrices:
                                 if m is None: continue
                                 dataset, matrix, samples, gene, values = m
-                                ranges, writer, reorder_indices, reorder_buffer, logs, logs_filter_enum = matrix['_internal']
+                                ranges, reorder_indices, reorder_buffer, logs, logs_filter_enum = matrix['_internal']
 
                                 # Write re-orderd matrix row and save range (input, buffer, steps)
                                 fixed = apply_reorder_indices([float(v) for v in values], reorder_buffer, reorder_indices)
@@ -775,6 +782,7 @@ if __name__ == '__main__':
                                         _, transcript_id, *vals = t
                                         data.append([float(v) for v in vals])
                                         names.append(transcript_to_transcript[transcript_id])
+                all_ranges.append((last_range_end, teller()))
 
             print(f'\nProcessed {total_written} entries')
 
@@ -839,7 +847,8 @@ if __name__ == '__main__':
                     with contextlib.suppress(KeyError):
                         p_pg_root[d_id] = root['metadata'][d_id]
 
-            asset_urls = deploy([os.path.join(OUTPUT_FOLDER, p) for p in os.listdir(OUTPUT_FOLDER) if p.endswith('.matrix')])
+            asset_urls = deploy([EXPRESSION_PATH])
+            expression_url = asset_urls.get(os.path.basename(EXPRESSION_PATH), '')
 
             for d in inputObj['datasets']:
                 meta_root = root['metadata'][d['id']]
@@ -848,11 +857,12 @@ if __name__ == '__main__':
                 all_logs = {}
                 for matrix in d['matrices']:
                     name, shape = matrix['name'], (len(annots_written), d['_internal_sample_count'])
-                    ranges, _, _, _, logs, logs_filter_enum = matrix['_internal']
+                    ranges, _, _, logs, logs_filter_enum = matrix['_internal']
         
                     curr_matrix_meta_root = matrix_meta_root.create_group(name)
-                    curr_matrix_meta_root.create_dataset('index', data=[c[0] for c in ranges] + [ranges[-1][1]], compression='gzip', compression_opts=9)
-                    curr_matrix_meta_root.attrs.create('path', asset_urls.get(get_matrix_name(d, matrix) + '.matrix', ''))
+                    curr_matrix_meta_root.create_dataset('start', data=[c[0] for c in ranges] + [ranges[-1][1]], compression='gzip', compression_opts=9)
+                    curr_matrix_meta_root.create_dataset('end', data=[c[1] for c in ranges] + [ranges[-1][1]], compression='gzip', compression_opts=9)
+                    curr_matrix_meta_root.attrs.create('path', expression_url)
                     curr_matrix_meta_root.attrs.create('shape', shape)
 
                     all_logs.setdefault('scaled', []).append(logs)

@@ -1,7 +1,5 @@
 <script>
     import { Button, Dropdown, Search} from 'flowbite-svelte';
-    import { ChevronDownSolid } from 'flowbite-svelte-icons';
-    import { writable } from 'svelte/store';
 
     export let groups;
     export let title = '';

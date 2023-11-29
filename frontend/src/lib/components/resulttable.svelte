@@ -7,6 +7,7 @@
     export let filteredStore;
     export let currentPage;
     export let currentVisible;
+    export let currentRow;
 
     // Heatmap setup
     const scale = chroma.scale(['purple', 'orange']);
@@ -29,6 +30,11 @@
             currSort.type = 1;
         }
         currSort = {...currSort}
+    }
+
+    function selectRow(e) {
+        const row = parseInt(e.target.parentNode.getAttribute('data-row'));
+        if(!isNaN(row)) currentRow.set(row)
     }
 
     // Takes the filteredStore and sorts based on visible selected columns
@@ -135,7 +141,7 @@
                 </thead>
                 <tbody>
                     {#each tableData.page as ri}
-                        <tr class="border-t-2 bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                        <tr on:click={selectRow} data-row="{ri}" class="cursor-pointer border-t-2 bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                             
                             <!-- Normal cells -->
                             {#each generalIndicesFiltered as ci }

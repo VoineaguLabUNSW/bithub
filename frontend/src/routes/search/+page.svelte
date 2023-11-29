@@ -1,13 +1,13 @@
     
-    <script>
-    import { page } from '$app/stores';
+<script>
     import ResultTable from '../../lib/components/resulttable.svelte'
     import ResultGraph from '../../lib/components/resultgraph.svelte'
+    import GeneView from '../../lib/components/geneview.svelte'
     import { createParam, createIntParam, createListParam } from '../../lib/stores/param'
     import { createCombinedStore, createFilteredStore } from '../../lib/stores/results'
     import { getContext } from "svelte";
     import { derived, writable } from 'svelte/store';
-    import { Button, Tabs, TabItem, Search, Breadcrumb, BreadcrumbItem  } from 'flowbite-svelte';
+    import { Button, Tabs, TabItem, Search, Breadcrumb, BreadcrumbItem, Modal } from 'flowbite-svelte';
     import ProgressHeader from '../../lib/components/progress.svelte'
 
     const customDatasets = writable([]);//['Custom dataset 1', 'Custom dataset 2']
@@ -19,7 +19,12 @@
     let currentSearch = writable('')
     paramSearch.subscribe(v => currentSearch.set(v))
 
-    const {data, getMatrixStore} = getContext('core')
+    let openModal = writable(undefined)
+    let currentRow = writable(undefined)
+    currentRow.subscribe(v => v !== undefined && openModal.set(true))
+    openModal.subscribe(v => !v && currentRow.set(undefined))
+
+    const {row, data, getMatrixStore} = getContext('core')
     const combinedStore = createCombinedStore(data, customDatasets)
 
     let currentVisibleCombined = ({
@@ -38,10 +43,18 @@
             unsub = getMatrixStore(dataset, matrix).subscribe((data) => {
                 if(unsub) unsub()
                 expression = data
+                console.log(data)
             })
+
+            getMatrixStore('BrainSpan', 'RPKM').subscribe((data) => {
+               console.log(data)
+            })
+            console.log('subscribing')
+            
+            row.set(20)
         }
     }
-
+    
 </script>
 
 <ProgressHeader/>
@@ -67,7 +80,7 @@
                 <i class='fas fa-table-list'></i>
                 Results Table
             </div>
-            <ResultTable filteredStore={filteredStore} bind:currentPage={paramPage} bind:currentVisible={currentVisibleCombined}/>
+            <ResultTable filteredStore={filteredStore} bind:currentPage={paramPage} bind:currentVisible={currentVisibleCombined} bind:currentRow={currentRow}/>
         </TabItem>
 
         <TabItem>
@@ -79,3 +92,7 @@
         </TabItem>
     </Tabs>
 </div>
+
+<Modal bind:open={$openModal} size='xl' outsideclose={true}>
+    <GeneView filteredStore={filteredStore} currentRow={currentRow}></GeneView>
+</Modal>

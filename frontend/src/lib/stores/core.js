@@ -1,6 +1,7 @@
 import { meros } from 'meros/browser';
 import * as hdf5 from 'jsfive';
 import * as fflate from 'fflate';
+import pako from 'pako'
 import { asyncDerived, asyncReadable, writable } from "@square/svelte-store";
 
 /**
@@ -54,6 +55,65 @@ const timeout = (ms) => {
     return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
+async function singleReqToBuffer(res) {
+    const ret = new Uint8Array(await res.arrayBuffer())
+    console.log(ret)
+    return ret
+}
+
+async function multipartReqToBuffer(res) {
+    const ret = new Uint8Array([...res.body].map(char => char.charCodeAt(0)))
+    console.log(ret)
+    return ret;
+}
+
+function bufferToRow(buffer, knownLen) {
+    //const inflated = fflate.unzlibSync(buffer);
+    const inflated = pako.inflate(buffer);
+    const dataView = new DataView(inflated.buffer);
+    const is_sparse = dataView.getUint8(0, true)
+    const array = new Array(knownLen).fill(0.0)
+    if(is_sparse) {
+        for(let i=1; i<inflated.byteLength; i+=(4 + 4)) {
+            let index = dataView.getInt32(i, true)
+            array[index] = dataView.getFloat32(i+4, true)
+        }
+    } else {
+        for(let i=0; i<knownLen; ++i) {
+            array[i] = dataView.getFloat32(1 + i*4, true)
+        }
+    }
+    return array
+}
+
+function parseMultipart(body) {
+    var i=0;
+    var str = '';
+    var arrayList = [];
+
+    for (i=0;i<body.length;i++){
+        if (body[i] !== '\n'){
+        str += body[i];
+        } else {
+        str = str.replace("\r","");
+        if (str.trim() !== "") {
+            arrayList.push(str);
+        }
+        str = '';
+        }
+    }
+
+    // Remove header
+    arrayList.splice(0,3);
+
+    // Remove footer
+    arrayList.splice(arrayList.length-1,1);
+
+    // arrayList is an array of all the lines in the file
+    console.log(arrayList); 
+
+}
+
 async function getJSON(url) {
     const req = await fetch(url)
     await timeout(2000);
@@ -71,7 +131,7 @@ function createCore(url) {
     let _row = undefined;
 
     const progress = writable(0);
-    const row = writable(0);
+    const row = writable(undefined);
 
     const metadata = asyncReadable (
         undefined, 
@@ -88,7 +148,7 @@ function createCore(url) {
         (metadata),
         async ($metadata) => {
             try {
-                const obj = await getHDF5($metadata.value.data_url, progress.set)
+                const obj = await getHDF5(/*$metadata.value.data_url*/'https://d33ldq8s2ek4w8.cloudfront.net/combined/out.hdf5', progress.set)
                 const updateLazy = async (id, prev, curr) => (!prev && curr) && await update(_row, obj, [id]);
                 const md = obj.get('metadata')
                 for(let d of md.keys.filter(d => md.get(d).keys.includes('matrices'))) {
@@ -119,15 +179,15 @@ function createCore(url) {
                 id,
                 length: latest_data.get(`metadata/${d}/matrices/${m}`).attrs.shape[1],
                 byteStart: index[latest_row],
-                byteEnd: index[latest_row+1]-1
+                byteEnd: index[latest_row+1]-1,
             })
         }
         requests.sort((a, b) => a.byteStart - b.byteStart)
 
         const controller = new AbortController();
-        const response = await fetch('https://bithub-data.netlify.app/Velmeshev_CPM.matrix', {
+        const response = await fetch('https://d33ldq8s2ek4w8.cloudfront.net/combined/combined.matrix', {
             signal: controller.signal,
-            headers: {'Range': 'bytes=' + requests.map(r => `${r.byteStart}-${r.byteEnd}`).join(',')}
+            headers: {'Range': 'bytes=' + requests.map(r => `${r.byteStart}-${r.byteEnd}`).join(',')},
         });
         if(response.status !== 206) {
             controller.abort();
@@ -137,42 +197,25 @@ function createCore(url) {
         } else {
             // Stream range results reactively
             let i=0
-            const enc = new TextEncoder();
             let parts = ids.length > 1 ? await meros(response) : [response]
-            
             for await (const part of parts) {
                 const r = requests[i++];
-                try{
-                    let array = undefined
-                    let content_header, valid;
-                    if(content_header = part.headers.get('content-length')) {
-                        valid = (content_header == (r.byteEnd - r.byteStart + 1))
-                    } else if(content_header = part.headers.get('content-range')) {
-                        valid = content_header.startsWith(`bytes ${r.byteStart}-${r.byteEnd}/`)
+                if(i==1) continue
+                console.log(r)
+                try {
+                    if(ids.length == 1) {
+                        const content_header = part.headers.get('content-length')
+                        if (content_header != (r.byteEnd - r.byteStart + 1)) throw Error('Unexpected single range: ' + e)
+                        matrixLoaders[r.id].set({data: bufferToRow(await singleReqToBuffer(part), r.length)})
+                    } else {
+                        parseMultipart(part.body)
+                        const content_header = part.headers['content-range']
+                        if (!content_header.startsWith(`bytes ${r.byteStart}-${r.byteEnd}/`)) throw Error('Unexpected multipart range: ' + e)
+                        matrixLoaders[r.id].set({data: bufferToRow(multipartReqToBuffer(part), r.length)})
                     }
-                    if (!valid) throw Error('Unexpected range')
-
-                    try {
-                        const inflated = fflate.unzlibSync(enc.encode(part.body).buffer);
-                        const dataView = new DataView(inflated.buffer);
-                        const is_sparse = dataView.getUint8(0, true)
-                        array = new Array(r.length).fill(0.0)
-                        if(is_sparse) {
-                            for(let i=1; i<inflated.byteLength; i+=(4 + 4)) {
-                                let index = dataView.getInt32(i, true)
-                                array[index] = dataView.getFloat32(i+4, true)
-                            }
-                        } else {
-                            for(let i=0; i<r.length; ++i) {
-                                array[i] = dataView.getFloat32(1 + i*4, true)
-                            }
-                        }
-                    } catch (e) {
-                        throw Error('Format not recognized')
-                    }
-                    matrixLoaders[r.id].set({data: array})
                 } catch(e) {
                     matrixLoaders[r.id].set({error: e})
+                    throw e
                 }
             }
         }

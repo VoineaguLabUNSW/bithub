@@ -34,6 +34,11 @@ resource "aws_s3_bucket_cors_configuration" "my_app" {
   bucket = "${aws_s3_bucket.my_app.id}"
 
   cors_rule {
+    # This is only required for comma separated Range headers
+    # Although Cloudfront+S3 doesn't seem to return requested ranges
+    # https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_request_header#additional_restrictions
+    allowed_headers = ["*"]
+    
     allowed_methods = ["GET"]
     allowed_origins = ["*"]
     expose_headers  = ["ETag"]

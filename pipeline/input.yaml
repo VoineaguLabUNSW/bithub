@@ -1,4 +1,4 @@
-output_resources: "../resources/data" 
+output_resources: "./output" 
 output_external: "./output" 
 
 # Annotation files
@@ -20,14 +20,14 @@ datasets:
             -   name: RPKM
                 path: "synth1-exp.csv"
     -   id: Synthetic2
-        dir: "./test-data"
+        dir: "./test_data"
         meta: "synth1-meta.csv"
         matrices: 
             -   name: RPKM
                 path: "synth2-exp.csv"
     -   id: BrainSeq
         url: "https://www.brainrnaseq.org/"
-        dir: "./test-data"
+        dir: "./test_data"
         meta: "BrainSeq-metadata-example.csv"
         annot: "BrainSeq-metadata-annot.csv"
         customFilter: 
@@ -46,7 +46,7 @@ datasets:
         variancePartition: Brainspan-varpart.csv
     -   id: BrainSpan
         url: "https://www.brainrnaseq.org/"
-        dir: "./test-data"
+        dir: "./test_data"
         meta: "BrainSeq-metadata-example.csv"
         customFilter: 
                 name: "Brain Region"

@@ -88,7 +88,10 @@
                 <i class='fas fa-chart-line'></i>
                 Results Graph
             </div>
-            <ResultGraph filteredStore={filteredStore}/>
+            <!-- TODO: hardcoded number of px above to give it defined height and force resizes -->
+            <div class="h-[calc(100vh-214px)]">
+                <ResultGraph filteredStore={filteredStore}/>
+            </div>
         </TabItem>
     </Tabs>
 </div>

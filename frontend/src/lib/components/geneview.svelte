@@ -28,6 +28,12 @@
 <div class='text-lg'>{$filteredStore.columns[2][$currentRow]}</div>
 <hr>
 
+<!-- TODO: hardcoded number of px above to give it defined height and force resizes -->
+<div class="h-[calc(100vh-218px)]">
+  <ResultGraph filteredStore={filteredStore}/>
+</div>
+
+<!--
 <Tabs contentClass='bg-white mt-0 shadow-lg sm:rounded-lg h-[calc(90vh-200px)]'>
     <TabItem open title="Genome Browser">
         <Genome currentRow={currentRow} filteredStore={filteredStore}/>
@@ -54,3 +60,4 @@
       </p>
     </TabItem>
   </Tabs>
+-->

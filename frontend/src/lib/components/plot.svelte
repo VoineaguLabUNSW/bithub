@@ -15,6 +15,7 @@
     let toggleOn = writable()
     let hoverOn = writable();
 
+    let firstRender = true;
     $: {
         if($plotlyArgs && $plotContainer) {
             let modeBarButtons = [[ "autoScale2d", "pan2d",
@@ -56,12 +57,14 @@
                 }
             );
 
-            toggleOn.set(false)
-            hoverOn.set(true)
+            if(firstRender) {
+                toggleOn.set(false)
+                hoverOn.set(true)
+                firstRender = false
+            }
         }
     }
 
-    let ro = undefined;
     plotContainer.subscribe((pc) => {
         if(!pc) return
         pc.onmouseleave = () => isHovering = false;
@@ -72,7 +75,6 @@
             if(!isHovering && (positionX - 100) > thresholdX) isHovering = true;
             else if(isHovering && (positionX < thresholdX)) isHovering = false;
         }
-        ro = new ResizeObserver(debounce((_) => Plotly.Plots.resize(pc.id), 100)).observe(pc)
     });
 
     $: document.querySelector('[data-attr="sidebar_hover"]')?.classList.toggle('active', $hoverOn)
@@ -104,7 +106,7 @@
     }
 </style>
 
-<div id='plot-container' class="relative h-[calc(75vh-200px)] overflow-x-hidden" bind:this={$plotContainer}>
+<div id='plot-container' class="relative h-full w-full overflow-x-hidden" bind:this={$plotContainer}>
     <Drawer placement="right" activateClickOutside={false} backdrop={false} transitionType="fly" transitionParams={TRANSITION_PARAMS} hidden={!($toggleOn || ($hoverOn && isHovering))} id="sidebar1" class='absolute bg-gray-50/90' style='width:{CONTROLS_WIDTH}px'>
         <slot name='controls'></slot>
     </Drawer>

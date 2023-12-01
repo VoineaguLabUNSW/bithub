@@ -6,7 +6,7 @@
 
     let browserContainer;
     $: {
-        if($filteredStore && $currentRow !== undefined) {
+        if(browserContainer && $filteredStore && $currentRow !== undefined) {
             let [chr, start, end] = [3, 4, 5].map(col_i =>  $filteredStore.columns[col_i][$currentRow]);
             igv.createBrowser(browserContainer, {genome: 'hg38', locus: 'BRCA1'});
         }

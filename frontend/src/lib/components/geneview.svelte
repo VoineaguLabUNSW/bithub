@@ -1,5 +1,6 @@
 <script>
-    import ResultGraph from '../components/resultgraph.svelte';
+    import MetadataGraph from '../components/metadatagraph.svelte';
+    import ResultsGraph from '../components/resultgraph.svelte';
     import Genome from '../components/genome.svelte';
     import {Tabs, TabItem } from 'flowbite-svelte';
 
@@ -30,7 +31,7 @@
 <hr>
 
 <Tabs contentClass='bg-white mt-0 shadow-lg sm:rounded-lg h-[calc(100vh-270px)]'>
-    <TabItem open title="Genome Browser">
+    <TabItem title="Genome Browser">
         <Genome currentRow={currentRow} filteredStore={filteredStore}/>
     </TabItem>
     <TabItem title="Transcripts">
@@ -42,14 +43,13 @@
     <TabItem title="Expression Across Datasets">
         <!-- TODO: hardcoded number of px above to give it defined height and force resizes -->
         <div class="h-[calc(100vh-270px)]">
-            <ResultGraph filteredStore={filteredStore}/>
+            <ResultsGraph filteredStore={filteredStore}/>
         </div>
     </TabItem>
-    <TabItem title="Bulk Datasets">
-        <p class="text-sm text-gray-500 dark:text-gray-400">
-            <b>Dashboard:</b>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-        </p>
+    <TabItem open title="Bulk Datasets">
+        <div class="h-[calc(100vh-270px)]">
+            <MetadataGraph filteredStore={filteredStore}/>
+        </div>
     </TabItem>
     <TabItem title = "Single Cell Datasets ">
         <p class="text-sm text-gray-500 dark:text-gray-400">

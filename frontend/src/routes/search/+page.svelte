@@ -4,11 +4,13 @@
     import ResultGraph from '../../lib/components/resultgraph.svelte';
     import GeneView from '../../lib/components/geneview.svelte';
     import { createParam, createIntParam, createListParam } from '../../lib/stores/param';
-    import { createCombinedStore, createFilteredStore } from '../../lib/stores/results';
+    import { createCombinedResultsStore, createFilteredResultsStore, createSelectedResultsStore } from '../../lib/stores/results';
     import { getContext } from "svelte";
     import { derived, writable } from 'svelte/store';
     import { Button, Tabs, TabItem, Search, Breadcrumb, BreadcrumbItem, Modal } from 'flowbite-svelte';
     import ProgressHeader from '../../lib/components/progress.svelte';
+
+    const { row, data } = getContext('core');
 
     const customDatasets = writable([]);//['Custom dataset 1', 'Custom dataset 2']
 
@@ -20,40 +22,27 @@
     paramSearch.subscribe(v => currentSearch.set(v));
 
     let openModal = writable(undefined);
-    let currentRow = writable(undefined);
+    let currentRow = row;
     currentRow.subscribe(v => v !== undefined && openModal.set(true));
     openModal.subscribe(v => !v && currentRow.set(undefined));
 
-    const {row, data, getMatrixStore} = getContext('core');
-    const combinedStore = createCombinedStore(data, customDatasets);
+    const combinedStore = createCombinedResultsStore(data, customDatasets);
+    const selectedStore = createSelectedResultsStore(combinedStore, row)
 
     let currentVisibleCombined = ({
         set: paramVisible.set,
         subscribe: derived([paramVisible, combinedStore], ([$v, $c]) => $v?.length ? $v : $c?.headingsDefaultVisible || [], []).subscribe
     })
 
-    const filteredStore = createFilteredStore(combinedStore, currentSearch, currentVisibleCombined);
-
-    let dataset = 'BrainSeq';
-    let matrix = 'RPKM';
-    let unsub = undefined;
-    let expression = undefined;
+    const filteredStore = createFilteredResultsStore(combinedStore, currentSearch, currentVisibleCombined);
+    
+    let sub;
     $: {
-        if($data?.value) {
-            unsub = getMatrixStore(dataset, matrix).subscribe((data) => {
-                if(unsub) unsub();
-                expression = data;
-                console.log(data);
-            })
-
-            getMatrixStore('BrainSpan', 'RPKM').subscribe((data) => {
-               console.log(data);
-            })
-            console.log('subscribing');
-            
-            row.set(20);
-        }
+        sub = $data?.rowStreams['BrainSeq:RPKM'].current.subscribe(rowData => {
+            console.log(rowData)
+        })
     }
+    
 </script>
 
 <ProgressHeader/>
@@ -95,5 +84,5 @@
 </div>
 
 <Modal bind:open={$openModal} size='xl' outsideclose={true}>
-    <GeneView filteredStore={filteredStore} currentRow={currentRow}></GeneView>
+    <GeneView filteredStore={selectedStore} currentRow={currentRow}></GeneView>
 </Modal>

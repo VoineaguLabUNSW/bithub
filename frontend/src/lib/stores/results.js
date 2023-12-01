@@ -1,4 +1,4 @@
-import { derived } from "@square/svelte-store";
+import { derived } from "svelte/store";
 
 function findMatchesSorted(arrays, searches) {
     searches.sort();
@@ -21,7 +21,7 @@ function findMatchesSorted(arrays, searches) {
     return ret;
 }
 
-function createCombinedStore(data, customDatasets) {
+function createCombinedResultsStore(data, customDatasets) {
     return derived([data, customDatasets], ([$data, $customDatasets], set) => {
         if($data?.value) {
             const headings = $data.value.get('data').attrs.order;
@@ -31,12 +31,12 @@ function createCombinedStore(data, customDatasets) {
             const columnStringSizes = headings.map(k => $data.value.get('data/' + k).dtype).map(dt => dt.startsWith('S') ? parseInt(dt.slice(1)) : undefined);
             const headingsDefaultVisible = $data.value.get('data').attrs.defaultVisible.map(i => headings[i])
 
-            for(let h of $customDatasets) {
+            for(let cd of $customDatasets) {
                 const insertPoint = isDs.indexOf(1)
-                headings.splice(insertPoint, 0, h)
-                original.splice(insertPoint, 0, new Array(original[0].length).fill(0))
+                headings.splice(insertPoint, 0, cd.name)
+                original.splice(insertPoint, 0, cd.mapping)
                 isDs.splice(insertPoint, 0, 1)
-                indices.splice(insertPoint, 0, [3.8])
+                indices.splice(insertPoint, 0, cd.zscores)
                 columnStringSizes.splice(insertPoint, 0, undefined)
             }
 
@@ -52,27 +52,39 @@ function createCombinedStore(data, customDatasets) {
     });
 }
 
-function createFilteredStore(columnStore, currentSearch, currentVisibleCombined) {
+function createFilteredResultsStore(columnStore, currentSearch, currentVisibleCombined) {
     return derived([columnStore, currentSearch, currentVisibleCombined], ([$columnStore, $currentSearch, $currentVisibleCombined], set) => {
         if ($columnStore) {
             const columns = $columnStore.columns;
-            let filtered = Array.from(Array(columns[0].length).keys());
+            let results = Array.from(Array(columns[0].length).keys());
 
+            let datasetIndicesResults = $columnStore.datasetIndices
             if($currentSearch) {
                 const searchTerms = $currentSearch.split(',').map(st => st.trim().toLowerCase())
                 searchTerms.sort()
 
                 if(searchTerms.length == 1) {
-                    const searchable = $columnStore.columns.map((_, col_i) => col_i).filter(col_i => $columnStore.columnStringSizes[col_i]).filter(col_i => $currentVisibleCombined.includes($columnStore.headings[col_i]))
-                    filtered = filtered.filter(row_i => searchable.some(col_i => $columnStore.columns[col_i][row_i].toLowerCase().includes(searchTerms[0])))
+                    const searchable = columns.map((_, col_i) => col_i).filter(col_i => $columnStore.columnStringSizes[col_i]).filter(col_i => $currentVisibleCombined.includes($columnStore.headings[col_i]))
+                    results = results.filter(row_i => searchable.some(col_i => $columnStore.columns[col_i][row_i].toLowerCase().includes(searchTerms[0])))
                 } else {
                     const exactSearchable = [0, 1].filter(col_i => $currentVisibleCombined.includes($columnStore.headings[col_i])).map(col_i => columns[col_i])
-                    filtered = findMatchesSorted(exactSearchable, searchTerms);
+                    results = findMatchesSorted(exactSearchable, searchTerms);
                 }
+                datasetIndicesResults = datasetIndicesResults.filter(col_i => results.some(row_i => $columnStore.original[col_i][row_i] >= 0))
             }
-            set({...$columnStore, results: filtered})
+            set({...$columnStore, results, datasetIndicesResults})
         }
     })
 }
 
-export { createCombinedStore, createFilteredStore };
+function createSelectedResultsStore(columnStore, row) {
+    return derived([columnStore, row], ([$columnStore, $row], set) => {
+        if($columnStore) {
+            const results = $row !== undefined ? [$row] : [];
+            const datasetIndicesResults = $columnStore.datasetIndices.filter(col_i => $columnStore.original[col_i][$row] >= 0)
+            set({...$columnStore, results, datasetIndicesResults})
+        }
+    })
+}
+
+export { createCombinedResultsStore, createFilteredResultsStore, createSelectedResultsStore};

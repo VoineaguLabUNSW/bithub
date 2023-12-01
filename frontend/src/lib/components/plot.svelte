@@ -65,7 +65,8 @@
                     displaylogo: false, 
                     displayModeBar: true,
                     modeBarButtons: modeBarButtons,
-                    ...($plotlyArgs.config || {})
+                    ...($plotlyArgs.config || {}),
+                    staticPlot: false // Static plots break modeBarButton visible states
                 }
             );
 
@@ -120,7 +121,7 @@
 </style>
 
 <div id='plot-container' class="relative h-full w-full overflow-x-hidden" bind:this={$plotContainer}>
-    <Drawer placement="right" activateClickOutside={false} backdrop={false} transitionType="fly" transitionParams={TRANSITION_PARAMS} hidden={!($toggleOn || ($hoverOn && isHovering))} id="sidebar1" class='absolute bg-gray-50 rounded-md outline outline-[0.1px] outline-gray-300 m-2' style='width:{CONTROLS_WIDTH}px'>
+    <Drawer placement="right" activateClickOutside={false} backdrop={false} transitionType="fly" transitionParams={TRANSITION_PARAMS} hidden={!($toggleOn || ($hoverOn && isHovering))} id="sidebar1" class='absolute bg-gray-50 rounded-md outline outline-[0.1px] outline-gray-300 m-2 shadow-md backdrop-blur-md bg-white/80' style='width:{CONTROLS_WIDTH}px'>
         <slot name='controls'></slot>
     </Drawer>
 </div>

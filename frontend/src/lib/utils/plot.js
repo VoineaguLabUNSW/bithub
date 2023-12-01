@@ -39,4 +39,8 @@ function getPlotEmpty(message) {
     }
 }
 
+function getPlotViolin(heading, subHeading, data, xName, yName, orderX, groupLabelsX, groupSizesX, orderZ) {
+    
+}
+
 export { getPlotEmpty }

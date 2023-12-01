@@ -32,11 +32,6 @@ function createMetadataStore(core) {
                 },
             }
         }
-        for(const group of $data.value.get('panels').keys) {
-            for(const h of $data.value.get('panels/' + group).keys) {
-                metadataColumnReaders[h].group = group
-            }
-        }
         return {readers: metadataColumnReaders}
     });
 }

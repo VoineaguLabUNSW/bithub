@@ -47,7 +47,12 @@ function createCombinedResultsStore(data, customDatasets) {
             
             const columns = [...generalIndices.map(i => original[i]), ...datasetIndices.concat(databaseIndices).map(col_i => original[col_i].map(v => v === -1 ? Number.NEGATIVE_INFINITY : indices[col_i][v]))]
             const headingGroups = new Map([['', generalIndices.map(i => headings[i])], ['Datasets', datasetIndices.map(i => headings[i])], ['Databases', databaseIndices.map(i => headings[i])]])
-            set({headings, headingsDefaultVisible, original, columns, generalIndices, datasetIndices, databaseIndices, columnStringSizes, headingGroups})
+            
+            const groupIndices = {}
+            for(const group of $data.value.get('panels').keys) {
+                groupIndices[group] = datasetIndices.filter(col_i => $data.value.get('panels/' + group).keys.includes(headings[col_i]))
+            }
+            set({headings, headingsDefaultVisible, original, columns, generalIndices, datasetIndices, databaseIndices, groupIndices, columnStringSizes, headingGroups})
         }
     });
 }
@@ -87,4 +92,12 @@ function createSelectedResultsStore(columnStore, row) {
     })
 }
 
-export { createCombinedResultsStore, createFilteredResultsStore, createSelectedResultsStore};
+function getFilteredStoreGroup(filteredStore, group) {
+    return derived(filteredStore, ($filteredStore, set) => {
+        const groupIndices = $filteredStore.groupIndices[group]
+        const datasetIndicesResults = $filteredStore.datasetIndicesResults.filter(col_i => groupIndices.includes(col_i))
+        if($filteredStore) set({...$filteredStore, datasetIndicesResults})
+    })
+}
+
+export { createCombinedResultsStore, createFilteredResultsStore, createSelectedResultsStore, getFilteredStoreGroup};

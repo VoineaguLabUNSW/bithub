@@ -64,10 +64,9 @@
         } else {
             const [ds, ms] = $metadataSelect.id.split('|', 2)
             if(ds !== $expressionDataObj.$datasetsSelect.id) return
-            console.log($metadataSelect.id)
             const reader = $expressionDataObj.$metadataStore.readers[ds];
             const [x, y] = [reader.getColumn(ms).values, $expressionDataObj.expression.data];
-            console.log(x, y)
+            
             set({
                 plotData: [
                     {
@@ -86,15 +85,14 @@
     <span slot="controls">
         <div class="flex justify-between">
             <h5 id="drawer-label" class="inline-flex items-center mb-4 text-base font-semibold text-gray-500 dark:text-gray-400">
-                <i class='fas fa-gears m-2'/>Datasets
+                <i class='fas fa-gears m-2'/>Metadata
             </h5>
         </div>
-        <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">
-            Select from different datasets to compare z-scores for any number of search results.
-        </p>
         <div class='w-48 flex flex-col items-stretch gap-3'>
             <Dropdown title='Dataset' selected={datasetsSelect} groups={$datasetOptsObj.datasetsOpts}/>
-            <Dropdown title='Matrix' selected={matrixSelect} groups={$matrixOptsObj.matrixOpts}/>
+            {#if $matrixOptsObj?.matrixOpts.get('').length > 1}
+                <Dropdown title='Matrix' selected={matrixSelect} groups={$matrixOptsObj.matrixOpts}/>
+            {/if}
             <Dropdown title='Metadata' selected={metadataSelect} groups={$matrixOptsObj.metadataOpts}/>
         </div>
     </span>

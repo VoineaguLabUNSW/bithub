@@ -3,7 +3,7 @@
     import MetadataGraph from '../components/metadatagraph.svelte';
     import ResultsGraph from '../components/resultgraph.svelte';
     import Genome from '../components/genome.svelte';
-    import {Tabs, TabItem } from 'flowbite-svelte';
+    import {Tabs, TabItem, Popover} from 'flowbite-svelte';
 
     export let currentRow;
     export let filteredStore;
@@ -44,13 +44,13 @@
             Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
         </p>
     </TabItem>
-    <TabItem title="Expression Across Datasets">
+    <TabItem open title="Expression Across Datasets">
         <!-- TODO: hardcoded number of px above to give it defined height and force resizes -->
         <div class="h-[calc(100vh-270px)]">
             <ResultsGraph filteredStore={filteredStore}/>
         </div>
     </TabItem>
-    <TabItem open title="Gene Expression">
+    <TabItem title="Gene Expression" disabled={$filteredBulk.datasetIndicesResults.length === 0}>
         <div class="h-[calc(100vh-270px)]">
             <MetadataGraph filteredStore={filteredBulk}/>
         </div>
@@ -61,9 +61,25 @@
             Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
         </p>
     </TabItem>
-    <TabItem title = "Single Cell Datasets ">
+    <TabItem disabled={$filteredSingleCell.datasetIndicesResults.length === 0}>
+        <div slot='title'>
+            <span>Single Cell Datasets</span>
+            <button id="b3">
+                <i class='fas fa-circle-question'/>
+                <span class="sr-only">Show information</span>
+            </button>
+        </div>
+
         <div class="h-[calc(100vh-270px)]">
             <MetadataGraph filteredStore={filteredSingleCell}/>
         </div>
     </TabItem>
   </Tabs>
+  
+  <Popover triggeredBy="#b3" class="w-[700px] text-sm font-light text-gray-500 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400" placement="bottom-start">
+    <div class="p-3 space-y-2">
+      <h3 class="font-semibold text-gray-900 dark:text-white">Single Cell Dataset Details</h3>
+      <p>This section allows the detailed exploration of the aggregated single-nucleus datasets on BITHub at the gene from each individual dataset. The CPM expression values can be plotted against several metadata attributes, and users are also able to view cell-type specific expression.</p>
+      <p>A box plot is generated for categorial metadata and a scatterplot is generated for numerical-based metadata. In the case of numerical variables, a second categorical variable can be selected to color the data points. Users can highlight and select a specific portion of the plot to zoom in, and select or deselect specific metadata annotations by clicking on the legend.</p>
+    </div>
+</Popover>

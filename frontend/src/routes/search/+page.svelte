@@ -5,9 +5,10 @@
     import GeneView from '../../lib/components/geneview.svelte';
     import { createParam, createIntParam, createListParam } from '../../lib/stores/param';
     import { createCombinedResultsStore, createFilteredResultsStore, createSelectedResultsStore } from '../../lib/stores/results';
-    import { getContext } from "svelte";
+    import { getContext, onDestroy } from "svelte";
     import { derived, writable } from 'svelte/store';
     import { Button, Tabs, TabItem, Search, Breadcrumb, BreadcrumbItem, Modal } from 'flowbite-svelte';
+    import { disableBodyScroll, enableBodyScroll, clearAllBodyScrollLocks } from 'body-scroll-lock';
     import ProgressHeader from '../../lib/components/progress.svelte';
 
     const { row, data } = getContext('core');
@@ -42,6 +43,10 @@
             console.log(rowData)
         })
     }
+
+    let modalElement;
+    openModal.subscribe(v => v ? disableBodyScroll(modalElement) : enableBodyScroll(modalElement))
+    onDestroy(clearAllBodyScrollLocks);
     
 </script>
 
@@ -83,6 +88,6 @@
     </Tabs>
 </div>
 
-<Modal bind:open={$openModal} size='xl' outsideclose={true}>
+<Modal bind:this={modalElement} bind:open={$openModal} size='xl' outsideclose={true} class='overscroll-contain'>
     <GeneView filteredStore={selectedStore} currentRow={currentRow}></GeneView>
 </Modal>

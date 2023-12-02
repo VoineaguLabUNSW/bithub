@@ -1,5 +1,6 @@
 import tempfile, os, csv, gzip, zlib, contextlib, itertools, re, array, io, shutil, datetime, json, struct, hashlib, math, collections.abc
 import oyaml, h5py, tqdm, boto3, numpy as np
+import data_pb2
 
 from typing import Callable, Iterable, Tuple, Dict, List
 from unittest.mock import patch
@@ -140,45 +141,22 @@ def context_closer():
             c.__exit__(None, None, None)
 
 @contextlib.contextmanager
-def write_compressed_ranges(path: str, dtype: str='f'):
+def write_compressed_ranges(path: str):
     '''Write independently retrievable gzipped float ranges to a binary file'''
     with open(path, 'wb') as f:
-        def write_row(values: List):
+        def write_row(binary):
             start = f.tell()
-            non_nulls = sum(1 for v in values if v)
-            use_sparse = False #non_nulls < len(values)/2 # TODO: DOES NOT save space on server but could help client since js arrays are sparse (undefined plots to 0?)
-            row_bytes = struct.pack('B', use_sparse)
-            if use_sparse:
-                row_bytes = row_bytes + struct.pack(f'<' + f'i{dtype}'*non_nulls, *(x for pair in enumerate(values) if pair[1] for x in pair))
-            else:
-                row_bytes = row_bytes + struct.pack(f'<{len(values)}{dtype}', *values)
-            f.write(zlib.compress(row_bytes, level=-1))
+            f.write(zlib.compress(binary, level=-1))
             return start, f.tell()
         yield write_row, f.tell
 
 @contextlib.contextmanager
-def read_compressed_ranges(path: str, dtype: str='f'):
+def read_compressed_ranges(path: str):
     '''Read independently retrievable gzipped float ranges from a binary file'''
     with open_with_progress(path, 'rb') as f:
         def read_row(start, end, row_length):
             f.seek(start)
-            values = None
-            vals = f.read(end - start)
-            row_bytes = zlib.decompress(vals)
-            used_sparse = row_bytes[0]
-            if used_sparse:
-                offset = 1
-                incriment = (struct.calcsize('i') + struct.calcsize(dtype)) // struct.calcsize('B')
-                values = [0] * row_length
-                while offset < len(row_bytes):
-                    i, v = struct.unpack(f'i{dtype}', row_bytes[offset:offset+incriment])
-                    values[i] = v
-                    offset += incriment
-                return values
-            else:
-                count = len(row_bytes) // struct.calcsize(dtype)
-                values = struct.unpack(f'<{count}f', row_bytes[1:])
-            return values
+            return zlib.decompress(f.read(end - start))
         yield read_row
 
 @contextlib.contextmanager
@@ -569,28 +547,18 @@ def test_compressed_ranges():
     with tempfile.TemporaryDirectory() as tmpdirname:
         path = os.path.join(tmpdirname, 'binary.bin')
         ranges = []
-        data = range(10000)
-        with write_compressed_ranges(path, dtype='f') as writer_utils:
+        data = list(range(10000))
+        with write_compressed_ranges(path) as writer_utils:
             writer, teller = writer_utils
             for _ in range(20):
-                ranges.append(writer(data))
-        with read_compressed_ranges(path, dtype='f') as reader:
+                row = data_pb2.RowData()
+                row.values.extend(data)
+                ranges.append(writer(row.SerializeToString()))
+        with read_compressed_ranges(path) as reader:
             for r in ranges:
-                for i, v in enumerate(reader(*r, 10000)):
-                    assert v == data[i]
-
-def test_compressed_ranges_sparse():
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        path = os.path.join(tmpdirname, 'binary.bin')
-        ranges = []
-        data = [0.0 if i%30 else 1.0 for i in range(10000)]
-        with write_compressed_ranges(path, dtype='f') as writer_utils:
-            writer, teller = writer_utils
-            for _ in range(20):
-                ranges.append(writer(data))
-        with read_compressed_ranges(path, dtype='f') as reader:
-            for r in ranges:
-                for i, v in enumerate(reader(*r, 10000)):
+                row = data_pb2.RowData()
+                row.ParseFromString(reader(*r, 10000))
+                for i, v in enumerate(row.values):
                     assert v == data[i]
 
 if __name__ == '__main__':
@@ -600,7 +568,6 @@ if __name__ == '__main__':
         test_reorder()
         test_reorder_missing()
         test_compressed_ranges()
-        test_compressed_ranges_sparse()
 
         total_written = 0
         
@@ -701,7 +668,7 @@ if __name__ == '__main__':
                             order_entry = next((o for o in orders if o['variable'] == transcript.get('variable', None)), None)
                             if order_entry: categories = [k for k in order_entry['order'] if k in categories]
                             else: categories = categories[1:]
-                            transcript['_internal'] = ([], [], [0], [0], [], [], categories)
+                            transcript['_internal'] = ([], categories)
 
                     # Loop over all genes
                     VARPART_INDICES, MATRIX_INDICES, TRANSCRIPT_INDICES = (1, 0), (1, 1, 1), (1, 2, 1)
@@ -719,7 +686,7 @@ if __name__ == '__main__':
                         total_written += 1
                         for dataset, varpart, matrices, transcripts in zip(inputObj['datasets'], varparts_per_dataset, m_groups_per_dataset, t_groups_per_dataset):
                             # Maintain sparse lookup indices for each dataset
-                            indices, curent_index, varpart_rows, varpart_headers = dataset['_internal']
+                            indices, curent_index, varpart_ranges, varpart_headers = dataset['_internal']
                             indices.append(curent_index[0] if matrices else -1)
                             
                             # Drop anything that doesn't appear in all matrices so we don't need to manage a second index
@@ -727,8 +694,9 @@ if __name__ == '__main__':
 
                             curent_index[0] += 1
                             if varpart_headers:
-                                #if not varpart: print(f'missing varpart for gene {gene} in dataset {dataset["id"]}')
-                                varpart_rows.append([float(v) for v in varpart[1:]] if varpart else [0.0] * len(varpart_headers))
+                                row = data_pb2.RowData()
+                                row.values.extend([float(v) for v in varpart[1:]] if varpart else [0.0] * len(varpart_headers))
+                                varpart_ranges.append(writer(row.SerializeToString()))
 
                             for m in matrices:
                                 if m is None: continue
@@ -737,7 +705,10 @@ if __name__ == '__main__':
 
                                 # Write re-orderd matrix row and save range (input, buffer, steps)
                                 fixed = apply_reorder_indices([float(v) for v in values], reorder_buffer, reorder_indices)
-                                ranges.append(writer(fixed))
+                                
+                                row = data_pb2.RowData()
+                                row.values.extend(fixed)
+                                ranges.append(writer(row.SerializeToString()))
 
                                 # Get logs for zscore calc
                                 _logs = [math.log2(abs(v) + 0.01) for v in fixed]
@@ -749,42 +720,24 @@ if __name__ == '__main__':
                                     for i in range(len(filter_indices)):
                                         logs_filter[i].append(sum((_logs[j] for j in filter_indices[i])) / len(filter_indices[i]))
                                 
-                            '''
-                            Transcript format:
-                            1. flattened string list
-                            2. flattened value list
-                            3. Ranges (that we can multiply by row length for 2.)
-
-                            e.g.
-                            1. ENT1, ENT2, ENT3, ENT4
-                            2. 0.12, 0.23, 0.44, 0.33, 0.12, 0.23, 0.44, 0.33 
-                            3. 0, 2, -1, 4
-
-                            So gene in ith index is 2-4 (and 2*2-4*2):
-                                ENT3, ENT4
-                                0.12, 0.23, 0.44, 0.33 
-                            '''
                             if 'transcript_matrices' in dataset:
                                 for transcript_matrix, accumulated in zip(dataset['transcript_matrices'], transcripts or dataset['_null_transcripts']):
-                                    indices, lengths, current_index, curr_length, data, names, categories = transcript_matrix['_internal']
-                
-                                    if accumulated is None: 
-                                        indices.append(-1)
-                                        continue
+                                    ranges, categories = transcript_matrix['_internal']
+                                    table = data_pb2.TableData()
+                                    if accumulated is not None: 
+                                        _, t_list = accumulated
+                                        for t in t_list:
+                                            _, transcript_id, *vals = t
+                                            table.float_values.extend([float(v) for v in vals])
+                                            table.string_values.append(str(transcript_to_transcript[transcript_id]))
+                                    ranges.append(writer(table.SerializeToString()))
 
-                                    _, t_list = accumulated
-                                    indices.append(current_index[0])
-                                    current_index[0] += 1
-                                    curr_length[0] += len(t_list)
-                                    lengths.append(curr_length[0])
-
-                                    for t in t_list:
-                                        _, transcript_id, *vals = t
-                                        data.append([float(v) for v in vals])
-                                        names.append(transcript_to_transcript[transcript_id])
                 all_ranges.append((last_range_end, teller()))
 
             print(f'\nProcessed {total_written} entries')
+
+            # Point to which datasets need to be pulled
+            remote_range_datasets = []
 
             # Finally, write main table and matrix compressed ranges
             data_root = root.create_group('data')
@@ -860,10 +813,10 @@ if __name__ == '__main__':
                     ranges, _, _, logs, logs_filter_enum = matrix['_internal']
         
                     curr_matrix_meta_root = matrix_meta_root.create_group(name)
-                    curr_matrix_meta_root.create_dataset('start', data=[c[0] for c in ranges] + [ranges[-1][1]], compression='gzip', compression_opts=9)
-                    curr_matrix_meta_root.create_dataset('end', data=[c[1] for c in ranges] + [ranges[-1][1]], compression='gzip', compression_opts=9)
+                    curr_matrix_meta_root.create_dataset('expression', data=ranges, compression='gzip', compression_opts=9)
                     curr_matrix_meta_root.attrs.create('path', expression_url)
                     curr_matrix_meta_root.attrs.create('shape', shape)
+                    remote_range_datasets.append([curr_matrix_meta_root.name + '/expression', '/data/' + d['id'], 'row'])
 
                     all_logs.setdefault('scaled', []).append(logs)
                     if logs_filter_enum:
@@ -883,22 +836,24 @@ if __name__ == '__main__':
                     transcript_meta_root = meta_root.create_group('transcripts')
                     transcript_meta_root.attrs.create('order', [t['name'] for t in d['transcript_matrices']])
                     for transcript_matrix in d.get('transcript_matrices', []):
-                        indices, lengths, current_index, curr_length, data, names, categories = transcript_matrix['_internal']
-                        
+                        ranges, categories = transcript_matrix['_internal']
                         curr_transcript_meta_root = transcript_meta_root.create_group(transcript_matrix['name'])
-                        curr_transcript_meta_root.create_dataset('index', data=indices, compression='gzip', compression_opts=9)
-                        curr_transcript_meta_root.create_dataset('length', data=lengths, compression='gzip', compression_opts=9)
-                        curr_transcript_meta_root.create_dataset('expression', data=data, compression='gzip', compression_opts=9)
-                        curr_transcript_meta_root.create_dataset('names', data=names, compression='gzip', compression_opts=9)
+                        curr_transcript_meta_root.create_dataset('transcripts', data=ranges, compression='gzip', compression_opts=9)
                         curr_transcript_meta_root.attrs.create('categories', categories)
 
-                indices, _, varpart_rows, varpart_headers = d['_internal']
+                        remote_range_datasets.append([curr_transcript_meta_root.name + '/transcripts', '/data/' + d['id'], 'table'])
+
+                indices, _, varpart_ranges, varpart_headers = d['_internal']
                 reverse_indices = [i for i, x in enumerate(indices) if x != -1]
                 meta_root.create_dataset('index', data=reverse_indices, compression='gzip', compression_opts=9)
                 
                 if varpart_headers:
-                    var_ds = meta_root.create_dataset('variancePartition', data=np.array(varpart_rows, dtype="<f4"), compression="gzip", compression_opts=9)
+                    var_ds = meta_root.create_dataset('variancePartition', data=varpart_ranges, compression="gzip", compression_opts=9)
                     var_ds.attrs.create("heading", varpart_headers)
+
+                    remote_range_datasets.append([var_ds.name, '/data/' + d['id'], 'row'])
+
+            root.attrs.create('remote', remote_range_datasets)
 
         # Upload remaining files to release
         asset_paths = [os.path.join(OUTPUT_FOLDER, 'out.hdf5')]

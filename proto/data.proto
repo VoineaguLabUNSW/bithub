@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+message RowData {
+  repeated float values = 1;
+}
+
+message TableData {
+  repeated float float_values = 1;
+  repeated string string_values = 2;
+}

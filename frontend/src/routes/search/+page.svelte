@@ -36,16 +36,9 @@
     })
 
     const filteredStore = createFilteredResultsStore(combinedStore, currentSearch, currentVisibleCombined);
-    
-    let sub;
-    $: {
-        sub = $data?.rowStreams['BrainSeq:RPKM'].current.subscribe(rowData => {
-            console.log(rowData)
-        })
-    }
 
     let modalElement;
-    openModal.subscribe(v => v ? disableBodyScroll(modalElement) : enableBodyScroll(modalElement))
+    openModal.subscribe(v => modalElement && (v ? disableBodyScroll(modalElement) : enableBodyScroll(modalElement)))
     onDestroy(clearAllBodyScrollLocks);
     
 </script>

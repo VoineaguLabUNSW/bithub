@@ -1,6 +1,7 @@
 import * as hdf5 from 'jsfive';
-import * as fflate from 'fflate';
+import * as pako from 'pako';
 import { asyncDerived, asyncReadable, writable, derived, get } from "@square/svelte-store";
+import { RowData, TableData} from '../../gen/data_pb'
 
 /**
  * Get HDF5 async
@@ -21,24 +22,6 @@ async function getHDF5(url, setProgress) {
         setProgress(Math.floor(100 * (at / length)));
     }
     return new hdf5.File(buffer.buffer, '');
-}
-
-function bufferToRow(buffer, knownLen) {
-    const inflated = fflate.unzlibSync(buffer);
-    const dataView = new DataView(inflated.buffer);
-    const is_sparse = dataView.getUint8(0, true)
-    const array = []
-    if(is_sparse) {
-        for(let i=1; i<inflated.byteLength; i+=(4 + 4)) {
-            let index = dataView.getInt32(i, true)
-            array[index] = dataView.getFloat32(i+4, true);
-        }
-    } else {
-        for(let i=0; i<knownLen; ++i) {
-            array[i] = dataView.getFloat32(1 + i*4, true);
-        }
-    }
-    return array
 }
 
 async function getJSON(url) {
@@ -68,17 +51,13 @@ function createCore(url) {
         async ($metadata) => {
             try {
                 const rowStreams = {}
-                const obj = await getHDF5(/*$metadata.value.data_url*/'https://d33ldq8s2ek4w8.cloudfront.net/bithub/out.hdf5', progress.set);
-                const md = obj.get('metadata')
-                for(let d of md.keys.filter(d => md.get(d).keys.includes('matrices'))) {
-                    for(let m of md.get(d + '/matrices').keys) {
-                        const id = d + ':' + m;
-                        const length = obj.get(`metadata/${d}/matrices/${m}`).attrs.shape[1]
-                        rowStreams[id] = {length, current: writable(undefined)}
-                    }
-                }
+                const obj = await getHDF5(/*$metadata.value.data_url'https://d33ldq8s2ek4w8.cloudfront.net/bithub/out.hdf5'*/'http://localhost:5501/out.hdf5', progress.set);
+                for(let i=0; i<obj.attrs.remote.length; i+=3) {
+                    rowStreams[obj.attrs.remote[i+0]] = {indexPath: obj.attrs.remote[i+1], type: obj.attrs.remote[i+2], current: writable(undefined)}
+                }                
                 return {value: obj, rowStreams: rowStreams};
             } catch (e) {
+                console.log(e)
                 return {error: e};
             }
         },
@@ -91,28 +70,28 @@ function createCore(url) {
 
         // Determine requests
         const requests = []
-        for(const [id, rowStream] of Object.entries($data.rowStreams)) {
-            
-            const [d, m] = id.split(':');
-            const index = $data.value.get(`data/${d}`).value;
+        for(const [rangesPath, rowStream] of Object.entries($data.rowStreams)) {
+            const index = $data.value.get(rowStream.indexPath).value;
             const indexedRow = index[$row];
             if(indexedRow >= 0) {
                 rowStream.current.set({loading: true})
                 requests.push({
-                    id,
-                    length: rowStream.length,
-                    byteStart: $data.value.get(`metadata/${d}/matrices/${m}/start`).value[indexedRow],
-                    byteEnd: $data.value.get(`metadata/${d}/matrices/${m}/end`).value[indexedRow]
+                    rowStream,
+                    byteStart: $data.value.get(rangesPath).value[indexedRow*2],
+                    byteEnd: $data.value.get(rangesPath).value[indexedRow*2+1],
+                    arr:  $data.value.get(rangesPath).value,
+                    ind: indexedRow
                 })
             } else {
                 rowStream.current.set({emtpy: true})
             }
         }
+        console.log(requests)
         requests.sort((a, b) => a.byteStart - b.byteStart)
 
         // Perform single combined request
         const controller = new AbortController();
-        const response = await fetch('https://d33ldq8s2ek4w8.cloudfront.net/bithub/expression.bin', {
+        const response = await fetch(/*'https://d33ldq8s2ek4w8.cloudfront.net/bithub/expression.bin'*/'http://localhost:5501/expression.bin', {
             signal: controller.signal,
             headers: {'Range': 'bytes=' + `${requests[0].byteStart}-${requests[requests.length-1].byteEnd-1}`},
         });
@@ -138,9 +117,9 @@ function createCore(url) {
                 receivedBytes += value.length
                 while(i<requests.length && ((requests[i].byteEnd-o) <= receivedBytes)) {
                     const part = chunksAll.subarray(requests[i].byteStart-o, requests[i].byteEnd-o)
-                    const rowStream = $data.rowStreams[requests[i].id];
+                    const rowStream = requests[i].rowStream
                     try {
-                        const unpacked = bufferToRow(part, requests[i].length);
+                        let unpacked = (rowStream.type == 'row' ?  RowData : TableData).fromBinary(pako.inflate(part))
                         rowStream.current.set({data: unpacked, row: $row});
                     } catch(e) {
                         console.log(e)

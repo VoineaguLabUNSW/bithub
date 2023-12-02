@@ -50,13 +50,15 @@
     const expressionDataObj = derived([matrixOptsObj, matrixSelect], ([$matrixOptsObj, $matrixSelect], set) => {
         if(!$matrixOptsObj || !$matrixSelect) return;
         const reader = $matrixOptsObj.$metadataStore.readers[$datasetsSelect.id];
-        const expressionSub = reader.getMatrixStore[$datasetsSelect.id + ':' + $matrixSelect.id].current.subscribe(expression => {
-            if(expression) set({...$matrixOptsObj, expression})
+        console.log(reader.getMatrixStore)
+        const expressionSub = reader.getMatrixStore['/metadata/' +  $datasetsSelect.id + '/matrices/' + $matrixSelect.id + '/expression'].current.subscribe(expression => {
+            if(expression) set({...$matrixOptsObj, expression: expression})
         })
         return () => expressionSub()
     })
 
     const plotlyArgs = derived([expressionDataObj, metadataSelect], ([$expressionDataObj, $metadataSelect], set) => {
+        console.log($expressionDataObj.expression)
         if(!$expressionDataObj || !$metadataSelect) {
             return
         } else if (!$expressionDataObj.expression.data) {
@@ -65,7 +67,7 @@
             const [ds, ms] = $metadataSelect.id.split('|', 2)
             if(ds !== $expressionDataObj.$datasetsSelect.id) return
             const reader = $expressionDataObj.$metadataStore.readers[ds];
-            const [x, y] = [reader.getColumn(ms).values, $expressionDataObj.expression.data];
+            const [x, y] = [reader.getColumn(ms).values, $expressionDataObj.expression.data.values];
             
             set({
                 plotData: [

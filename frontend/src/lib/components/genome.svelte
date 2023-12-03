@@ -1,8 +1,9 @@
 <script context="module">
     import igv from '../../../node_modules/igv/dist/igv.esm.js';
+    import { asyncReadable } from '@square/svelte-store';
+
     let browserContainer = document.createElement('div')
-    let browser;
-    igv.createBrowser(browserContainer, {genome: 'hg38'}).then(v => browser=v)
+    let browser =  asyncReadable(undefined, async () => igv.createBrowser(browserContainer, {genome: 'hg38'}))
 </script>
 
 <script>
@@ -12,9 +13,9 @@
     export let filteredStore;
 
     $: {
-        if(browser && $filteredStore && $currentRow !== undefined) {
+        if($browser && $filteredStore && $currentRow !== undefined) {
             let [chr, start, end] = [3, 4, 5].map(col_i =>  $filteredStore.columns[col_i][$currentRow]);
-            browser.search(`chr${chr}:${start}-${end}`)
+            $browser.search(`chr${chr}:${start}-${end}`)
         }
     }
 

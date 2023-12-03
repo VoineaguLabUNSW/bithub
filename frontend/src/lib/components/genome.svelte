@@ -1,16 +1,25 @@
-<script>
+<script context="module">
     import igv from '../../../node_modules/igv/dist/igv.esm.js';
+    let browserContainer = document.createElement('div')
+    let browser;
+    igv.createBrowser(browserContainer, {genome: 'hg38'}).then(v => browser=v)
+</script>
+
+<script>
+    import { onMount } from 'svelte'
 
     export let currentRow;
     export let filteredStore;
 
-    let browserContainer;
     $: {
-        if(browserContainer && $filteredStore && $currentRow !== undefined) {
+        if(browser && $filteredStore && $currentRow !== undefined) {
             let [chr, start, end] = [3, 4, 5].map(col_i =>  $filteredStore.columns[col_i][$currentRow]);
-            igv.createBrowser(browserContainer, {genome: 'hg38', locus: 'BRCA1'});
+            browser.search(`chr${chr}:${start}-${end}`)
         }
     }
+
+    let div;
+    onMount(() => div.append(browserContainer));
 </script>
 
-<div bind:this={browserContainer}></div>
+<div bind:this={div}></div>

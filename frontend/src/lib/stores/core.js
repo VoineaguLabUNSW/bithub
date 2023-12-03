@@ -1,7 +1,7 @@
 import * as hdf5 from 'jsfive';
 import * as pako from 'pako';
 import { asyncDerived, asyncReadable, writable, derived, get } from "@square/svelte-store";
-import { RowData, TableData} from '../../gen/data_pb'
+import * as protobuf from '../../gen/data_pb'
 
 /**
  * Get HDF5 async
@@ -53,7 +53,8 @@ function createCore(url) {
                 const rowStreams = {}
                 const obj = await getHDF5(/*$metadata.value.data_url'https://d33ldq8s2ek4w8.cloudfront.net/bithub/out.hdf5'*/'http://localhost:5501/out.hdf5', progress.set);
                 for(let i=0; i<obj.attrs.remote.length; i+=3) {
-                    rowStreams[obj.attrs.remote[i+0]] = {indexPath: obj.attrs.remote[i+1], type: obj.attrs.remote[i+2], current: writable(undefined)}
+                    console.log(obj.attrs.remote[i+0])
+                    rowStreams[obj.attrs.remote[i+0]] = {attrs: obj.get(obj.attrs.remote[i+0]).attrs, indexPath: obj.attrs.remote[i+1], type: obj.attrs.remote[i+2], current: writable(undefined)}
                 }                
                 return {value: obj, rowStreams: rowStreams};
             } catch (e) {
@@ -79,8 +80,6 @@ function createCore(url) {
                     rowStream,
                     byteStart: $data.value.get(rangesPath).value[indexedRow*2],
                     byteEnd: $data.value.get(rangesPath).value[indexedRow*2+1],
-                    arr:  $data.value.get(rangesPath).value,
-                    ind: indexedRow
                 })
             } else {
                 rowStream.current.set({emtpy: true})
@@ -119,7 +118,7 @@ function createCore(url) {
                     const part = chunksAll.subarray(requests[i].byteStart-o, requests[i].byteEnd-o)
                     const rowStream = requests[i].rowStream
                     try {
-                        let unpacked = (rowStream.type == 'row' ?  RowData : TableData).fromBinary(pako.inflate(part))
+                        let unpacked = protobuf[rowStream.type].fromBinary(pako.inflate(part))
                         rowStream.current.set({data: unpacked, row: $row});
                     } catch(e) {
                         console.log(e)

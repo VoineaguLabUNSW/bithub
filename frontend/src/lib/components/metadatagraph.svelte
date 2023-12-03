@@ -12,7 +12,11 @@
 
     let datasetsSelect = writable();
     let matrixSelect = writable();
-    let metadataSelect = writable();
+    let metadataSelect1 = writable();
+    let metadataSelect2 = writable();
+
+    let scaleSelect = writable({id: 'Linear', name: 'Linear'});
+    const scaleOpts = new Map([['', ['Linear', 'Log e', 'Log 10'].map(l => ({id: l, name: l}))]])
 
     const core = getContext('core');
     const metadataStore = createMetadataStore(core)
@@ -23,7 +27,6 @@
         const datasetsOpts = new Map([['', datasetOptVals]]);
         datasetsSelect.set(datasetOptVals[0]);
         set({$metadataStore, datasetsOpts});
-        
     });
 
     const matrixOptsObj = derived([datasetOptsObj, datasetsSelect], ([$datasetOptsObj, $datasetsSelect], set) => {
@@ -31,43 +34,60 @@
         const reader = $datasetOptsObj.$metadataStore.readers[$datasetsSelect.id];
         const matrixOptVals = reader.matrixNames.map(m => ({id: m, name: m}));
         const matrixOpts = new Map([['', matrixOptVals]]);
-        const metadataOptVals = reader.order.map(o => ({id: $datasetsSelect.id + '|' + o, name: o}))
-        const metadataOpts = new Map();
-        if(reader.type) {
-            for(let i=0; i<reader.type.length; ++i) {
-                const arr = metadataOpts.get(reader.type[i]) || [];
-                arr.push(metadataOptVals[i]);
-                metadataOpts.set(reader.type[i], arr);
+        const metadataOptVals1 = reader.order.map((o, i) => ({i, id: $datasetsSelect.id + '|' + o, name: o}))
+        const metadataOptVals2 = metadataOptVals1.filter(v => (typeof reader.getColumn(v.name).values[0]) == 'string')
+        
+        function opstToGroups(opts, type) {
+            const ret = new Map();
+            if(type) {
+                for(let o of opts) {
+                    const arr = ret.get(reader.type[o.i]) || [];
+                    arr.push(o);
+                    ret.set(reader.type[o.i], arr);
+                }
+            } else {
+                ret.set('', opts)
             }
-        } else {
-            metadataOpts.set('', metadataOptVals)
+            return ret
         }
-        metadataSelect.set(metadataOptVals[0]);
+
+        const metadataOpts1 = opstToGroups(metadataOptVals1, reader.type)
+        const metadataOpts2 = opstToGroups(metadataOptVals2, reader.type)
+        
+        metadataSelect1.set(metadataOptVals1[0]);
+        metadataSelect2.set(undefined)
         matrixSelect.set(matrixOptVals[0]);
-        set({...$datasetOptsObj, $datasetsSelect, metadataOpts, matrixOpts})
+
+        console.log(metadataOpts2)
+
+        set({...$datasetOptsObj, $datasetsSelect, metadataOpts1, metadataOpts2, matrixOpts})
     })
 
     const expressionDataObj = derived([matrixOptsObj, matrixSelect], ([$matrixOptsObj, $matrixSelect], set) => {
         if(!$matrixOptsObj || !$matrixSelect) return;
         const reader = $matrixOptsObj.$metadataStore.readers[$datasetsSelect.id];
-        console.log(reader.getMatrixStore)
-        const expressionSub = reader.getMatrixStore['/metadata/' +  $datasetsSelect.id + '/matrices/' + $matrixSelect.id + '/expression'].current.subscribe(expression => {
+        const expressionSub = reader.getMatrixStore['/metadata/' +  $datasetsSelect.id + '/matrices/' + $matrixSelect.id].current.subscribe(expression => {
             if(expression) set({...$matrixOptsObj, expression: expression})
         })
         return () => expressionSub()
     })
 
-    const plotlyArgs = derived([expressionDataObj, metadataSelect], ([$expressionDataObj, $metadataSelect], set) => {
+    const plotlyArgs = derived([expressionDataObj, metadataSelect1, metadataSelect2, scaleSelect], ([$expressionDataObj, $metadataSelect1, $metadataSelect2, $scaleSelect], set) => {
         console.log($expressionDataObj.expression)
-        if(!$expressionDataObj || !$metadataSelect) {
+        if(!$expressionDataObj || !$metadataSelect1) {
             return
         } else if (!$expressionDataObj.expression.data) {
             set(getPlotEmpty($expressionDataObj.expression.loading ? 'Loading...' : 'Not in dataset'))
         } else {
-            const [ds, ms] = $metadataSelect.id.split('|', 2)
+            // Prevent invalid combinations during updates
+            const [ds, ms] = $metadataSelect1.id.split('|', 2)
             if(ds !== $expressionDataObj.$datasetsSelect.id) return
+
             const reader = $expressionDataObj.$metadataStore.readers[ds];
-            const [x, y] = [reader.getColumn(ms).values, $expressionDataObj.expression.data.values];
+            let [x, y] = [reader.getColumn(ms).values, $expressionDataObj.expression.data.values];
+
+            if($scaleSelect.id === 'Log e') y = y.map(v => Math.log(v))
+            if($scaleSelect.id === 'Log 10') y = y.map(v => Math.log10(v))
             
             set({
                 plotData: [
@@ -95,7 +115,9 @@
             {#if $matrixOptsObj?.matrixOpts.get('').length > 1}
                 <Dropdown title='Matrix' selected={matrixSelect} groups={$matrixOptsObj.matrixOpts}/>
             {/if}
-            <Dropdown title='Metadata' selected={metadataSelect} groups={$matrixOptsObj.metadataOpts}/>
+            <Dropdown title='Metadata 1' selected={metadataSelect1} groups={$matrixOptsObj.metadataOpts1}/>
+            <Dropdown title='Metadata 2' selected={metadataSelect2} groups={$matrixOptsObj.metadataOpts2} optional={true}/>
+            <Dropdown title='Scale' selected={scaleSelect} groups={scaleOpts}/>
         </div>
     </span>
 </Plot>

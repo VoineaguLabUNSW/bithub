@@ -729,7 +729,7 @@ if __name__ == '__main__':
                                         for t in t_list:
                                             _, transcript_id, *vals = t
                                             table.float_values.extend([float(v) for v in vals])
-                                            table.string_values.append(str(transcript_to_transcript[transcript_id]))
+                                            table.string_values.append(transcript_id)
                                     ranges.append(writer(table.SerializeToString()))
 
                 all_ranges.append((last_range_end, teller()))
@@ -812,11 +812,10 @@ if __name__ == '__main__':
                     name, shape = matrix['name'], (len(annots_written), d['_internal_sample_count'])
                     ranges, _, _, logs, logs_filter_enum = matrix['_internal']
         
-                    curr_matrix_meta_root = matrix_meta_root.create_group(name)
-                    curr_matrix_meta_root.create_dataset('expression', data=ranges, compression='gzip', compression_opts=9)
+                    curr_matrix_meta_root = matrix_meta_root.create_dataset(name, data=ranges, compression='gzip', compression_opts=9)
                     curr_matrix_meta_root.attrs.create('path', expression_url)
                     curr_matrix_meta_root.attrs.create('shape', shape)
-                    remote_range_datasets.append([curr_matrix_meta_root.name + '/expression', '/data/' + d['id'], 'row'])
+                    remote_range_datasets.append([curr_matrix_meta_root.name, '/data/' + d['id'], 'RowData'])
 
                     all_logs.setdefault('scaled', []).append(logs)
                     if logs_filter_enum:
@@ -837,21 +836,19 @@ if __name__ == '__main__':
                     transcript_meta_root.attrs.create('order', [t['name'] for t in d['transcript_matrices']])
                     for transcript_matrix in d.get('transcript_matrices', []):
                         ranges, categories = transcript_matrix['_internal']
-                        curr_transcript_meta_root = transcript_meta_root.create_group(transcript_matrix['name'])
-                        curr_transcript_meta_root.create_dataset('transcripts', data=ranges, compression='gzip', compression_opts=9)
+                        curr_transcript_meta_root = transcript_meta_root.create_dataset(transcript_matrix['name'], data=ranges, compression='gzip', compression_opts=9)
                         curr_transcript_meta_root.attrs.create('categories', categories)
-
-                        remote_range_datasets.append([curr_transcript_meta_root.name + '/transcripts', '/data/' + d['id'], 'table'])
+                        remote_range_datasets.append([curr_transcript_meta_root.name, '/data/' + d['id'], 'TableData'])
 
                 indices, _, varpart_ranges, varpart_headers = d['_internal']
                 reverse_indices = [i for i, x in enumerate(indices) if x != -1]
                 meta_root.create_dataset('index', data=reverse_indices, compression='gzip', compression_opts=9)
                 
                 if varpart_headers:
-                    var_ds = meta_root.create_dataset('variancePartition', data=varpart_ranges, compression="gzip", compression_opts=9)
+                    var_ds = meta_root.create_dataset('variance_partition', data=varpart_ranges, compression="gzip", compression_opts=9)
                     var_ds.attrs.create("heading", varpart_headers)
 
-                    remote_range_datasets.append([var_ds.name, '/data/' + d['id'], 'row'])
+                    remote_range_datasets.append([var_ds.name, '/data/' + d['id'], 'RowData'])
 
             root.attrs.create('remote', remote_range_datasets)
 

@@ -1,4 +1,5 @@
 <script>
+    import { getPlotEmpty } from '$lib/utils/plot';
     import Dropdown from '../components/dropdown.svelte';
     import Plot from '../components/plot.svelte';
     import { writable } from "@square/svelte-store";
@@ -22,7 +23,9 @@
     });
 
     $: {
-        if($filteredStore && $datasetsSelect1 && $datasetsSelect2) {
+        if(!$filteredStore || !$datasetsSelect1 || !$datasetsSelect2) {
+            plotlyArgs.set(getPlotEmpty('No results'))
+        } else {
             const inds = [$datasetsSelect1.id, $datasetsSelect2.id].map(h => $filteredStore.headings.indexOf(h));
             const [x, y] = inds.map(col_i => $filteredStore.results.map(row_i => $filteredStore.columns[col_i][row_i]));
             const filteredNames = $filteredStore.results.map(row_i => $filteredStore.columns[1][row_i]);
@@ -49,7 +52,7 @@
                     }
                 ]
             });
-        }
+        }  
     }
 </script>
 

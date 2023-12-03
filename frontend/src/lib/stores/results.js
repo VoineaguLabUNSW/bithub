@@ -52,6 +52,8 @@ function createCombinedResultsStore(data, customDatasets) {
             for(const group of $data.value.get('panels').keys) {
                 groupIndices[group] = datasetIndices.filter(col_i => $data.value.get('panels/' + group).keys.includes(headings[col_i]))
             }
+            groupIndices['_varpart'] = datasetIndices.filter(col_i => $data.value.get('metadata/' + headings[col_i]).keys.includes('variance_partition'))
+            groupIndices['_transcripts'] = datasetIndices.filter(col_i => $data.value.get('metadata/' + headings[col_i]).keys.includes('transcripts'))
             set({headings, headingsDefaultVisible, original, columns, generalIndices, datasetIndices, databaseIndices, groupIndices, columnStringSizes, headingGroups})
         }
     });

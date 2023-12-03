@@ -1,22 +1,20 @@
 <script>
     import { getFilteredStoreGroup } from '../stores/results'
     import MetadataGraph from '../components/metadatagraph.svelte';
+    import VarpartGraph from '../components/varpartgraph.svelte'
     import ResultsGraph from '../components/resultgraph.svelte';
     import Genome from '../components/genome.svelte';
     import {Tabs, TabItem, Popover} from 'flowbite-svelte';
+    import TranscriptGraph from '../components/transcriptgraph.svelte';
 
     export let currentRow;
     export let filteredStore;
 
     let filteredBulk = getFilteredStoreGroup(filteredStore, 'Gene expression')
     let filteredSingleCell = getFilteredStoreGroup(filteredStore, 'Cell type specific expression')
+    let filteredVarpart = getFilteredStoreGroup(filteredStore, '_varpart')
+    let filteredTranscript = getFilteredStoreGroup(filteredStore, '_transcripts')
 
-    let geneName = '';
-    $: {
-        if($filteredStore && $currentRow !== undefined) {
-            geneName = $filteredStore.columns[1][$currentRow];
-        }
-    }
 </script>
 
 
@@ -35,16 +33,15 @@
 <hr>
 
 <Tabs contentClass='bg-white mt-0 shadow-lg sm:rounded-lg h-[calc(100vh-270px)]'>
-    <TabItem title="Genome Browser">
+    <TabItem open title="Genome Browser">
         <Genome currentRow={currentRow} filteredStore={filteredStore}/>
     </TabItem>
     <TabItem title="Transcript Expression">
-        <p class="text-sm text-gray-500 dark:text-gray-400">
-            <b>Settings:</b>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-        </p>
+        <div class="h-[calc(100vh-270px)]">
+            <TranscriptGraph filteredStore={filteredTranscript}/>
+        </div>
     </TabItem>
-    <TabItem open title="Expression Across Datasets">
+    <TabItem title="Expression Across Datasets">
         <!-- TODO: hardcoded number of px above to give it defined height and force resizes -->
         <div class="h-[calc(100vh-270px)]">
             <ResultsGraph filteredStore={filteredStore}/>
@@ -55,11 +52,10 @@
             <MetadataGraph filteredStore={filteredBulk}/>
         </div>
     </TabItem>
-    <TabItem title="Drivers of Variation">
-        <p class="text-sm text-gray-500 dark:text-gray-400">
-            <b>Settings:</b>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-        </p>
+    <TabItem title="Drivers of Variation" disabled={$filteredVarpart.datasetIndicesResults.length === 0}>
+        <div class="h-[calc(100vh-270px)]">
+            <VarpartGraph filteredStore={filteredVarpart}/>
+        </div>
     </TabItem>
     <TabItem disabled={$filteredSingleCell.datasetIndicesResults.length === 0}>
         <div slot='title'>

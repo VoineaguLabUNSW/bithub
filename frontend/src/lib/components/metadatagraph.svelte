@@ -1,19 +1,25 @@
-<script>
-    import Dropdown from '../components/dropdown.svelte';
-    import Plot from '../components/plot.svelte';
-    import { writable, get } from "@square/svelte-store";
-    import { getContext, onMount } from "svelte";
-    import { createMetadataStore } from '../stores/metadata'
-    import { derived } from 'svelte/store';
-    import { getPlotEmpty } from '../utils/plot';
-
-    export let filteredStore;
-    export const description = 'This is a panel'
+<script context="module">
+    import { writable, get, derived } from "@square/svelte-store";
 
     let datasetsSelect = writable();
     let matrixSelect = writable();
     let metadataSelect1 = writable();
     let metadataSelect2 = writable();
+</script>
+
+
+<script>
+    import Dropdown from '../components/dropdown.svelte';
+    import Plot from '../components/plot.svelte';
+    
+    import { getContext, onMount } from "svelte";
+    import { createMetadataStore } from '../stores/metadata'
+    import { getPlotEmpty, getPlotViolinBasic, getPlotScatter } from '../utils/plot';
+    import { withoutNulls } from '../utils/hdf5';
+
+    export let filteredStore;
+    export let heading;
+    export const description = 'This is a panel'
 
     let scaleSelect = writable({id: 'Linear', name: 'Linear'});
     const scaleOpts = new Map([['', ['Linear', 'Log e', 'Log 10'].map(l => ({id: l, name: l}))]])
@@ -23,7 +29,8 @@
     
     const datasetOptsObj = derived([metadataStore, filteredStore], ([$metadataStore, $filteredStore], set) => {
         if(!$metadataStore || !$filteredStore) return;
-        const datasetOptVals = $filteredStore.datasetIndicesResults.map(col_i => $filteredStore.headings[col_i]).map(h => ({id: h, name: h}));
+        const datasetOptStrs = $filteredStore.datasetIndicesResults.map(col_i => $filteredStore.headings[col_i]);
+        const datasetOptVals = datasetOptStrs.map(h => ({id: h, name: h}));
         const datasetsOpts = new Map([['', datasetOptVals]]);
         datasetsSelect.set(datasetOptVals[0]);
         set({$metadataStore, datasetsOpts});
@@ -57,9 +64,6 @@
         metadataSelect1.set(metadataOptVals1[0]);
         metadataSelect2.set(undefined)
         matrixSelect.set(matrixOptVals[0]);
-
-        console.log(metadataOpts2)
-
         set({...$datasetOptsObj, $datasetsSelect, metadataOpts1, metadataOpts2, matrixOpts})
     })
 
@@ -67,7 +71,7 @@
         if(!$matrixOptsObj || !$matrixSelect) return;
         const reader = $matrixOptsObj.$metadataStore.readers[$datasetsSelect.id];
         const expressionSub = reader.getMatrixStore['/metadata/' +  $datasetsSelect.id + '/matrices/' + $matrixSelect.id].current.subscribe(expression => {
-            if(expression) set({...$matrixOptsObj, expression: expression})
+            if(expression) set({...$matrixOptsObj, expression: expression, $matrixSelect})
         })
         return () => expressionSub()
     })
@@ -80,25 +84,42 @@
             set(getPlotEmpty($expressionDataObj.expression.loading ? 'Loading...' : 'Not in dataset'))
         } else {
             // Prevent invalid combinations during updates
-            const [ds, ms] = $metadataSelect1.id.split('|', 2)
-            if(ds !== $expressionDataObj.$datasetsSelect.id) return
+            const [ds1, ms1] = $metadataSelect1.id.split('|', 2)
+            const [ds2, ms2] = ($metadataSelect2?.id || '|').split('|', 2)
+            
+            if(ds1 !== $expressionDataObj.$datasetsSelect.id || (ds2 && ds2 !== $expressionDataObj.$datasetsSelect.id)) return
 
-            const reader = $expressionDataObj.$metadataStore.readers[ds];
-            let [x, y] = [reader.getColumn(ms).values, $expressionDataObj.expression.data.values];
+            const reader = $expressionDataObj.$metadataStore.readers[ds1];
+            const x = withoutNulls(reader.getColumn(ms1).values)
+            const z = ms2 && withoutNulls(reader.getColumn(ms2).values)
+            
+            const names = reader.sampleNames;
+            let y = $expressionDataObj.expression.data.values;
+            
+            const orderX = reader.getColumn(ms1).attrs.order
+            const orderZ = ms2 && reader.getColumn(ms2).attrs.order
+            
+            const groupSizesX = reader.getColumn(ms1).attrs.groupSizes
+            const groupLabelsX = reader.getColumn(ms1).attrs.groupLabels
+
+            const headingX = ms1;
+            let headingY = $expressionDataObj.$matrixSelect.name;
+            const headingZ = ms2;
 
             if($scaleSelect.id === 'Log e') y = y.map(v => Math.log(v))
             if($scaleSelect.id === 'Log 10') y = y.map(v => Math.log10(v))
+
+            const data = x.map((x, i) => ({x, y: y[i],  z: z[i], name: names[i]}))
+
+            const headingMain = `${heading} - ${ds1}`
+            if($scaleSelect.id != 'Linear') headingY = `${headingY} (${$scaleSelect.id})`
             
-            set({
-                plotData: [
-                    {
-                        mode: 'markers',
-                        type: 'scattergl',
-                        name: 'all',
-                        x: x,
-                        y: y
-                    }
-            ]});
+            if((typeof data[0].x) == 'string' || data[0].x instanceof String) {
+                set(getPlotViolinBasic(headingMain, data, headingX, headingY, headingZ, orderX, orderZ, groupLabelsX, groupSizesX))
+            } else {
+                console.log('plotting scatter')
+                set(getPlotScatter(headingMain, data, headingX, headingY, headingZ, orderZ))   
+            }
         }
     });
 </script>

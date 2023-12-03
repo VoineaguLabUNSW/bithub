@@ -89,7 +89,7 @@
                         b: 100,
                         t: 100,
                         pad: 4
-                        },
+                    },
                     xaxis: {
                         linecolor: 'black',
                         linewidth: 1,
@@ -105,9 +105,7 @@
                         y: 0.5
                     }
                 },
-                config: {
-                    responsive: false
-                }
+                config: { responsive: false }
             });
         }
     })

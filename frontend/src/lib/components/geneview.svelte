@@ -4,17 +4,22 @@
     import VarpartGraph from '../components/varpartgraph.svelte'
     import ResultsGraph from '../components/resultgraph.svelte';
     import Genome from '../components/genome.svelte';
+    import { derived } from 'svelte/store'
     import {Tabs, TabItem, Popover} from 'flowbite-svelte';
     import TranscriptGraph from '../components/transcriptgraph.svelte';
 
     export let currentRow;
     export let filteredStore;
 
-    let filteredBulk = getFilteredStoreGroup(filteredStore, 'Gene expression')
-    let filteredSingleCell = getFilteredStoreGroup(filteredStore, 'Cell type specific expression')
-    let filteredVarpart = getFilteredStoreGroup(filteredStore, '_varpart')
-    let filteredTranscript = getFilteredStoreGroup(filteredStore, '_transcripts')
+    const filteredBulk = getFilteredStoreGroup(filteredStore, 'Gene expression')
+    const filteredSingleCell = getFilteredStoreGroup(filteredStore, 'Cell type specific expression')
+    const filteredVarpart = getFilteredStoreGroup(filteredStore, '_varpart')
+    const filteredTranscript = getFilteredStoreGroup(filteredStore, '_transcripts')
 
+    const geneInfo = derived(filteredStore, $filteredStore => {
+        const [ensembl, symbol, description] = [0, 1, 2].map(col_i => $filteredStore.columns[col_i][$currentRow],)
+        return { ensembl, symbol, description }
+    })
 </script>
 
 
@@ -26,35 +31,35 @@
 
 <div class='flex justify-between px-8'>
     <div class='flex gap-2 items-center'>
-        <div class='text-3xl'>{$filteredStore.columns[1][$currentRow]}</div><div>{'(' + $filteredStore.columns[0][$currentRow] + ')'}</div>
+        <div class='text-3xl'>{$geneInfo?.symbol}</div><div>{'(' + $geneInfo?.ensembl + ')'}</div>
     </div>
-    <div class='text-lg'>{$filteredStore.columns[2][$currentRow]}</div>
+    <div class='text-lg'>{$geneInfo?.description}</div>
 </div>
 <hr>
 
 <Tabs contentClass='bg-white mt-0 shadow-lg sm:rounded-lg h-[calc(100vh-270px)]'>
-    <TabItem open title="Genome Browser">
+    <TabItem title="Genome Browser">
         <Genome currentRow={currentRow} filteredStore={filteredStore}/>
     </TabItem>
     <TabItem title="Transcript Expression">
         <div class="h-[calc(100vh-270px)]">
-            <TranscriptGraph filteredStore={filteredTranscript}/>
+            <TranscriptGraph filteredStore={filteredTranscript} heading={$geneInfo?.symbol}/>
         </div>
     </TabItem>
     <TabItem title="Expression Across Datasets">
         <!-- TODO: hardcoded number of px above to give it defined height and force resizes -->
         <div class="h-[calc(100vh-270px)]">
-            <ResultsGraph filteredStore={filteredStore}/>
+            <ResultsGraph filteredStore={filteredStore} heading={$geneInfo?.symbol + ' Transformed Mean Log2 (Expression)'}/>
         </div>
     </TabItem>
-    <TabItem title="Gene Expression" disabled={$filteredBulk.datasetIndicesResults.length === 0}>
+    <TabItem open title="Gene Expression" disabled={$filteredBulk.datasetIndicesResults.length === 0}>
         <div class="h-[calc(100vh-270px)]">
-            <MetadataGraph filteredStore={filteredBulk}/>
+            <MetadataGraph filteredStore={filteredBulk} heading={$geneInfo?.symbol}/>
         </div>
     </TabItem>
     <TabItem title="Drivers of Variation" disabled={$filteredVarpart.datasetIndicesResults.length === 0}>
         <div class="h-[calc(100vh-270px)]">
-            <VarpartGraph filteredStore={filteredVarpart}/>
+            <VarpartGraph filteredStore={filteredVarpart} heading={$geneInfo?.symbol}/>
         </div>
     </TabItem>
     <TabItem disabled={$filteredSingleCell.datasetIndicesResults.length === 0}>
@@ -67,7 +72,7 @@
         </div>
 
         <div class="h-[calc(100vh-270px)]">
-            <MetadataGraph filteredStore={filteredSingleCell}/>
+            <MetadataGraph filteredStore={filteredSingleCell} heading={$geneInfo?.symbol}/>
         </div>
     </TabItem>
   </Tabs>

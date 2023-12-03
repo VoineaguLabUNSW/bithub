@@ -86,7 +86,7 @@ function createFilteredResultsStore(columnStore, currentSearch, currentVisibleCo
 
 function createSelectedResultsStore(columnStore, row) {
     return derived([columnStore, row], ([$columnStore, $row], set) => {
-        if($columnStore) {
+        if($columnStore && $row !== undefined) {
             const results = $row !== undefined ? [$row] : [];
             const datasetIndicesResults = $columnStore.datasetIndices.filter(col_i => $columnStore.original[col_i][$row] >= 0)
             set({...$columnStore, results, datasetIndicesResults})

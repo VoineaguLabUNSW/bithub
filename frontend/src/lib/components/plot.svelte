@@ -57,9 +57,27 @@
             Plotly.react($plotContainer, $plotlyArgs.plotData,
                 { 
                     autosize: true,
-                    margin: { t: 0 },
-                    showlegend: false,
-                    ...($plotlyArgs.layout || {})
+                    legend: {
+                        x: 1,
+                        y: 0.5
+                    },
+                    ...($plotlyArgs.layout || {}),
+                    xaxis: {
+                        automargin: true,
+                        zeroline: false,
+                        linecolor: 'black',
+                        linewidth: 1,
+                        mirror: true,
+                        ...($plotlyArgs.layout?.xaxis || {}),
+                    },
+                    yaxis: {
+                        automargin: true,
+                        zeroline: false,
+                        linecolor: 'black',
+                        linewidth: 1,
+                        mirror: true,
+                        ...($plotlyArgs.layout?.yaxis || {}),
+                    }
                 }, {
                     responsive: true, 
                     displaylogo: false, 
@@ -100,9 +118,9 @@
 <style>
     :global(.modebar) {
         right: 0px !important;
-        left: 0px !important;
+        left: 50px !important;
         display: flex;
-        justify-content: center;
+        justify-content: left;
 
     }
     :global(.modebar-group) {

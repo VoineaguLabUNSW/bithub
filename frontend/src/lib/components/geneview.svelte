@@ -38,26 +38,54 @@
 <hr>
 
 <Tabs contentClass='bg-white mt-0 shadow-lg sm:rounded-lg h-[calc(100vh-270px)]'>
-    <TabItem title="Genome Browser">
+    <TabItem open title="Genome Browser">
         <Genome currentRow={currentRow} filteredStore={filteredStore}/>
     </TabItem>
-    <TabItem title="Transcript Expression">
+    <TabItem>
+        <div slot='title'>
+            <span>Transcript Expression</span>
+            <button id="ts-help">
+                <i class='fas fa-circle-question'/>
+                <span class="sr-only">Show information</span>
+            </button>
+        </div>
         <div class="h-[calc(100vh-270px)]">
             <TranscriptGraph filteredStore={filteredTranscript} heading={$geneInfo?.symbol}/>
         </div>
     </TabItem>
-    <TabItem title="Expression Across Datasets">
+    <TabItem>
+        <div slot='title'>
+            <span>Expression Across Datasets</span>
+            <button id="exp-help">
+                <i class='fas fa-circle-question'/>
+                <span class="sr-only">Show information</span>
+            </button>
+        </div>
         <!-- TODO: hardcoded number of px above to give it defined height and force resizes -->
         <div class="h-[calc(100vh-270px)]">
-            <ResultsGraph filteredStore={filteredStore} heading={$geneInfo?.symbol + ' Transformed Mean Log2 (Expression)'}/>
+            <ResultsGraph filteredStore={filteredStore} heading={$geneInfo?.symbol + ' - Z-Score Transformed Mean Log2 (Expression)'}/>
         </div>
     </TabItem>
-    <TabItem open title="Gene Expression" disabled={$filteredBulk.datasetIndicesResults.length === 0}>
+    <TabItem disabled={$filteredBulk.datasetIndicesResults.length === 0}>
+        <div slot='title'>
+            <span>Gene Expression</span>
+            <button id="bulk-help">
+                <i class='fas fa-circle-question'/>
+                <span class="sr-only">Show information</span>
+            </button>
+        </div>
         <div class="h-[calc(100vh-270px)]">
             <MetadataGraph filteredStore={filteredBulk} heading={$geneInfo?.symbol}/>
         </div>
     </TabItem>
-    <TabItem title="Drivers of Variation" disabled={$filteredVarpart.datasetIndicesResults.length === 0}>
+    <TabItem disabled={$filteredVarpart.datasetIndicesResults.length === 0}>
+        <div slot='title'>
+            <span>Drivers of Variation</span>
+            <button id="varpart-help">
+                <i class='fas fa-circle-question'/>
+                <span class="sr-only">Show information</span>
+            </button>
+        </div>
         <div class="h-[calc(100vh-270px)]">
             <VarpartGraph filteredStore={filteredVarpart} heading={$geneInfo?.symbol}/>
         </div>
@@ -65,7 +93,7 @@
     <TabItem disabled={$filteredSingleCell.datasetIndicesResults.length === 0}>
         <div slot='title'>
             <span>Single Cell Datasets</span>
-            <button id="b3">
+            <button id="sc-help">
                 <i class='fas fa-circle-question'/>
                 <span class="sr-only">Show information</span>
             </button>
@@ -75,12 +103,46 @@
             <MetadataGraph filteredStore={filteredSingleCell} heading={$geneInfo?.symbol}/>
         </div>
     </TabItem>
-  </Tabs>
-  
-  <Popover triggeredBy="#b3" class="w-[700px] text-sm font-light text-gray-500 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400" placement="bottom-start">
+</Tabs>
+
+<Popover triggeredBy="#ts-help" class="z-[9999] w-[700px] text-sm font-light text-gray-500 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400" placement="bottom-start">
     <div class="p-3 space-y-2">
-      <h3 class="font-semibold text-gray-900 dark:text-white">Single Cell Dataset Details</h3>
-      <p>This section allows the detailed exploration of the aggregated single-nucleus datasets on BITHub at the gene from each individual dataset. The CPM expression values can be plotted against several metadata attributes, and users are also able to view cell-type specific expression.</p>
-      <p>A box plot is generated for categorial metadata and a scatterplot is generated for numerical-based metadata. In the case of numerical variables, a second categorical variable can be selected to color the data points. Users can highlight and select a specific portion of the plot to zoom in, and select or deselect specific metadata annotations by clicking on the legend.</p>
+        <h3 class="font-semibold text-gray-900 dark:text-white">Transcript Details</h3>
+        <p>Heatmap displaying transcript specific expression across different tissues (GTEx) and brain developmental stages (BrainSeq). Values were calculated by averaging expression values per transcript per tissue across all tissues (for GTEx data) or per transcript per age interval (BrainSeq). A z-score normalization has been performed to rank the means. </p>
     </div>
 </Popover>
+
+
+<Popover triggeredBy="#exp-help" class="z-[9999] w-[700px] text-sm font-light text-gray-500 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400" placement="bottom-start">
+    <div class="p-3 space-y-2">
+        <h3 class="font-semibold text-gray-900 dark:text-white">Dataset Comparison Details</h3>
+        <p>This panel provides information on the overall expression level of the gene in the human brain. Select any two datasets to produce a scatterplot of scaled gene expression values for all genes expressed in both datasets. Each dot represents a gene, with the gene of interest highlighted. For each dataset, gene expression levels are calculated as the mean of log2-transfomed expression values, followed by z-score transformation (subtracting the mean and dividing by the standard deviation).</p>
+        <p> For each dataset, z-scores have also been calculated for each region and each developmental period within each dataset. These subsets can be selected using the subset drop down menu. When interpreting these data, note that different datasets include different developmental stages, brain regions, and quantify gene expression by different methods (see Dataset description). </p>
+    </div>
+</Popover>
+
+<Popover triggeredBy="#bulk-help" class="z-[9999] w-[700px] text-sm font-light text-gray-500 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400" placement="bottom-start">
+    <div class="p-3 space-y-2">
+        <h3 class="font-semibold text-gray-900 dark:text-white">Bulk Cell Details</h3>
+        <p>This section allows the detailed exploration of the aggregated brain datasets on BITHub at the gene level from each individual dataset. The expression values (TPM/RPKM) can be plotted against several metadata attributes. By selecting metadata attributes, users have the ability to determine how gene expression of interest varies with any metadata properties such as phenotype (e.g Age, Sex ), sample characteristic or sequencing metrics. Users also have the ability to filter the data based on region by selecting their region of interest from the ‘Select Brain Region’ drop down menu.</p>
+        <p>A box plot is generated for categorial metadata and a scatterplot is generated for numerical-based metadata. In the case of numerical variables, a second categorical variable can be selected to color the data points. Users can highlight and select a specific portion of the plot to zoom in, and select or deselect specific metadata annotations by clicking on the legend.</p>
+    </div>
+</Popover>
+
+<Popover triggeredBy="#varpart-help" class="z-[9999] w-[700px] text-sm font-light text-gray-500 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400" placement="bottom-start">
+    <div class="p-3 space-y-2">
+        <h3 class="font-semibold text-gray-900 dark:text-white">Variance Partition Details</h3>
+        <p>View metadata attributes driving variation in a gene of interest across datasets. Drivers of variance were determined using variancePartition (Hoffman,G & Schadt, E).</p>
+        <p>The interactive pie charts from each dataset show a fraction of variance explained against the selected metadata. “Unknown” denotes no variancePartition analysis for the given gene in a given dataset due to filtering constraints.</p>
+    </div>
+</Popover>
+  
+<Popover triggeredBy="#sc-help" class="z-[9999] w-[700px] text-sm font-light text-gray-500 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400" placement="bottom-start">
+    <div class="p-3 space-y-2">
+        <h3 class="font-semibold text-gray-900 dark:text-white">Single Cell Dataset Details</h3>
+        <p>This section allows the detailed exploration of the aggregated single-nucleus datasets on BITHub at the gene from each individual dataset. The CPM expression values can be plotted against several metadata attributes, and users are also able to view cell-type specific expression.</p>
+        <p>A box plot is generated for categorial metadata and a scatterplot is generated for numerical-based metadata. In the case of numerical variables, a second categorical variable can be selected to color the data points. Users can highlight and select a specific portion of the plot to zoom in, and select or deselect specific metadata annotations by clicking on the legend.</p>
+    </div>
+</Popover>
+
+

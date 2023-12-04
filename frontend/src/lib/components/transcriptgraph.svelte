@@ -7,6 +7,7 @@
     import { getPlotEmpty } from '../utils/plot';
 
     export let filteredStore;
+    export let heading;
 
     const { data } = getContext('core');
 
@@ -77,7 +78,7 @@
                 layout: { 
                     height: Math.max(350, 30 * headingsY.length),
                     title: {
-                        text: 'Transcripts',
+                        text: heading + ` - ${headingsY.length} Transcripts`,
                         font: {
                             family: "Times New Roman",
                             size: 20

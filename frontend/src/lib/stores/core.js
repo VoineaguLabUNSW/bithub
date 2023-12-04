@@ -51,7 +51,7 @@ function createCore(url) {
         async ($metadata) => {
             try {
                 const rowStreams = {}
-                const obj = await getHDF5(/*$metadata.value.data_url'https://d33ldq8s2ek4w8.cloudfront.net/bithub/out.hdf5'*/'http://localhost:5501/out.hdf5', progress.set);
+                const obj = await getHDF5($metadata.value.data_url/*'http://localhost:5501/out.hdf5'*/, progress.set);
                 for(let i=0; i<obj.attrs.remote.length; i+=3) {
                     console.log(obj.attrs.remote[i+0])
                     rowStreams[obj.attrs.remote[i+0]] = {attrs: obj.get(obj.attrs.remote[i+0]).attrs, indexPath: obj.attrs.remote[i+1], type: obj.attrs.remote[i+2], current: writable(undefined)}
@@ -90,7 +90,7 @@ function createCore(url) {
 
         // Perform single combined request
         const controller = new AbortController();
-        const response = await fetch(/*'https://d33ldq8s2ek4w8.cloudfront.net/bithub/expression.bin'*/'http://localhost:5501/expression.bin', {
+        const response = await fetch('https://d33ldq8s2ek4w8.cloudfront.net/bithub3/expression.bin'/*'http://localhost:5501/expression.bin'*/, {
             signal: controller.signal,
             headers: {'Range': 'bytes=' + `${requests[0].byteStart}-${requests[requests.length-1].byteEnd-1}`},
         });

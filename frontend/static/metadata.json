@@ -1,0 +1,55 @@
+{
+  "data_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub3/out.hdf5",
+  "count": 34440,
+  "last_updated": "December 2023",
+  "meta_files": [
+    {
+      "name": "BrainSpan",
+      "meta_url": "",
+      "matrix_url": "",
+      "samples": 524
+    },
+    {
+      "name": "GTEx",
+      "meta_url": "",
+      "matrix_url": "",
+      "samples": 2642
+    },
+    {
+      "name": "BrainSeq",
+      "meta_url": "",
+      "matrix_url": "",
+      "samples": 900
+    },
+    {
+      "name": "PsychENCODE",
+      "meta_url": "",
+      "matrix_url": "",
+      "samples": 1369
+    },
+    {
+      "name": "HDBR",
+      "meta_url": "",
+      "matrix_url": "",
+      "samples": 649
+    },
+    {
+      "name": "Cameron",
+      "meta_url": "",
+      "matrix_url": "",
+      "samples": 69284
+    },
+    {
+      "name": "HCA",
+      "meta_url": "",
+      "matrix_url": "",
+      "samples": 46958
+    },
+    {
+      "name": "Velmeshev",
+      "meta_url": "",
+      "matrix_url": "",
+      "samples": 81215
+    }
+  ]
+}

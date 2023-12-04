@@ -1,5 +1,9 @@
-function withoutNulls(arr) {
-    return typeof arr[0] == 'string' ? arr.map(v => v.replace(/\0.*$/g,'')) : arr;
+function withoutNullsStr(str) {
+    return str.replace(/\0.*$/g, '')
 }
 
-export { withoutNulls }
+function withoutNulls(arr) {
+    return typeof arr[0] == 'string' ? arr.map(v => withoutNullsStr(v)) : arr;
+}
+
+export { withoutNulls, withoutNullsStr }

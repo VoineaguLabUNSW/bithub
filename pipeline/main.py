@@ -442,7 +442,7 @@ def parse_metadata(dataset, order_entries: Dict[str, List[str]], category_limit:
 
         return top_headers, side_headers, filter_factors_enum, columns()
 
-def write_metadata_columns(hdf5_f, columns: Iterable[Tuple[str, np.ndarray, Dict[str, List[str]]]], sample_valid_indices: Iterable[int]=None):
+def write_metadata_columns(hdf5_f, columns: Iterable[Tuple[str, np.ndarray, Dict[str, List[str]]]], sample_valid_indices: Iterable[int]=None, extra_attrs={}):
     '''Write each column as a separate dataset since JS struggles to deserialize different types'''
     sample_root = hdf5_f.create_group('samples')
     column_headers, column_types = [], []
@@ -452,9 +452,12 @@ def write_metadata_columns(hdf5_f, columns: Iterable[Tuple[str, np.ndarray, Dict
         column_types.append(col_type)
         if sample_valid_indices: array = array[sample_valid_indices]
         ds = sample_root.create_dataset(header, data=array, chunks=array.shape, compression='gzip', compression_opts=9)
-        for k, v in attrs.items():
+        for k, v in (attrs).items():
             ds.attrs.create(k, v)
     sample_root.attrs['order'] = column_headers
+    for k, v in (extra_attrs).items():
+        sample_root.attrs.create(k, v)
+    
 
     # Only write types if some are actually defined
     if column_types.count(None) < len(column_types):
@@ -620,15 +623,15 @@ if __name__ == '__main__':
                         samples_from_metadata = list(iterate_unique(side_headers))
 
                         data_meta_root = meta_root.create_group(dataset['id'])
-                        data_meta_root.attrs.create('name', dataset.get('name', ''))
 
                         # Write display-related settings
+                        extra_attrs = {}
                         if custom_filter := dataset.get('customFilter', None):
-                            data_meta_root.attrs.create('customFilterCategory', filter_factors_enum[1])
+                            extra_attrs['customFilterCategory'] = filter_factors_enum[1]
                             if name_filter := custom_filter.get('name', None):
-                                data_meta_root.attrs.create('customFilterName', name_filter.strip()) 
+                                extra_attrs['customFilterName'] = name_filter.strip()
                             if order_filter := custom_filter.get('column', None):
-                                data_meta_root.attrs.create('customFilterColumn', order_filter.strip())
+                                extra_attrs['customFilterColumn'] = order_filter.strip()
 
                         # Determine minimal sample set to write
                         samples_from_matrices = set()
@@ -639,7 +642,7 @@ if __name__ == '__main__':
                         
                         # Write sample metadata
                         column_indices = list(filter(lambda x: x is not None, get_reorder_indices(sample_whitelist_ordered, side_headers)))
-                        write_metadata_columns(data_meta_root, columns, column_indices)
+                        write_metadata_columns(data_meta_root, columns, column_indices, extra_attrs)
                         with contextlib.suppress(Exception):
                             write_string_dataset(data_meta_root, 'sample_names', sample_whitelist_ordered)
                         dataset['_internal_sample_count'] = len(sample_whitelist)
@@ -860,9 +863,10 @@ if __name__ == '__main__':
             matrix_path = os.path.join(d['dir'], m['path'])
             matrix_dst = os.path.join(OUTPUT_FOLDER, get_matrix_name(d, m) + '.csv.gz')
 
-            asset_paths.extend([os.path.join(OUTPUT_FOLDER, d['meta']), matrix_dst])
-            shutil.copy2(meta_path, OUTPUT_FOLDER)
-            os.system(f'gzip -c {matrix_path} > {matrix_dst}')
+            # TODO: Re-enable this
+            #asset_paths.extend([os.path.join(OUTPUT_FOLDER, d['meta']), matrix_dst])
+            #shutil.copy2(meta_path, OUTPUT_FOLDER)
+            #os.system(f'gzip -c {matrix_path} > {matrix_dst}')
         
         asset_urls = deploy(asset_paths)
 

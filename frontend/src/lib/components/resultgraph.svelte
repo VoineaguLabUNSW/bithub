@@ -5,6 +5,7 @@
     import { writable } from "@square/svelte-store";
    
     export let filteredStore;
+    export let heading;
 
     let datasetsAll;
 
@@ -29,13 +30,20 @@
             const inds = [$datasetsSelect1.id, $datasetsSelect2.id].map(h => $filteredStore.headings.indexOf(h));
             const [x, y] = inds.map(col_i => $filteredStore.results.map(row_i => $filteredStore.columns[col_i][row_i]));
             const filteredNames = $filteredStore.results.map(row_i => $filteredStore.columns[1][row_i]);
+
+            let extraMarkerArgs = {}
+            if(filteredNames.length == 1) {
+                extraMarkerArgs = {
+                    line: { color: 'white', width: 1 },
+                    size: 15
+                }
+            }
             
             plotlyArgs.set({
                 plotData: [
                     {
                         mode: 'markers',
                         type: 'scattergl',
-                        name: 'all',
                         x: $filteredStore.columns[inds[0]],
                         y: $filteredStore.columns[inds[1]],
                         hoverinfo: 'skip',
@@ -47,10 +55,29 @@
                         name: '',
                         x: x,
                         y: y,
-                        marker : {color: 'rgb(196, 89, 59)'},
+                        marker : {color: 'rgb(196, 89, 59)', ...extraMarkerArgs},
                         text: filteredNames
                     }
-                ]
+                ],
+                layout: { 
+                    showlegend: false,
+                    title: {
+                        text: heading,
+                        font: { family: "Times New Roman", size: 20 },
+                    },
+                    xaxis: {
+                        title: {
+                            text: $datasetsSelect1.id,
+                            font: { family: 'Times New Roman', size: 18, color: '#7f7f7f' }
+                        },
+                    },
+                    yaxis: {
+                        title: {
+                            text: $datasetsSelect2.id,
+                            font: { family: 'Times New Roman', size: 18, color: '#7f7f7f' }
+                        }
+                    },
+                }
             });
         }  
     }

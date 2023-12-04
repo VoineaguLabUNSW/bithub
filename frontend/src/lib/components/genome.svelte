@@ -1,4 +1,5 @@
 <script context="module">
+    import { withoutNullsStr } from '$lib/utils/hdf5.js';
     import igv from '../../../node_modules/igv/dist/igv.esm.js';
     import { asyncReadable } from '@square/svelte-store';
 
@@ -13,9 +14,13 @@
     export let filteredStore;
 
     $: {
-        if($browser && $filteredStore && $currentRow !== undefined) {
+        if($browser && $filteredStore && ($currentRow !== undefined)) {
+            console.log($currentRow)
             let [chr, start, end] = [3, 4, 5].map(col_i =>  $filteredStore.columns[col_i][$currentRow]);
-            $browser.search(`chr${chr}:${start}-${end}`)
+            const locus = `chr${withoutNullsStr(chr)}:${start}-${end}`
+            
+            console.log(locus)
+            $browser.search(locus)
         }
     }
 

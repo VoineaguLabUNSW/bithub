@@ -4,7 +4,7 @@
     import './../../node_modules/@fortawesome/fontawesome-free/css/all.min.css';
     import '../app.css';
 
-    const url = /*'https://d33ldq8s2ek4w8.cloudfront.net/combined/metadata.json'*/'http://localhost:5501/metadata.json';
+    const url = './metadata.json'/*'http://localhost:5501/metadata.json'*/;
     setContext('core', createCore(url)); 
 </script>
 

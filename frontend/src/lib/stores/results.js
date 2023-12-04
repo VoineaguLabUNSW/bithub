@@ -1,19 +1,22 @@
+import { withoutNulls } from "$lib/utils/hdf5";
 import { derived } from "svelte/store";
 
 function findMatchesSorted(arrays, searches) {
     searches.sort();
-    arrays.forEach(a => a.sort());
+    arrays = arrays.map(a => [...withoutNulls(a).entries()])
+    arrays.forEach(a => a.sort((a, b) => a[1].localeCompare(b[1])));
+    
     let indices = new Array(arrays.length).fill(0)
     let ret = []
     for(const term of searches) {
         for(const [i, arr] of arrays.entries()) {
             let cmp = -1;
             while(indices[i]<arr.length && cmp < 0) {
-                cmp = arr[indices[i]].localeCompare(term, undefined, { sensitivity: 'accent' })
-                if(cmp < 0) indices[i]++;
+                cmp = arr[indices[i]][1].localeCompare(term, undefined, { sensitivity: 'accent' })
+                if(cmp <= 0) indices[i]++;
             }
             if (cmp === 0) {
-                ret.push(indices[i]);
+                ret.push(arr[indices[i]-1][0]);
                 break;
             }
         }

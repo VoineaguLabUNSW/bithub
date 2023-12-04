@@ -7,6 +7,7 @@
     import { getPlotEmpty } from '../utils/plot';
 
     export let filteredStore;
+    export let heading;
 
     const { data } = getContext('core');
 
@@ -38,14 +39,35 @@
             console.log($varianceDataObj.headings, $varianceDataObj.varpart.data.values)
             set({
                 plotData: [{
-            type: 'bar',
-            x: $varianceDataObj.headings,
-            y: $varianceDataObj.varpart.data.values,
-            orientation: 'v',
-            marker: {
-                color: self.variancePartitionColor
-              }
-            }]})
+                    type: 'bar',
+                    x: $varianceDataObj.headings,
+                    y: $varianceDataObj.varpart.data.values,
+                    orientation: 'v',
+                    marker: {
+                        color: self.variancePartitionColor
+                    }
+                }],
+                layout: { 
+                    showlegend: false,
+                    title: {
+                        text: heading + ` - ${$datasetsSelect?.id}`,
+                        font: { family: "Times New Roman", size: 20 },
+                    },
+                    xaxis: {
+                        title: {
+                            text: 'Metadata Variable',
+                            font: { family: 'Times New Roman', size: 18, color: '#7f7f7f' }
+                        },
+                    },
+                    yaxis: {
+                        title: {
+                            text: 'Fraction Variance Explained',
+                            font: { family: 'Times New Roman', size: 18, color: '#7f7f7f' }
+                        }
+                    },
+                }
+            
+            })
         }
     
     })

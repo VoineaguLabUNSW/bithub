@@ -3,6 +3,7 @@
     import ResultTable from '../../lib/components/resulttable.svelte';
     import ResultGraph from '../../lib/components/resultgraph.svelte';
     import GeneView from '../../lib/components/geneview.svelte';
+    import CustomView from '../../lib/components/customview.svelte';
     import { createParam, createIntParam, createListParam } from '../../lib/stores/param';
     import { createCombinedResultsStore, createFilteredResultsStore, createSelectedResultsStore } from '../../lib/stores/results';
     import { getContext, onDestroy } from "svelte";
@@ -18,15 +19,19 @@
     let paramPage = createIntParam('page', 1);
     let paramSearch = createParam('terms', '', v=>v, true);
     let paramVisible = createListParam('visible', ',', true);
+    let paramModal = createParam('open', '', v=>v, true);
 
     let currentSearch = writable('');
     paramSearch.subscribe(v => currentSearch.set(v));
 
-    let openModal = writable(undefined);
-    let currentRow = row;
-    currentRow.subscribe(v => v !== undefined && openModal.set(true));
-    openModal.subscribe(v => !v && currentRow.set(undefined));
+    let openCustomView = writable(undefined);
+    let customModalElement;
 
+    let openGeneView = writable(undefined);
+    let currentRow = row;
+    currentRow.subscribe(v => v !== undefined && openGeneView.set(true));
+    openGeneView.subscribe(v => !v && currentRow.set(undefined));
+    
     const combinedStore = createCombinedResultsStore(data, customDatasets);
     const selectedStore = createSelectedResultsStore(combinedStore, row)
 
@@ -37,8 +42,10 @@
 
     const filteredStore = createFilteredResultsStore(combinedStore, currentSearch, currentVisibleCombined);
 
-    let modalElement;
-    openModal.subscribe(v => modalElement && (v ? disableBodyScroll(modalElement) : enableBodyScroll(modalElement)))
+    let geneModalElement;
+
+    openGeneView.subscribe(v => geneModalElement && (v ? disableBodyScroll(geneModalElement) : enableBodyScroll(geneModalElement)))
+    paramModal.subscribe(v => customModalElement && (v ? disableBodyScroll(customModalElement) : enableBodyScroll(customModalElement)))
     onDestroy(clearAllBodyScrollLocks);
     
 </script>
@@ -54,8 +61,8 @@
 
     <div class="flex items-center gap-2 items-stretch pb-4">
         <Search on:blur={(e) => paramSearch.set(e.target.value)} bind:value={$currentSearch}/>
-        <Button color='light'><i class='fas fa-file-lines'/></Button>
-        <Button color='light'><i class='fas fa-plus'/></Button>
+        <Button disabled color='light'><i class='fas fa-file-lines'/></Button>
+        <Button on:click={() => paramModal.set('custom')} color='light'><i class='fas fa-plus'/></Button>
     </div>
 
     <Tabs contentClass='bg-white mt-0 shadow-lg sm:rounded-lg'>
@@ -75,12 +82,16 @@
             </div>
             <!-- TODO: hardcoded number of px above to give it defined height and force resizes -->
             <div class="h-[calc(100vh-214px)]">
-                <ResultGraph filteredStore={filteredStore}/>
+                <ResultGraph filteredStore={filteredStore} heading={'Z-Score Transformed Mean Log2 (Expression)'}/>
             </div>
         </TabItem>
     </Tabs>
 </div>
 
-<Modal bind:this={modalElement} bind:open={$openModal} size='xl' outsideclose={true} class='overscroll-contain'>
+<Modal bind:this={geneModalElement} bind:open={$openGeneView} size='xl' outsideclose={true} class='overscroll-contain'>
     <GeneView filteredStore={selectedStore} currentRow={currentRow}></GeneView>
+</Modal>
+
+<Modal bind:this={customModalElement} title="Add Custom Dataset" open={$paramModal == 'custom'} outsideclose={true} on:close={() => paramModal.set('')}>
+    <CustomView/>
 </Modal>

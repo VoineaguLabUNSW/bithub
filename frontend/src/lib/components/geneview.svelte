@@ -5,16 +5,16 @@
     import ResultsGraph from '../components/resultgraph.svelte';
     import Genome from '../components/genome.svelte';
     import { derived } from 'svelte/store'
-    import {Tabs, TabItem, Popover} from 'flowbite-svelte';
+    import { Tabs, TabItem, Popover } from 'flowbite-svelte';
     import TranscriptGraph from '../components/transcriptgraph.svelte';
 
     export let currentRow;
     export let filteredStore;
 
-    const filteredBulk = getFilteredStoreGroup(filteredStore, 'Gene expression')
-    const filteredSingleCell = getFilteredStoreGroup(filteredStore, 'Cell type specific expression')
-    const filteredVarpart = getFilteredStoreGroup(filteredStore, '_varpart')
-    const filteredTranscript = getFilteredStoreGroup(filteredStore, '_transcripts')
+    const filteredBulk = getFilteredStoreGroup(filteredStore, ['Gene expression', '_custom'])
+    const filteredSingleCell = getFilteredStoreGroup(filteredStore, ['Cell type specific expression'])
+    const filteredVarpart = getFilteredStoreGroup(filteredStore, ['_varpart'])
+    const filteredTranscript = getFilteredStoreGroup(filteredStore, ['_transcripts'])
 
     const geneInfo = derived(filteredStore, $filteredStore => {
         const [ensembl, symbol, description] = [0, 1, 2].map(col_i => $filteredStore.columns[col_i][$currentRow],)

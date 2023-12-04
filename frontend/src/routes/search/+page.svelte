@@ -12,9 +12,7 @@
     import { disableBodyScroll, enableBodyScroll, clearAllBodyScrollLocks } from 'body-scroll-lock';
     import ProgressHeader from '../../lib/components/progress.svelte';
 
-    const { row, data } = getContext('core');
-
-    const customDatasets = writable([]);//['Custom dataset 1', 'Custom dataset 2']
+    const { row, data, customs } = getContext('core');
 
     let paramPage = createIntParam('page', 1);
     let paramSearch = createParam('terms', '', v=>v, true);
@@ -32,7 +30,7 @@
     currentRow.subscribe(v => v !== undefined && openGeneView.set(true));
     openGeneView.subscribe(v => !v && currentRow.set(undefined));
     
-    const combinedStore = createCombinedResultsStore(data, customDatasets);
+    const combinedStore = createCombinedResultsStore(data, customs);
     const selectedStore = createSelectedResultsStore(combinedStore, row)
 
     let currentVisibleCombined = ({
@@ -93,5 +91,5 @@
 </Modal>
 
 <Modal bind:this={customModalElement} title="Add Custom Dataset" open={$paramModal == 'custom'} outsideclose={true} on:close={() => paramModal.set('')}>
-    <CustomView/>
+    <CustomView customModal={paramModal}/>
 </Modal>

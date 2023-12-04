@@ -54,7 +54,12 @@ function createCore(url) {
                 const obj = await getHDF5($metadata.value.data_url/*'http://localhost:5501/out.hdf5'*/, progress.set);
                 for(let i=0; i<obj.attrs.remote.length; i+=3) {
                     console.log(obj.attrs.remote[i+0])
-                    rowStreams[obj.attrs.remote[i+0]] = {attrs: obj.get(obj.attrs.remote[i+0]).attrs, indexPath: obj.attrs.remote[i+1], type: obj.attrs.remote[i+2], current: writable(undefined)}
+                    rowStreams[obj.attrs.remote[i+0]] = {
+                        attrs: obj.get(obj.attrs.remote[i+0]).attrs, 
+                        indexPath: obj.attrs.remote[i+1], 
+                        type: obj.attrs.remote[i+2], 
+                        current: writable(undefined)
+                    }
                 }                
                 return {value: obj, rowStreams: rowStreams};
             } catch (e) {
@@ -85,7 +90,6 @@ function createCore(url) {
                 rowStream.current.set({emtpy: true})
             }
         }
-        console.log(requests)
         requests.sort((a, b) => a.byteStart - b.byteStart)
 
         // Perform single combined request
@@ -129,7 +133,8 @@ function createCore(url) {
             }
         }
     });
-    return { data, metadata, progress, row}
+    
+    return { data, metadata, progress, row, customs: writable({})}
 }
 
 export { createCore };

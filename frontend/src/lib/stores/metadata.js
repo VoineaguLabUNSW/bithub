@@ -1,24 +1,7 @@
-//Just create this at the source you coward
-/*
-// Add dataset -> 
-function createMetadataStores(customDatasets) {
-    return derived(customDatasets, ($customDatasets) => {
-        const metadataColumnReaders = {}
-        for(let cd of $customDatasets) {
-            metadataColumnReaders[cd.name] = ({
-                ...cd,
-                getColumn: (colHeading) => ({values: cd.metadata[colHeading]}),
-            });
-        }
-        return {readers: metadataColumnReader}
-    });
-}
-*/
-
 import { derived } from 'svelte/store';
 
 function createMetadataStore(core) {
-    return derived(core.data, ($data) => {
+    return derived([core.data, core.customs], ([$data, $customs]) => {
         const metadataColumnReaders = {};
         for(const h of $data.value.get('metadata').keys) {
             metadataColumnReaders[h] = {
@@ -31,6 +14,9 @@ function createMetadataStore(core) {
                     return {values: sRoot.value, attrs: sRoot.attrs}
                 },
             }
+        }
+        for(let cd of Object.values($customs)) {
+            metadataColumnReaders[cd.name] = cd.metadataColumnReader;
         }
         return {readers: metadataColumnReaders}
     });

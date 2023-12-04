@@ -3,14 +3,17 @@
     import Plot from '../components/plot.svelte';
     
     import { writable, derived } from "svelte/store";
-    import { getContext } from "svelte";
-    import { createMetadataStore } from '../stores/metadata'
     import { getPlotEmpty, getPlotViolinBasic, getPlotScatter } from '../utils/plot';
     import { withoutNulls } from '../utils/hdf5';
 
+    import { getContext } from "svelte";
+    import { createMetadataStore } from '../stores/metadata'
+
     export let filteredStore;
     export let heading;
-    export const description = 'This is a panel'
+
+    const core = getContext('core')
+    const metadataStore = createMetadataStore(core)
 
     let datasetsSelect = writable();
     let matrixSelect = writable();
@@ -22,13 +25,11 @@
 
     let customSelect = writable()
     let customSelectName = 'Filter'
-
-    const core = getContext('core');
-    const metadataStore = createMetadataStore(core)
     
     const datasetOptsObj = derived([metadataStore, filteredStore], ([$metadataStore, $filteredStore], set) => {
         if(!$metadataStore || !$filteredStore) return;
-        const datasetOptStrs = $filteredStore.datasetIndicesResults.map(col_i => $filteredStore.headings[col_i]);
+        let datasetOptStrs = $filteredStore.datasetIndicesResults.map(col_i => $filteredStore.headings[col_i]);
+        datasetOptStrs = datasetOptStrs.filter(ds => $metadataStore.readers[ds] !== undefined)
         const datasetOptVals = datasetOptStrs.map(h => ({id: h, name: h}));
         const datasetsOpts = new Map([['', datasetOptVals]]);
         datasetsSelect.set(datasetOptVals[0]);
@@ -80,7 +81,6 @@
     })
 
     const plotlyArgs = derived([expressionDataObj, metadataSelect1, metadataSelect2, scaleSelect, customSelect], ([$expressionDataObj, $metadataSelect1, $metadataSelect2, $scaleSelect, $customSelect], set) => {
-        console.log($expressionDataObj.expression)
         if(!$expressionDataObj || !$metadataSelect1) {
             return
         } else if (!$expressionDataObj.expression.data) {
@@ -114,6 +114,8 @@
             if($scaleSelect.id === 'Log 10') y = y.map(v => Math.log10(v))
 
             let data = x.map((x, i) => ({x, y: y[i],  z: z[i], name: names[i]}))
+
+            console.log(data)
 
             if(cs) {
                 const csColumn = withoutNulls(reader.getColumn(reader.customFilterColumn).values)

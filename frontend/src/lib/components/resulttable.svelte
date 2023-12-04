@@ -9,8 +9,10 @@
     export let currentVisible;
     export let currentRow;
 
+    const COLOR_RANGE = ['#941a6c', '#ffa500']
+
     // Heatmap setup
-    const scale = chroma.scale(['purple', 'orange']);
+    const scale = chroma.scale(COLOR_RANGE);
     function toColorScale(v, min, max) {
         v = Math.max(Math.min(v, max), min);
         return scale((v-min)/max).hex();
@@ -81,7 +83,7 @@
                         <!-- Group headings -->
                         {#each generalIndicesFiltered as i}
                             <!-- N.B Dtype is only used for scaling for relatively small fields so that large ones collapse first-->
-                            <th scope="col" class="text-center px-6 py-3 h-24"  style={i!=generalIndicesFiltered[0] && (tableData.columnStringSizes[i] ? tableData.columnStringSizes[i] < 20 && `max-width: 300px; width:${tableData.columnStringSizes[i]+8}ch` : 'width:150px')}></th> 
+                            <th scope="col" class="text-center px-6 py-3 h-24" style={i!=generalIndicesFiltered[0] && (tableData.columnStringSizes[i] ? tableData.columnStringSizes[i] < 20 && `max-width: 300px; width:${tableData.columnStringSizes[i]+8}ch` : 'width:150px')}></th> 
                         {/each}
                         {#if datasetIndicesFiltered.length } 
                             {@const id = 'Datasets'}

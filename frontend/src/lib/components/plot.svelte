@@ -13,7 +13,7 @@
     const dispatch = createEventDispatcher();
 
     let plotContainer = writable(undefined);
-    let isHovering = false;
+    let isHovering = true; // Show initially until cursor enters plot
     let toggleOn = writable();
     let hoverOn = writable();
 

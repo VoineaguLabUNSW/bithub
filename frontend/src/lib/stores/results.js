@@ -90,4 +90,10 @@ function getFilteredStoreGroup(filteredStore, groups) {
     })
 }
 
-export { createCombinedResultsStore, createFilteredResultsStore, createSelectedResultsStore, getFilteredStoreGroup};
+function getFilteredStoreAll(filteredStore) {
+    return derived(filteredStore, ($filteredStore, set) => {
+        if($filteredStore) set({...$filteredStore, datasetIndicesResults: $filteredStore.datasetIndices})
+    });
+}
+
+export { createCombinedResultsStore, createFilteredResultsStore, createSelectedResultsStore, getFilteredStoreGroup, getFilteredStoreAll};

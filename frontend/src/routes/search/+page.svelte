@@ -5,7 +5,7 @@
     import GeneView from '../../lib/components/geneview.svelte';
     import CustomView from '../../lib/components/customview.svelte';
     import { createParam, createIntParam, createListParam } from '../../lib/stores/param';
-    import { createCombinedResultsStore, createFilteredResultsStore, createSelectedResultsStore } from '../../lib/stores/results';
+    import { createCombinedResultsStore, createFilteredResultsStore, createSelectedResultsStore, getFilteredStoreAll } from '../../lib/stores/results';
     import { getContext, onDestroy } from "svelte";
     import { derived, writable } from 'svelte/store';
     import { Button, Tabs, TabItem, Search, Breadcrumb, BreadcrumbItem, Modal } from 'flowbite-svelte';
@@ -22,7 +22,6 @@
     let currentSearch = writable('');
     paramSearch.subscribe(v => currentSearch.set(v));
 
-    let openCustomView = writable(undefined);
     let customModalElement;
 
     let openGeneView = writable(undefined);
@@ -39,6 +38,7 @@
     })
 
     const filteredStore = createFilteredResultsStore(combinedStore, currentSearch, currentVisibleCombined);
+    const filteredStoreAll = getFilteredStoreAll(filteredStore);
 
     let geneModalElement;
 
@@ -80,7 +80,7 @@
             </div>
             <!-- TODO: hardcoded number of px above to give it defined height and force resizes -->
             <div class="h-[calc(100vh-214px)]">
-                <ResultGraph filteredStore={filteredStore} heading={'Z-Score Transformed Mean Log2 (Expression)'}/>
+                <ResultGraph filteredStore={filteredStoreAll} heading={'Z-Score Transformed Mean Log2 (Expression)'}/>
             </div>
         </TabItem>
     </Tabs>

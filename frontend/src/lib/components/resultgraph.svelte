@@ -2,7 +2,7 @@
     import { getPlotEmpty } from '$lib/utils/plot';
     import Dropdown from '../components/dropdown.svelte';
     import Plot from '../components/plot.svelte';
-    import { writable } from "@square/svelte-store";
+    import { writable, get } from "svelte/store";
    
     export let filteredStore;
     export let heading;
@@ -17,9 +17,11 @@
     // Initial data parse
     filteredStore.subscribe(fs => {
         if(fs) {
-            datasetsAll = new Map([['', fs.datasetIndicesResults.map(col_i => fs.headings[col_i]).map(h => ({id: h, name: h}))]])
-            datasetsSelect1.set(datasetsAll.get('')[0]);
-            datasetsSelect2.set(datasetsAll.get('')[1]);
+            const datasetAvail = fs.datasetIndicesResults.map(col_i => fs.headings[col_i]);
+            const datasetOptVals =  datasetAvail.map(h => ({id: h, name: h}))
+            datasetsAll = new Map([['', datasetOptVals]])
+            if(!datasetAvail.includes(get(datasetsSelect1)?.id)) datasetsSelect1.set(datasetOptVals[0]);
+            if(!datasetAvail.includes(get(datasetsSelect2)?.id)) datasetsSelect2.set(datasetOptVals[1]);
         }
     });
 

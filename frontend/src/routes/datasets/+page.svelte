@@ -7,6 +7,11 @@ import { Breadcrumb, BreadcrumbItem } from 'flowbite-svelte';
 import Footer from '../../lib/components/footer.svelte'
 import ProgressHeader from '../../lib/components/progress.svelte'
 
+import videoUsingSearch from '../../lib/assets/1 Using Search.webm'
+import videoNavigatingResults1 from '../../lib/assets/2 Navigating Results 1.webm'
+import videoNavigatingResults2 from '../../lib/assets/3 Navigating Results 2.webm'
+import videoTranscriptExpression from '../../lib/assets/4 Transcript Expression.webm'
+
 const { metadata } = getContext('core')
 
 let tocElement;
@@ -101,17 +106,44 @@ onMount(() => {
             <p class='ml-4'>
                 Use the search bar in the home-page by either by entering the HGNC-approved gene symbol or Ensembl IDs. Users can also input multiple genes separated by a comma. Files containing comma separated values (.csv) containing a list of genes can also be uploaded and searched for. You can use the input example genes to gain familiarity with the expected format.
             </p>
+            <video class="w-5/6 py-5 m-auto select-none"
+                src={videoUsingSearch}
+                loop
+                autoplay
+                muted
+            />
             <h5 id='tutorial-navigate' class='text-xl font-sans "Helvetica Neue" my-2'>ii. Navigating your results</h5>
             <p class='ml-4'>
                 Once a query has been sent to the interface, you will be directed to the main page with the results. The gene or genes of interest will be shown in a table with their Ensembl ID, Gene Symbol and a heatmap. The heatmap denotes the relative expression of the gene amongst datasets and if that gene is present in the given dataset. The user can then navigate directly to the corresponding gene page and explore its expression properties for each dataset. Click on the modal to investigate gene expression properties of a specific gene.
             </p>
+            <video class="w-5/6 py-5 m-auto select-none"
+                src={videoNavigatingResults1}
+                loop
+                autoplay
+                muted
+            />
+            <video class="w-5/6 py-5 m-auto select-none"
+                src={videoNavigatingResults2}
+                loop
+                autoplay
+                muted
+            />
             <h5 id='tutorial-visualize' class='text-xl font-sans "Helvetica Neue" my-2'>iii. Visualize your results</h5>
             <div class='ml-4'>
                 <p>BITHub displays interactive plots.</p>
                 <ul class='list-disc ml-8'>
                     <li>
-                        Genome browser view and transcript heatmaps
+                        Genome browser view
                     </li>
+                    <li>
+                        Transcript heatmaps
+                    </li>
+                    <video class="w-5/6 py-5 m-auto select-none"
+                        src={videoTranscriptExpression}
+                        loop
+                        autoplay
+                        muted
+                    />
                     <li>
                         <p>Compare gene expression across datasets</p>
                         <p>To allow the direct comparison of gene expression across different datasets, we have provided a scatterplot listing z-score log2 mean transformed values of gene expression. This plot shows all genes in a given dataset with the gene of interest highlighted in green. Users can use this plot to determine how well a gene is expressed amongst any two datasets.</p>

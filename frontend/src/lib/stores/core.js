@@ -53,7 +53,6 @@ function createCore(url) {
                 const rowStreams = {}
                 const obj = await getHDF5($metadata.value.data_url/*'http://localhost:5501/out.hdf5'*/, progress.set);
                 for(let i=0; i<obj.attrs.remote.length; i+=3) {
-                    console.log(obj.attrs.remote[i+0])
                     rowStreams[obj.attrs.remote[i+0]] = {
                         attrs: obj.get(obj.attrs.remote[i+0]).attrs, 
                         indexPath: obj.attrs.remote[i+1], 

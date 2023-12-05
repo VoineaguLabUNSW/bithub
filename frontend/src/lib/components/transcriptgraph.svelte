@@ -52,7 +52,6 @@
         else {
             // Prevent invalid combinations during updates
             const [ds, ts] = $transcriptSelect.id.split('|', 2)
-            console.log(ds, ts)
             if(ds !== $expressionDataObj.$datasetsSelect.id) return
 
             const headingsX = $expressionDataObj.categories

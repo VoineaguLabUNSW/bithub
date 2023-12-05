@@ -15,11 +15,8 @@
 
     $: {
         if($browser && $filteredStore && ($currentRow !== undefined)) {
-            console.log($currentRow)
             let [chr, start, end] = [3, 4, 5].map(col_i =>  $filteredStore.columns[col_i][$currentRow]);
             const locus = `chr${withoutNullsStr(chr)}:${start}-${end}`
-            
-            console.log(locus)
             $browser.search(locus)
         }
     }

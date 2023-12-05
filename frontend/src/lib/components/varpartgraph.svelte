@@ -35,8 +35,6 @@
         if(!$varianceDataObj) set(getPlotEmpty('No data'));
         else if($varianceDataObj.varpart.loading) set(getPlotEmpty('Loading'));
         else {
-            console.log($varianceDataObj)
-            console.log($varianceDataObj.headings, $varianceDataObj.varpart.data.values)
             set({
                 plotData: [{
                     type: 'bar',

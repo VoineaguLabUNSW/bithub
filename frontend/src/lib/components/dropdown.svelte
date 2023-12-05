@@ -11,13 +11,14 @@
     let open = false;
     let filter = '';
     let disabled = '';
+    let mainClass = '';
     $: disabled = !groups || Array.from(groups.values()).reduce((acc, arr) => acc + arr.length, 0) == 0
     $: if(!open) filter = '';
   </script>
   
 <div class='flex w-52 flex-col items-stretch'>
     <div class='text-sm ml-2'>{title}</div>
-    <Button disabled={disabled} color="light">
+    <Button class={mainClass} disabled={disabled} color="light">
         <span class="overflow-x-hidden text-ellipsis">
             {$selected?.name || placeholder}
         </span><i class='fas fa-angle-down pl-2 text-gray-200'/></Button>

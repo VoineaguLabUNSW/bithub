@@ -4,6 +4,9 @@
     import ResultGraph from '../../lib/components/resultgraph.svelte';
     import GeneView from '../../lib/components/geneview.svelte';
     import CustomView from '../../lib/components/customview.svelte';
+    import DropdownFile from '../../lib/components/dropdownfile.svelte'
+    import { findMatchesSorted } from "../../lib/utils/hdf5";
+    import { asCSV } from '../../lib/stores/custom'
     import { createParam, createIntParam, createListParam } from '../../lib/stores/param';
     import { createCombinedResultsStore, createFilteredResultsStore, createSelectedResultsStore, getFilteredStoreAll } from '../../lib/stores/results';
     import { getContext, onDestroy } from "svelte";
@@ -13,6 +16,25 @@
     import ProgressHeader from '../../lib/components/progress.svelte';
 
     const { row, data, customs } = getContext('core');
+
+    const userFilterFiles = writable(undefined);
+    const userFilterFileActive = writable(true);
+    const userFilterContent = asCSV(userFilterFiles, false, 1, 1)
+    const userFilterColumn = derived([data, userFilterContent], ([$data, $userFilterContent], set) => {
+        if(!$userFilterContent?.result || !$data?.value) return;
+        const headings = $data.value.get('data').attrs.order;
+        const ensemblIds = $data.value.get('data/' + headings[0]).value;
+        const userEnsemblIds = $userFilterContent.result.map(row => row[0]);
+        const ensemblMatches = findMatchesSorted([ensemblIds], userEnsemblIds);
+        if(ensemblMatches.length == 0) {
+            set({error: 'No strings in the first column matched to Ensembl IDs'});
+        } else {
+            set({result: ensemblMatches.map(m => m.rowIndex)})
+        }
+    })
+    const userFilterIndices = derived([userFilterColumn, userFilterFileActive], ([$userFilterColumn, $userFilterFileActive]) => {
+        return $userFilterFileActive ? $userFilterColumn?.result : undefined;
+    });
 
     let paramPage = createIntParam('page', 1);
     let paramSearch = createParam('terms', '', v=>v, true);
@@ -37,7 +59,7 @@
         subscribe: derived([paramVisible, combinedStore], ([$v, $c]) => $v?.length ? $v : $c?.headingsDefaultVisible || [], []).subscribe
     })
 
-    const filteredStore = createFilteredResultsStore(combinedStore, currentSearch, currentVisibleCombined);
+    const filteredStore = createFilteredResultsStore(combinedStore, currentSearch, currentVisibleCombined, userFilterIndices);
     const filteredStoreAll = getFilteredStoreAll(filteredStore);
 
     let geneModalElement;
@@ -57,10 +79,10 @@
         </Breadcrumb>
     </div>
 
-    <div class="flex items-center gap-2 items-stretch pb-4">
-        <Search on:blur={(e) => paramSearch.set(e.target.value)} bind:value={$currentSearch}/>
-        <Button disabled color='light'><i class='fas fa-file-lines'/></Button>
-        <Button on:click={() => paramModal.set('custom')} color='light'><i class='fas fa-plus'/></Button>
+    <div class="flex items-center gap-1 items-stretch pb-4">
+        <DropdownFile files={userFilterFiles} active={userFilterFileActive} mainClass='rounded-e-none max-w-[150px] min-w-[150px]' title='Filter...' error={$userFilterContent?.error} help='First column should be Ensembl IDs or gene symbols.'></DropdownFile>
+        <Search class='rounded-none' on:blur={(e) => paramSearch.set(e.target.value)} bind:value={$currentSearch}/>
+        <Button class='rounded-s-none' on:click={() => paramModal.set('custom')} color='dark'><i class='fas fa-plus'/></Button>
     </div>
 
     <Tabs contentClass='bg-white mt-0 shadow-lg sm:rounded-lg'>

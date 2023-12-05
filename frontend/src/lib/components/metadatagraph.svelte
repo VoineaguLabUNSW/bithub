@@ -114,9 +114,6 @@
             if($scaleSelect.id === 'Log 10') y = y.map(v => Math.log10(v))
 
             let data = x.map((x, i) => ({x, y: y[i],  z: z[i], name: names[i]}))
-
-            console.log(data)
-
             if(cs) {
                 const csColumn = withoutNulls(reader.getColumn(reader.customFilterColumn).values)
                 data = data.filter((d, i) => csColumn[i] == cs)
@@ -128,7 +125,6 @@
             if((typeof data[0].x) == 'string' || data[0].x instanceof String) {
                 set(getPlotViolinBasic(headingMain, data, headingX, headingY, headingZ, orderX, orderZ, groupLabelsX, groupSizesX))
             } else {
-                console.log('plotting scatter')
                 set(getPlotScatter(headingMain, data, headingX, headingY, headingZ, orderZ))   
             }
         }

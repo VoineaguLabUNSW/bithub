@@ -47,12 +47,11 @@ function createCombinedResultsStore(data, customDatasets) {
     });
 }
 
-function createFilteredResultsStore(columnStore, currentSearch, currentVisibleCombined) {
-    return derived([columnStore, currentSearch, currentVisibleCombined], ([$columnStore, $currentSearch, $currentVisibleCombined], set) => {
+function createFilteredResultsStore(columnStore, currentSearch, currentVisibleCombined, currentIndexSubset) {
+    return derived([columnStore, currentSearch, currentVisibleCombined, currentIndexSubset], ([$columnStore, $currentSearch, $currentVisibleCombined, $currentIndexSubset], set) => {
         if ($columnStore) {
             const columns = $columnStore.columns;
-            let results = Array.from(Array(columns[0].length).keys());
-
+            let results = $currentIndexSubset || Array.from(Array(columns[0].length).keys());
             let datasetIndicesResults = $columnStore.datasetIndices
             if($currentSearch) {
                 const searchTerms = $currentSearch.split(',').map(st => st.trim().toLowerCase())
@@ -62,7 +61,7 @@ function createFilteredResultsStore(columnStore, currentSearch, currentVisibleCo
                     const searchable = columns.map((_, col_i) => col_i).filter(col_i => $columnStore.columnStringSizes[col_i]).filter(col_i => $currentVisibleCombined.includes($columnStore.headings[col_i]))
                     results = results.filter(row_i => searchable.some(col_i => $columnStore.columns[col_i][row_i].toLowerCase().includes(searchTerms[0])))
                 } else {
-                    const exactSearchable = [0, 1].filter(col_i => $currentVisibleCombined.includes($columnStore.headings[col_i])).map(col_i => columns[col_i])
+                    const exactSearchable = [0, 1].filter(col_i => $currentVisibleCombined.includes($columnStore.headings[col_i])).map(col_i => results.map(row_i => columns[col_i][row_i]))
                     results = findMatchesSorted(exactSearchable, searchTerms).map(obj => obj.rowIndex);
                 }
                 datasetIndicesResults = datasetIndicesResults.filter(col_i => results.some(row_i => $columnStore.original[col_i][row_i] >= 0))

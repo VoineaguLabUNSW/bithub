@@ -4,7 +4,7 @@
     import { writable } from "@square/svelte-store";
     import { getContext } from "svelte";
     import { derived } from 'svelte/store';
-    import { getPlotEmpty } from '../utils/plot';
+    import { getColumnDownloader, getPlotEmpty, getZipped } from '../utils/plot';
 
     export let filteredStore;
     export let heading;
@@ -35,11 +35,15 @@
         if(!$varianceDataObj) set(getPlotEmpty('No data'));
         else if($varianceDataObj.varpart.loading) set(getPlotEmpty('Loading'));
         else {
+            const combinedHeading = heading + ` - ${$datasetsSelect?.id}`;
+            const [x, y] = [$varianceDataObj.headings, $varianceDataObj.varpart.data.values];
+            const xName = 'Metadata Variable';
+            const yName = 'Fraction Variance Explained';
             set({
                 plotData: [{
                     type: 'bar',
-                    x: $varianceDataObj.headings,
-                    y: $varianceDataObj.varpart.data.values,
+                    x: x,
+                    y: y,
                     orientation: 'v',
                     marker: {
                         color: self.variancePartitionColor
@@ -48,23 +52,23 @@
                 layout: { 
                     showlegend: false,
                     title: {
-                        text: heading + ` - ${$datasetsSelect?.id}`,
+                        text: combinedHeading,
                         font: { family: "Times New Roman", size: 20 },
                     },
                     xaxis: {
                         title: {
-                            text: 'Metadata Variable',
+                            text: xName,
                             font: { family: 'Times New Roman', size: 18, color: '#7f7f7f' }
                         },
                     },
                     yaxis: {
                         title: {
-                            text: 'Fraction Variance Explained',
+                            text: yName,
                             font: { family: 'Times New Roman', size: 18, color: '#7f7f7f' }
                         }
                     },
-                }
-            
+                },
+                downloadCSV: getColumnDownloader(combinedHeading, getZipped({x, y}), xName, yName)
             })
         }
     

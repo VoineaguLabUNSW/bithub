@@ -7,6 +7,7 @@
     import { derived } from 'svelte/store'
     import { Tabs, TabItem, Popover } from 'flowbite-svelte';
     import TranscriptGraph from '../components/transcriptgraph.svelte';
+    import { withoutNullsStr } from '../utils/hdf5'
 
     export let currentRow;
     export let filteredStore;
@@ -17,7 +18,7 @@
     const filteredTranscript = getFilteredStoreGroup(filteredStore, ['_transcripts'])
 
     const geneInfo = derived(filteredStore, $filteredStore => {
-        const [ensembl, symbol, description] = [0, 1, 2].map(col_i => $filteredStore.columns[col_i][$currentRow],)
+        const [ensembl, symbol, description] = [0, 1, 2].map(col_i => withoutNullsStr($filteredStore.columns[col_i][$currentRow]))
         return { ensembl, symbol, description }
     })
 </script>

@@ -1,6 +1,8 @@
 <script>
     import Dropdown from '../components/dropdown.svelte';
     import Plot from '../components/plot.svelte';
+
+    import { getZipped } from '../utils/plot'
     
     import { writable, derived } from "svelte/store";
     import { getPlotEmpty, getPlotViolinBasic, getPlotScatter } from '../utils/plot';
@@ -113,7 +115,7 @@
             if($scaleSelect.id === 'Log e') y = y.map(v => Math.log(v))
             if($scaleSelect.id === 'Log 10') y = y.map(v => Math.log10(v))
 
-            let data = x.map((x, i) => ({x, y: y[i],  z: z[i], name: names[i]}))
+            let data = getZipped({x, y, z, name: names})
             if(cs) {
                 const csColumn = withoutNulls(reader.getColumn(reader.customFilterColumn).values)
                 data = data.filter((d, i) => csColumn[i] == cs)

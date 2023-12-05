@@ -2,7 +2,9 @@
     import Dropdown from './dropdowncheck.svelte';
     import { paginate, LightPaginationNav } from 'svelte-paginate';
     import chroma from "chroma-js";
-    import { Button } from 'flowbite-svelte';
+    import { Button, Tooltip} from 'flowbite-svelte';
+    import { createRowWriter } from '../utils/save'
+    import { withoutNullsStr } from '../utils/hdf5';
 
     export let filteredStore;
     export let currentPage;
@@ -10,6 +12,7 @@
     export let currentRow;
 
     const COLOR_RANGE = ['#941a6c', '#ffa500']
+    const ZSCORE_RANGE = [-2, 10]
 
     // Heatmap setup
     const scale = chroma.scale(COLOR_RANGE);
@@ -61,8 +64,20 @@
 
             // We aren't modifying the actual page, just truncating the view
             const page = paginate({items: sorted, pageSize: 50, currentPage: $currentPage > 1 && $currentPage * 50 > sorted.length ? Math.floor(sorted.length/50 + 1) : $currentPage});
-            tableData = {...$filteredStore, page, tableSize: sorted.length};
+            
+            tableData = {...$filteredStore, page, sorted, tableSize: sorted.length};
         }
+    }
+
+    function downloadTSV(tableData, $filteredStore, currentVisibleIndices) {
+        currentVisibleIndices.sort((a, b) => a - b);
+        const transformRow = (arr) => arr.map(v => v === -Infinity ? 'NA' : withoutNullsStr(v))
+        const tsv = createRowWriter('BITHub.tsv', '\t');
+        tsv.write(currentVisibleIndices.map(col_i => $filteredStore.headings[col_i]));
+        for(let row_i of tableData.sorted) {
+            tsv.write(transformRow(currentVisibleIndices.map(col_i => $filteredStore.columns[col_i][row_i])))
+        }
+        tsv.close()
     }
 </script>
 
@@ -74,7 +89,7 @@
         {@const databaseIndicesFiltered = tableData.databaseIndices.filter(v => currentVisibleIndices.includes(v))}
         <div>
             <span class="absolute m-4 gap-1 flex items-center justify-between items-stretch">
-                <Button disabled color="light" class="rounded-e-none"><i class="fas fa-download"/></Button>
+                <Button on:click={() => downloadTSV(tableData, $filteredStore, currentVisibleIndices)} color="light" class="rounded-e-none"><i class="fas fa-download"/></Button>
                 <span class="w-64"><Dropdown title="Columns" mainClass="rounded-s-none" groups={tableData.headingGroups} selected={currentVisible} disabled={tableData.headings[0]}/></span>
             </span>
             <table class="table-fixed w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
@@ -95,6 +110,14 @@
                                     </span>
                                     <span class="p-1">{id}</span>
                                 </span>
+                                <div class='flex flex-col items-center justify-between items-stretch w-[100%] m-auto text-xs normal-case'>
+                                    <span class="float-right text-right">{ZSCORE_RANGE[1]} ┐</span>
+                                    <div class='bg-red-600 h-[4px] rounded-xl w-full' style="background: linear-gradient(to right, {COLOR_RANGE.join(',')});"></div>
+                                    <span>
+                                        <span class='float-left text-left'>└ {ZSCORE_RANGE[0]}</span>
+                                        <span class='float-right text-right'>z-scores</span>
+                                    </span>
+                                </div>
                             </th>
                         {/if}
                         {#if databaseIndicesFiltered.length } 
@@ -112,9 +135,9 @@
                     </tr>
                     <tr>
                         <!-- Normal headings -->
-                        {#each generalIndicesFiltered as i}
-                            {@const id = tableData.headings[i]}
-                            <th data-sort-id={id} data-sort-list={i} on:click={toggleSort} scope="col" class="cursor-pointer select-none whitespace-nowrap overflow-hidden overflow-ellipsis">
+                        {#each generalIndicesFiltered as ci}
+                            {@const id = tableData.headings[ci]}
+                            <th data-sort-id={id} data-sort-list={ci} on:click={toggleSort} scope="col" class="cursor-pointer select-none whitespace-nowrap overflow-hidden overflow-ellipsis">
                                 <span class='pointer-events-none'>
                                     <span class="fa-stack fa-1x text-gray-300">
                                         <i class="fa-solid fa-caret-up fa-stack-1x mb-1 {currSort.id === id && currSort.type == 2 ? 'text-gray-800': 'text-gray-300'}"></i>
@@ -126,9 +149,9 @@
                         {/each}
 
                         <!-- Rotated headings -->
-                        {#each datasetIndicesFiltered.concat(databaseIndicesFiltered) as i }
-                            {@const id = tableData.headings[i]}
-                            <th data-sort-id={id} data-sort-list={i} on:click={toggleSort} scope="col" class="cursor-pointer select-none align-bottom">
+                        {#each datasetIndicesFiltered.concat(databaseIndicesFiltered) as ci }
+                            {@const id = tableData.headings[ci]}
+                            <th data-sort-id={id} data-sort-list={ci} on:click={toggleSort} scope="col" class="cursor-pointer select-none align-bottom">
                                 <span class='pointer-events-none'>
                                     <span class="p-2 [writing-mode:vertical-lr] scale-[-1] ">{id}</span>
                                     <span class="fa-stack fa-1x text-gray-300">
@@ -153,7 +176,7 @@
                             {#each datasetIndicesFiltered.concat(databaseIndicesFiltered) as ci }
                                 {@const zscore = tableData.columns[ci][ri]}
                                 {#if zscore !== Number.NEGATIVE_INFINITY }
-                                <td class='hover:translate-y-[-3px] group text-center outline outline-1 outline-white rounded-lg shadow-md transition duration-50' style='background-color:{toColorScale(zscore, -2, 7)}'>
+                                <td class='hover:translate-y-[-3px] group text-center outline outline-1 outline-white rounded-lg shadow-md transition duration-50' style='background-color:{toColorScale(zscore, ...ZSCORE_RANGE)}'>
                                     <p class="group-hover:opacity-100 opacity-0 z-50 text-black bg-white border rounded-lg text-center transition duration-400 shadow-md cursor-default overflow-hidden" style="text-overflow: ''">{zscore}</p>
                                 </td>
                                 {:else}

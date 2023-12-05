@@ -4,7 +4,8 @@
     import { writable } from "@square/svelte-store";
     import { getContext } from "svelte";
     import { derived } from 'svelte/store';
-    import { getPlotEmpty } from '../utils/plot';
+    import { getPlotEmpty, getTablDownloader } from '../utils/plot';
+    import { withoutNullsStr } from '$lib/utils/hdf5';
 
     export let filteredStore;
     export let heading;
@@ -63,6 +64,7 @@
 
             values = headingsY.map((_, i) => values.slice(i*headingsX.length, (i+1)*headingsX.length))
 
+            const combinedHeading = heading + ` - ${headingsY.length} Transcripts`;
             set({
                 plotData: [{
                     z: values,
@@ -77,7 +79,7 @@
                 layout: { 
                     height: Math.max(350, 30 * headingsY.length),
                     title: {
-                        text: heading + ` - ${headingsY.length} Transcripts`,
+                        text: combinedHeading,
                         font: {
                             family: "Times New Roman",
                             size: 20
@@ -105,7 +107,8 @@
                         y: 0.5
                     }
                 },
-                config: { responsive: false }
+                config: { responsive: false },
+                downloadCSV: getTablDownloader(combinedHeading, headingsX, headingsY, values)
             });
         }
     })

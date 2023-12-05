@@ -1,3 +1,30 @@
+import { createRowWriter } from '../utils/save'
+import { withoutNullsStr } from './hdf5';
+
+function getZipped(columns) {
+    let keys = Object.keys(columns);
+    return columns[keys[0]].map((_, i) => keys.reduce((acc, curr) => {acc[curr] = columns[curr][i]; return acc}, {}))
+}
+
+function getColumnDownloader(heading, data, xName, yName, zName) {
+    return () => {
+        const onlyDefined = (arr) =>  arr.filter(v => v !== undefined).map(v => withoutNullsStr(v))
+        const csv = createRowWriter(heading.toLowerCase().replaceAll(' ', '_') + '.csv', ',')
+        csv.write(onlyDefined(['', yName, xName, zName]))
+        for(let d of data) csv.write(onlyDefined([d.name, d.y, d.x, d.z]))
+        csv.close()
+    }
+}
+
+function getTablDownloader(heading, headingsX, headingsY, values) {
+    return () => {
+        const csv = createRowWriter(heading.toLowerCase().replaceAll(' ', '_') + '.csv', ',')
+        csv.write(['', ...headingsX])
+        for(let [i, h] of headingsY.entries()) csv.write([h, ...values[i]])
+        csv.close()
+    }
+}
+
 function getOrderIndexed(arr, order, unknown_name='Unknown', unknown_index=Infinity) {
     const ret = new Map(order.map((x, i) => [x, {index: i, seen: false}]));
     arr.forEach(v => {
@@ -34,7 +61,7 @@ function getPlotEmpty(message) {
             responsive: true,
             displaylogo: false,
             staticPlot: true,
-        }
+        },
     }
 }
 
@@ -97,8 +124,8 @@ function getPlotScatter(heading, data, xName, yName, zName, orderZ) {
                     font: { family: 'Times New Roman', size: 18, color: '#7f7f7f' }
                 }
             },
-        }
-    
+        },
+        downloadCSV: getColumnDownloader(heading, data, xName, yName, zName)
     }
 }
 
@@ -154,7 +181,6 @@ function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, 
                 borderwidth: 10,
             });
 
-            console.log(nextStart, seenX.length)
             if(nextStart < seenX.length) {
                 groupShapes.push({
                     type: 'line',
@@ -230,8 +256,9 @@ function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, 
             shapes: groupShapes,
             annotations: groupAnnotations,
             legend: { x: 1, y: 0.5 }
-        }
+        },
+        downloadCSV: getColumnDownloader(heading, data, xName, yName, zName)
     }
 }
 
-export { getPlotEmpty, getPlotViolinBasic, getPlotScatter }
+export { getPlotEmpty, getPlotViolinBasic, getPlotScatter, getColumnDownloader, getZipped, getTablDownloader }

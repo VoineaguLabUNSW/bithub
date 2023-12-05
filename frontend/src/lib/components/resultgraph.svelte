@@ -1,5 +1,5 @@
 <script>
-    import { getPlotEmpty } from '$lib/utils/plot';
+    import { getPlotEmpty, getColumnDownloader, getZipped } from '../utils/plot';
     import Dropdown from '../components/dropdown.svelte';
     import Plot from '../components/plot.svelte';
     import { writable, get } from "svelte/store";
@@ -40,6 +40,8 @@
                     size: 15
                 }
             }
+            const xName = $datasetsSelect1.id;
+            const yName = $datasetsSelect2.id;
             
             plotlyArgs.set({
                 plotData: [
@@ -79,7 +81,8 @@
                             font: { family: 'Times New Roman', size: 18, color: '#7f7f7f' }
                         }
                     },
-                }
+                },
+                downloadCSV: getColumnDownloader(heading, getZipped({x, y, name: filteredNames}), xName, yName)
             });
         }  
     }

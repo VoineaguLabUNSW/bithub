@@ -7,18 +7,20 @@
     export let groups;
     export let title = '';
     export let placeholder = 'Select...';
+    export let mainClass = '';
+    export let color = 'light';
 
     let open = false;
     let filter = '';
     let disabled = '';
-    let mainClass = '';
+    
     $: disabled = !groups || Array.from(groups.values()).reduce((acc, arr) => acc + arr.length, 0) == 0
     $: if(!open) filter = '';
   </script>
   
 <div class='flex w-52 flex-col items-stretch'>
     <div class='text-sm ml-2'>{title}</div>
-    <Button class={mainClass} disabled={disabled} color="light">
+    <Button class={mainClass} disabled={disabled} color={color}>
         <span class="overflow-x-hidden text-ellipsis">
             {$selected?.name || placeholder}
         </span><i class='fas fa-angle-down pl-2 text-gray-200'/></Button>

@@ -2,9 +2,10 @@
     import { Button, Dropdown, Toggle, Fileupload } from 'flowbite-svelte';
     import { ChevronDownSolid } from 'flowbite-svelte-icons';
     
-    export let title = '';
+    export let title = 'Select...';
     export let help = ''
     export let mainClass = ''
+    export let color = 'light'
 
     export let files;
     export let active;
@@ -13,7 +14,7 @@
     let open;
 </script>
   
-<Button class={mainClass} color="light">
+<Button class={mainClass} color={color}>
     <span class='whitespace-nowrap overflow-hidden text-ellipsis'>{($files?.length && $active && !error) ? $files[0].name : title}</span>
     <ChevronDownSolid class="w-3 h-3 ml-2 text-gray-200 dark:text-white" />
 </Button>

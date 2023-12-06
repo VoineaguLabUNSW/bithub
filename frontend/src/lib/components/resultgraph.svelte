@@ -1,5 +1,5 @@
 <script>
-    import { getPlotEmpty, getColumnDownloader, getZipped } from '../utils/plot';
+    import { getPlotEmpty, getColumnDownloader, getZipped, getWithNA } from '../utils/plot';
     import Dropdown from '../components/dropdown.svelte';
     import Plot from '../components/plot.svelte';
     import { writable, get } from "svelte/store";
@@ -82,7 +82,7 @@
                         }
                     },
                 },
-                downloadCSV: getColumnDownloader(heading, getZipped({x, y, name: filteredNames}), xName, yName)
+                downloadCSV: getColumnDownloader(heading, getZipped({x: getWithNA(x), y: getWithNA(y), name: filteredNames}), xName, yName)
             });
         }  
     }

@@ -80,7 +80,7 @@
     </div>
 
     <div class="flex items-center gap-1 items-stretch pb-4">
-        <DropdownFile files={userFilterFiles} active={userFilterFileActive} mainClass='rounded-e-none max-w-[150px] min-w-[150px]' title='Filter...' error={$userFilterContent?.error} help='First column should be Ensembl IDs or gene symbols.'></DropdownFile>
+        <DropdownFile files={userFilterFiles} active={userFilterFileActive} mainClass='rounded-e-none max-w-[150px] min-w-[150px]' color='dark' title='Filter...' error={$userFilterColumn?.error || $userFilterContent?.error} help='First column should be Ensembl IDs or gene symbols.'></DropdownFile>
         <Search class='rounded-none' on:blur={(e) => paramSearch.set(e.target.value)} bind:value={$currentSearch}/>
         <Button class='rounded-s-none' on:click={() => paramModal.set('custom')} color='dark'><i class='fas fa-plus'/></Button>
     </div>

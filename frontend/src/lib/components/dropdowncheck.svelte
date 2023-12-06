@@ -3,22 +3,19 @@
     import { ChevronDownSolid } from 'flowbite-svelte-icons';
 
     export let groups;
-    export let title = '';
+    export let title = 'Select...';
     export let disabled = [];
     export let selected = [];
     export let mainClass = '';
+    export let color = 'light';
 
     let open = false;
     
     let filter = '';
     $: if(!open) filter = '';
-
-    if(!title) title = 'Select:';
-    if(!groups) groups = new Map([['first', ['one', 'two', 'three', 'four']], ['second', ['one']]]);
-    if(Array.isArray(groups)) groups = new Map([['', groups]]);
 </script>
   
-<Button class={mainClass} color="light">{title}<ChevronDownSolid class="w-3 h-3 ml-2 text-gray-200 dark:text-white" /></Button>
+<Button class={mainClass} color={color}>{title}<ChevronDownSolid class="w-3 h-3 ml-2 text-gray-200 dark:text-white" /></Button>
 <Dropdown bind:open class="overflow-y-auto px-3 pb-3 text-sm h-44 divide-y divide-gray-100">
     <div slot="header" class="p-3">
         <Search placeholder='Filter...' bind:value={filter} size="md" />

@@ -64,7 +64,7 @@
 
             values = headingsY.map((_, i) => values.slice(i*headingsX.length, (i+1)*headingsX.length))
 
-            const combinedHeading = heading + ` - ${headingsY.length} Transcripts`;
+            const combinedHeading = heading + ` - ${ds} (${headingsY.length} Transcripts)`;
             set({
                 plotData: [{
                     z: values,

@@ -1,6 +1,10 @@
 import { createRowWriter } from '../utils/save'
 import { withoutNullsStr } from './hdf5';
 
+function getWithNA(arr, from=-Infinity, to='NA') {
+    return arr.map(v => (v === from) ? to : v)
+}
+
 function getZipped(columns) {
     let keys = Object.keys(columns);
     return columns[keys[0]].map((_, i) => keys.reduce((acc, curr) => {acc[curr] = columns[curr][i]; return acc}, {}))
@@ -255,10 +259,10 @@ function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, 
             },
             shapes: groupShapes,
             annotations: groupAnnotations,
-            legend: { x: 1, y: 0.5 }
+            legend: { x: 1, y: 0.5, title: {text: zName} }
         },
         downloadCSV: getColumnDownloader(heading, data, xName, yName, zName)
     }
 }
 
-export { getPlotEmpty, getPlotViolinBasic, getPlotScatter, getColumnDownloader, getZipped, getTablDownloader }
+export { getPlotEmpty, getPlotViolinBasic, getPlotScatter, getColumnDownloader, getZipped, getWithNA, getTablDownloader }

@@ -3,6 +3,7 @@
     import Dropdown from '../components/dropdown.svelte';
     import Plot from '../components/plot.svelte';
     import { writable, get } from "svelte/store";
+    import { primary } from '../utils/colors'
    
     export let filteredStore;
     export let heading;
@@ -44,22 +45,20 @@
             const yName = $datasetsSelect2.id;
             
             plotlyArgs.set({
-                plotData: [
-                    {
+                plotData: [{
                         mode: 'markers',
                         type: 'scattergl',
                         x: $filteredStore.columns[inds[0]],
                         y: $filteredStore.columns[inds[1]],
                         hoverinfo: 'skip',
-                        marker : {color: 'rgb(219, 219, 219)'}
-                    },
-                    {
+                        marker : {color: 'lightgray'}
+                    },{
                         mode: 'markers',
                         type: 'scattergl',
                         name: '',
                         x: x,
                         y: y,
-                        marker : {color: 'rgb(196, 89, 59)', ...extraMarkerArgs},
+                        marker : {color: primary[600], ...extraMarkerArgs},
                         text: filteredNames
                     }
                 ],

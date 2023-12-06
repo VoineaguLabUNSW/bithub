@@ -5,6 +5,7 @@
     import { getContext } from "svelte";
     import { derived } from 'svelte/store';
     import { getColumnDownloader, getPlotEmpty, getZipped } from '../utils/plot';
+    import { primary } from '../utils/colors'
 
     export let filteredStore;
     export let heading;
@@ -45,9 +46,7 @@
                     x: x,
                     y: y,
                     orientation: 'v',
-                    marker: {
-                        color: self.variancePartitionColor
-                    }
+                    //marker: { color: primary[900] }
                 }],
                 layout: { 
                     showlegend: false,

@@ -1,7 +1,7 @@
 <script>
     import Dropdown from './dropdowncheck.svelte';
     import { paginate, LightPaginationNav } from 'svelte-paginate';
-    import chroma from "chroma-js";
+    import { gradientCSS, toColorScale, gradientRange } from '../utils/colors'
     import { Button, Tooltip} from 'flowbite-svelte';
     import { createRowWriter } from '../utils/save'
     import { withoutNullsStr } from '../utils/hdf5';
@@ -10,22 +10,6 @@
     export let currentPage;
     export let currentVisible;
     export let currentRow;
-
-    const COLOR_RANGE = ['#ffa500', 'gray', '#941a6c']
-    const ZSCORE_RANGE = [-3, 0, 3]
-
-    // Heatmap setup (ZSCORE_GRAD used for legend, toColorScale used by heatmap)
-    const norm = (v, min, max) => (v - min) / (max-min)
-    const ZSCORE_STOPS = ZSCORE_RANGE.map(v => norm(v, ZSCORE_RANGE[0], ZSCORE_RANGE[ZSCORE_RANGE.length-1]))
-    const ZSCORE_GRAD = ZSCORE_STOPS.map((s, i) => `${COLOR_RANGE[i]} ${s*100}%`).flat()
-    const scales = COLOR_RANGE.slice(1).map((_, i) => chroma.scale([COLOR_RANGE[i], COLOR_RANGE[i+1]]))
-    function toColorScale(v) {
-        let i=0;
-        v = Math.max(ZSCORE_RANGE[0], Math.min(v, ZSCORE_RANGE[ZSCORE_RANGE.length-1]))
-        for(; ZSCORE_RANGE[i+1]<v; i++) continue;
-        v = norm(v, ZSCORE_RANGE[i], ZSCORE_RANGE[i+1])
-        return  scales[i](v).hex();
-    }
 
     // Custom sorting setup
     let currSort = {list: [], type: 0, id: undefined};
@@ -117,10 +101,10 @@
                                     <span class="p-1">{id}</span>
                                 </span>
                                 <div class='flex flex-col items-center justify-between items-stretch w-[100%] m-auto text-xs normal-case'>
-                                    <span class="float-right text-right">{ZSCORE_RANGE[ZSCORE_RANGE.length-1]} ┐</span>
-                                    <div class='bg-red-600 h-[4px] rounded-xl w-full' style="background: linear-gradient(to right, {ZSCORE_GRAD.join(',')});"></div>
+                                    <span class="float-right text-right">{gradientRange[1]} ┐</span>
+                                    <div class='bg-red-600 h-[4px] rounded-xl w-full' style="background: linear-gradient(to right, {gradientCSS});"></div>
                                     <span>
-                                        <span class='float-left text-left'>└ {ZSCORE_RANGE[0]}</span>
+                                        <span class='float-left text-left'>└ {gradientRange[0]}</span>
                                         <span class='float-right text-right'>z-scores</span>
                                     </span>
                                 </div>
@@ -182,7 +166,7 @@
                             {#each datasetIndicesFiltered.concat(databaseIndicesFiltered) as ci }
                                 {@const zscore = tableData.columns[ci][ri]}
                                 {#if zscore !== Number.NEGATIVE_INFINITY }
-                                <td class='hover:translate-y-[-3px] group text-center outline outline-1 outline-white rounded-lg shadow-md transition duration-50' style='background-color:{toColorScale(zscore, ...ZSCORE_RANGE)}'>
+                                <td class='hover:translate-y-[-3px] group text-center outline outline-1 outline-white rounded-lg shadow-md transition duration-50' style='background-color:{toColorScale(zscore)}'>
                                     <p class="group-hover:opacity-100 opacity-0 z-50 text-black bg-white border rounded-lg text-center transition duration-400 shadow-md cursor-default overflow-hidden" style="text-overflow: ''">{zscore}</p>
                                 </td>
                                 {:else}

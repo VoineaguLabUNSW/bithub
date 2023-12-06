@@ -11,14 +11,20 @@
     export let currentVisible;
     export let currentRow;
 
-    const COLOR_RANGE = ['#941a6c', '#ffa500']
-    const ZSCORE_RANGE = [-2, 10]
+    const COLOR_RANGE = ['#ffa500', 'gray', '#941a6c']
+    const ZSCORE_RANGE = [-3, 0, 3]
 
-    // Heatmap setup
-    const scale = chroma.scale(COLOR_RANGE);
-    function toColorScale(v, min, max) {
-        v = Math.max(Math.min(v, max), min);
-        return scale((v-min)/max).hex();
+    // Heatmap setup (ZSCORE_GRAD used for legend, toColorScale used by heatmap)
+    const norm = (v, min, max) => (v - min) / (max-min)
+    const ZSCORE_STOPS = ZSCORE_RANGE.map(v => norm(v, ZSCORE_RANGE[0], ZSCORE_RANGE[ZSCORE_RANGE.length-1]))
+    const ZSCORE_GRAD = ZSCORE_STOPS.map((s, i) => `${COLOR_RANGE[i]} ${s*100}%`).flat()
+    const scales = COLOR_RANGE.slice(1).map((_, i) => chroma.scale([COLOR_RANGE[i], COLOR_RANGE[i+1]]))
+    function toColorScale(v) {
+        let i=0;
+        v = Math.max(ZSCORE_RANGE[0], Math.min(v, ZSCORE_RANGE[ZSCORE_RANGE.length-1]))
+        for(; ZSCORE_RANGE[i+1]<v; i++) continue;
+        v = norm(v, ZSCORE_RANGE[i], ZSCORE_RANGE[i+1])
+        return  scales[i](v).hex();
     }
 
     // Custom sorting setup
@@ -111,8 +117,8 @@
                                     <span class="p-1">{id}</span>
                                 </span>
                                 <div class='flex flex-col items-center justify-between items-stretch w-[100%] m-auto text-xs normal-case'>
-                                    <span class="float-right text-right">{ZSCORE_RANGE[1]} ┐</span>
-                                    <div class='bg-red-600 h-[4px] rounded-xl w-full' style="background: linear-gradient(to right, {COLOR_RANGE.join(',')});"></div>
+                                    <span class="float-right text-right">{ZSCORE_RANGE[ZSCORE_RANGE.length-1]} ┐</span>
+                                    <div class='bg-red-600 h-[4px] rounded-xl w-full' style="background: linear-gradient(to right, {ZSCORE_GRAD.join(',')});"></div>
                                     <span>
                                         <span class='float-left text-left'>└ {ZSCORE_RANGE[0]}</span>
                                         <span class='float-right text-right'>z-scores</span>

@@ -123,7 +123,7 @@
         </div>
         <div class='w-48 flex flex-col items-stretch gap-3'>
             <Dropdown title='Dataset' selected={datasetsSelect} groups={$datasetOptsObj.datasetsOpts}/>
-            <Dropdown title='Transcripts' selected={transcriptSelect} groups={$transcriptOptsObj.transcriptOpts}/>
+            <Dropdown title='Transcripts' selected={transcriptSelect} groups={$transcriptOptsObj?.transcriptOpts}/>
             <Dropdown title='Scale' selected={scaleSelect} groups={scaleOpts}/>
         </div>
     </span>

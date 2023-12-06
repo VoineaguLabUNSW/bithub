@@ -42,7 +42,7 @@
     <TabItem open title="Genome Browser">
         <Genome currentRow={currentRow} filteredStore={filteredStore}/>
     </TabItem>
-    <TabItem>
+    <TabItem disabled={$filteredTranscript.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>
         <div slot='title'>
             <span>Transcript Expression</span>
             <button id="ts-help">
@@ -67,7 +67,7 @@
             <ResultsGraph filteredStore={filteredStore} heading={$geneInfo?.symbol + ' - Z-Score Transformed Mean Log2 (Expression)'}/>
         </div>
     </TabItem>
-    <TabItem disabled={$filteredBulk.datasetIndicesResults.length === 0}>
+    <TabItem disabled={$filteredBulk.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>
         <div slot='title'>
             <span>Gene Expression</span>
             <button id="bulk-help">
@@ -79,7 +79,7 @@
             <MetadataGraph filteredStore={filteredBulk} heading={$geneInfo?.symbol}/>
         </div>
     </TabItem>
-    <TabItem disabled={$filteredVarpart.datasetIndicesResults.length === 0}>
+    <TabItem disabled={$filteredVarpart.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>
         <div slot='title'>
             <span>Drivers of Variation</span>
             <button id="varpart-help">
@@ -91,7 +91,7 @@
             <VarpartGraph filteredStore={filteredVarpart} heading={$geneInfo?.symbol}/>
         </div>
     </TabItem>
-    <TabItem disabled={$filteredSingleCell.datasetIndicesResults.length === 0}>
+    <TabItem disabled={$filteredSingleCell.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>
         <div slot='title'>
             <span>Single Cell Datasets</span>
             <button id="sc-help">

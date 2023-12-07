@@ -1,9 +1,10 @@
 import chroma from "chroma-js";
 
 // Editable constants
-const gradient_colors = ['#ffa500', 'gray', '#941a6c']
-const gradient_stops = [-3, 0, 3]
+const gradientColors = ['#7a1dc2', '#6d97a3', '#ffa500']
+const gradientStops = [-2, 0, 3]
 const primary = {
+    DEFAULT: '#d98b06',
     '50': '#fff8eb',
     '100': '#feeac7',
     '200': '#fdd28a',
@@ -25,6 +26,7 @@ function gradientHelper(colors, stops) {
     const scales = colors.slice(1).map((_, i) => chroma.scale([colors[i], colors[i+1]]))
     const gradientRange = [stops[0], stops[stops.length-1]]
     const gradientCSS = stops.map((s, i) => `${colors[i]} ${norm(s, ...gradientRange)*100}%`).flat()
+    const gradientPairs = stops.map((s, i) => [norm(s, ...gradientRange), colors[i]])
 
     function toColorScale(v) {
         let i=0;
@@ -34,9 +36,9 @@ function gradientHelper(colors, stops) {
         return scales[i](v).hex();
     }
 
-    return { toColorScale, gradientCSS, gradientRange }
+    return { toColorScale, gradientCSS, gradientRange, gradientPairs }
 }
 
-const { toColorScale, gradientCSS, gradientRange } = gradientHelper(gradient_colors, gradient_stops);
+const { toColorScale, gradientCSS, gradientRange, gradientPairs } = gradientHelper(gradientColors, gradientStops);
 
-export { primary, toColorScale, gradientCSS, gradientRange}
+export { primary, toColorScale, gradientCSS, gradientRange, gradientColors, gradientPairs}

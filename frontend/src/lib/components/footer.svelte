@@ -8,7 +8,7 @@
     <div class="w-full mx-auto max-w-screen-xl p-4 md:flex md:items-center md:justify-between">
         <span class="text-sm text-gray-500 sm:text-center dark:text-gray-400">
             <p class="flex">
-                <span>Developed at <a target="_blank" href="https://www.babs.unsw.edu.au/voineagu-lab" class="text-red-600">Voineagu Lab</a>
+                <span>Developed at <a target="_blank" href="https://www.babs.unsw.edu.au/voineagu-lab" class="text-primary">Voineagu Lab</a>
                 </span>
                 {#if $metadata?.value}
                     <span in:fade={{ delay: 500 }}>, data last updated {$metadata.value.last_updated}<strong id="last_updated"></strong>.</span>

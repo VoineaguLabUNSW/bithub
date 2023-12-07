@@ -35,6 +35,7 @@
     const plotlyArgs = derived(varianceDataObj, ($varianceDataObj, set) => {
         if(!$varianceDataObj) set(getPlotEmpty('No data'));
         else if($varianceDataObj.varpart.loading) set(getPlotEmpty('Loading'));
+        else if($varianceDataObj.varpart.error) set(getPlotEmpty($varianceDataObj.varpart.error))
         else {
             const combinedHeading = heading + ` - ${$datasetsSelect?.id}`;
             const [x, y] = [$varianceDataObj.headings, $varianceDataObj.varpart.data.values];

@@ -170,7 +170,13 @@
                                     <p class="group-hover:opacity-100 opacity-0 z-50 text-black bg-white border rounded-lg text-center transition duration-400 shadow-md cursor-default overflow-hidden" style="text-overflow: ''">{zscore}</p>
                                 </td>
                                 {:else}
-                                    <td class='bg-gray-100/50'>&nbsp</td>
+                                    <td style="background: repeating-linear-gradient(
+                                        45deg,
+                                        #e7e7e7,
+                                        #e7e7e7 10px,
+                                        #f3f3f3 10px,
+                                        #f3f3f3 20px
+                                      );">&nbsp</td>
                                 {/if}
                             {/each}
                         </tr>

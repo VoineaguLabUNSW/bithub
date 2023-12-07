@@ -167,15 +167,15 @@
                                 {@const zscore = tableData.columns[ci][ri]}
                                 {#if zscore !== Number.NEGATIVE_INFINITY }
                                 <td class='hover:translate-y-[-3px] group text-center outline outline-1 outline-white rounded-lg shadow-md transition duration-50' style='background-color:{toColorScale(zscore)}'>
-                                    <p class="group-hover:opacity-100 opacity-0 z-50 text-black bg-white border rounded-lg text-center transition duration-400 shadow-md cursor-default overflow-hidden" style="text-overflow: ''">{zscore}</p>
+                                    <p class="group-hover:opacity-100 opacity-0 z-50 text-black bg-white border rounded-lg text-center transition duration-400 shadow-md overflow-hidden" style="text-overflow: ''">{zscore}</p>
                                 </td>
                                 {:else}
-                                    <td style="background: repeating-linear-gradient(
+                                    <td style="opacity: 0.75; background: repeating-linear-gradient(
                                         45deg,
-                                        #e7e7e7,
-                                        #e7e7e7 10px,
-                                        #f3f3f3 10px,
-                                        #f3f3f3 20px
+                                        #e7e7e7,0%,
+                                        #e7e7e7 12.5%,
+                                        #f3f3f3 12.5%,
+                                        #f3f3f3 25%
                                       );">&nbsp</td>
                                 {/if}
                             {/each}

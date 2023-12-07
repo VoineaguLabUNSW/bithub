@@ -4,18 +4,18 @@ import chroma from "chroma-js";
 const gradientColors = ['#0b06b8', '#ffffff', '#b80641']
 const gradientStops = [-2, 0, 3]
 const primary = {
-    DEFAULT: '#d98b06',
-    '50': '#fff8eb',
-    '100': '#feeac7',
-    '200': '#fdd28a',
-    '300': '#fcbb4d',
-    '400': '#fbab24',
-    '500': '#f59e0b',
-    '600': '#d98b06',
-    '700': '#b47409',
-    '800': '#92610e',
-    '900': '#78510f',
-    '950': '#452c03',
+    DEFAULT: '#e74c4c',
+    '50': '#fdf3f3',
+    '100': '#fde3e3',
+    '200': '#fbcdcd',
+    '300': '#f8a9a9',
+    '400': '#ef6060',
+    '500': '#e74c4c',
+    '600': '#d32f2f',
+    '700': '#b12424',
+    '800': '#932121',
+    '900': '#7a2222',
+    '950': '#420d0d',
 }
 
 // Helper functions

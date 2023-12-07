@@ -7,7 +7,7 @@ function createCombinedResultsStore(data, customDatasets) {
             const headings = $data.value.get('data').attrs.order;
             const original = headings.map(k => $data.value.get('data/' + k).value);
             const [isDs, isDb] = [$data.value.get('data').attrs.isDataset, $data.value.get('data').attrs.isDatabase]
-            const indices = headings.map((h, i) => (isDs[i] || isDb[i]) ? $data.value.get('metadata/' + h + '/scaled').value : undefined)
+            const indices = headings.map((h, i) => (isDs[i] || isDb[i]) ? $data.value.get('metadata/' + h + '/zscores/All').value : undefined)
             const columnStringSizes = headings.map(k => $data.value.get('data/' + k).dtype).map(dt => dt.startsWith('S') ? parseInt(dt.slice(1)) : undefined);
             const headingsDefaultVisible = $data.value.get('data').attrs.defaultVisible.map(i => headings[i])
             

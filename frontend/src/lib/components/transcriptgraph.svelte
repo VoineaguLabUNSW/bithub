@@ -5,7 +5,7 @@
     import { getContext } from "svelte";
     import { derived } from 'svelte/store';
     import { getPlotEmpty, getTablDownloader } from '../utils/plot';
-    import { withoutNullsStr } from '$lib/utils/hdf5';
+    import { gradientPairs  } from '../utils/colors'
 
     export let filteredStore;
     export let heading;
@@ -59,12 +59,18 @@
             const headingsY = $expressionDataObj.expression.data.stringValues
             let values = $expressionDataObj.expression.data.floatValues
 
-            if($scaleSelect.id === 'Log e') values = values.map(v => Math.log(v + 0.05))
-            if($scaleSelect.id === 'Log 10') values = values.map(v => Math.log10(v + 0.05))
+            let combinedHeading = heading + ` - ${ds} (${headingsY.length} Transcripts)`;
+
+            let range = [0, 20]
+            if($scaleSelect.id !== 'Linear') {
+                range = [-5, 5]
+                combinedHeading += ` - ${$scaleSelect.id}`
+                if($scaleSelect.id === 'Log e') values = values.map(v => Math.log(v + 0.05))
+                if($scaleSelect.id === 'Log 10') values = values.map(v => Math.log10(v + 0.05))
+            }
 
             values = headingsY.map((_, i) => values.slice(i*headingsX.length, (i+1)*headingsX.length))
 
-            const combinedHeading = heading + ` - ${ds} (${headingsY.length} Transcripts)`;
             set({
                 plotData: [{
                     z: values,
@@ -74,7 +80,9 @@
                     hoverongaps: false,
                     xgap: 0.5,
                     ygap: 0.5,
-                    colorscale: [[-20, 'rgb(0,0,255)'], [20, 'rgb(255,0,0)']]
+                    colorscale: gradientPairs,
+                    zmin: range[0],
+                    zmax: range[1]
                 }],
                 layout: { 
                     height: Math.max(350, 30 * headingsY.length),

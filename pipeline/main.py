@@ -28,7 +28,7 @@ def calc_s3_etag(path, multipart_threshold, multipart_chunksize):
             chunks_hashes.append(hashlib.md5(chunk).digest())
         return hashlib.md5(b''.join(chunks_hashes)).hexdigest() + '-' + str(len(chunks_hashes))
       
-def manage_deploy_cloudfront(asset_paths, cloudfront_url=None, chunk_size=8388608, prefix='bithub'):
+def manage_deploy_cloudfront(asset_paths, cloudfront_url=None, chunk_size=8388608, prefix='bithub_data'):
     '''Upload list of files and return URL mapping'''
     s3 = boto3.client('s3')
     for path, name in zip(asset_paths, map(os.path.basename, asset_paths)):
@@ -49,6 +49,11 @@ def pad_elipses(string, length=20):
     if len(string) > length:
         return string[:length-3] + '...'
     return (' ' * (length - len(string))) + string
+
+def calc_zscore(logs):
+    log_mean = np.mean(logs)
+    log_sd = np.std(logs) or 0.0000000001
+    return np.array([((x - log_mean) / log_sd) for x in logs], dtype='f4')
 
 def iterate_unique(a: Iterable, cmp_key: Callable=lambda x: x):
     '''Filter out repetitions from a sorted iterable'''
@@ -811,6 +816,7 @@ if __name__ == '__main__':
                 matrix_meta_root = meta_root.create_group('matrices')
                 matrix_meta_root.attrs.create('order', [m['name'] for m in d['matrices']])
                 all_logs = {}
+                [filter_name, filter_categories] = ['', []]
                 for matrix in d['matrices']:
                     name, shape = matrix['name'], (len(annots_written), d['_internal_sample_count'])
                     ranges, _, _, logs, logs_filter_enum = matrix['_internal']
@@ -820,19 +826,20 @@ if __name__ == '__main__':
                     curr_matrix_meta_root.attrs.create('shape', shape)
                     remote_range_datasets.append([curr_matrix_meta_root.name, '/data/' + d['id'], 'RowData'])
 
-                    all_logs.setdefault('scaled', []).append(logs)
+                    all_logs.setdefault('All', []).append(logs)
                     if logs_filter_enum:
                         [filter_name, filter_categories, filter_factors], filter_indices, logs_filter = logs_filter_enum
                         for i in range(len(filter_categories)): 
                             if logs_filter[i]:
-                                all_logs.setdefault('_'.join(('scaled', filter_name, filter_categories[i].replace('/', '-'))), []).append(logs_filter[i])
+                                all_logs.setdefault(filter_categories[i].replace('/', '-'), []).append(logs_filter[i])
 
+                zscore_meta_root = meta_root.create_group('zscores')
+                zscore_meta_root.attrs.create('customFilterCategory', list(all_logs.keys()))
+                zscore_meta_root.attrs.create('customFilterName', filter_name)
                 for log_name, log_list in all_logs.items():
-                    logs = [np.mean([log_list[j][i] for j in range(len(log_list))]) for i in range(len(log_list[0]))]
-                    log_mean = np.mean(logs)
-                    log_sd = np.std(logs) or 0.0000000001
-                    scaled = np.array([((x - log_mean) / log_sd) for x in logs], dtype='f4')
-                    meta_root.create_dataset(log_name, data=scaled, compression='gzip', compression_opts=9)
+                    zscores_2d = [calc_zscore(logs) for logs in log_list]
+                    zscores = [np.mean([zscores_2d[j][i] for j in range(len(zscores_2d))]) for i in range(len(zscores_2d[0]))]
+                    zscore_meta_root.create_dataset(log_name, data=zscores, compression='gzip', compression_opts=9)
 
                 if (transcript_matrices := d.get('transcript_matrices', None)):
                     transcript_meta_root = meta_root.create_group('transcripts')

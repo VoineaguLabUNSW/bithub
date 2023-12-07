@@ -2,6 +2,7 @@
     import { Fileupload, Label, Button, Helper, Input } from 'flowbite-svelte';
     import { getContext } from 'svelte'
     import { writable, derived } from 'svelte/store'
+    import { base } from '$app/paths';
     import { asCSV } from '../stores/custom'
     import { findMatchesSorted } from "../utils/hdf5";
     import {count, mean, sd} from '../utils/math'
@@ -148,14 +149,14 @@
 
         <Label class="space-y-2 mb-4">
             <span>Load Expression Matrix</span>
-            <a class='underline' href='./BrainSeq-exp-example.csv'>(e.g. BrainSeq-exp-example.csv)</a>
+            <a class='underline' href='{base}/BrainSeq-exp-example.csv'>(e.g. BrainSeq-exp-example.csv)</a>
             <Fileupload bind:files={$dataFiles}/>
             <Helper color={$dataProcessed?.error ? 'red' : undefined}>Ensembl gene IDs (first column) x sample names (first row){$dataProcessed?.error ? ` - Error: ${$dataProcessed.error }` : ''}.</Helper>
         </Label>
 
         <Label class="space-y-2 mb-4">
             <span>Load Metadata</span>
-            <a class='underline' href='./BrainSeq-metadata-example.csv'>(e.g. BrainSeq-metadata-example.csv)</a>
+            <a class='underline' href='{base}/BrainSeq-metadata-example.csv'>(e.g. BrainSeq-metadata-example.csv)</a>
             <Fileupload bind:files={$metadataFiles}/>
             <Helper color={$metadataProcessed?.error ? 'red' : undefined}>Sample names (first column) x metadata variables (first row){$metadataProcessed?.error ? ` - Error: ${$metadataProcessed.error }` : ''}.</Helper>
         </Label>

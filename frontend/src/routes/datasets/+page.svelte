@@ -3,6 +3,7 @@ import '../../../node_modules/tocbot/dist/tocbot.css'
 import * as tocbot from 'tocbot';
 import { onMount, getContext } from 'svelte'
 import { Breadcrumb, BreadcrumbItem } from 'flowbite-svelte';
+import { base } from '$app/paths';
 
 import Footer from '../../lib/components/footer.svelte'
 import ProgressHeader from '../../lib/components/progress.svelte'
@@ -38,7 +39,7 @@ onMount(() => {
 <div class='m-12 mt-4 mb-[10%]'>
     <div class='pb-4'>
         <Breadcrumb aria-label="Home breadcrumbs">
-            <BreadcrumbItem href="/" home>Home</BreadcrumbItem>
+            <BreadcrumbItem href="{base}" home>Home</BreadcrumbItem>
             <BreadcrumbItem>Datasets</BreadcrumbItem>
         </Breadcrumb>
     </div>

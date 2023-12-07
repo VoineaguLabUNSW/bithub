@@ -5,6 +5,7 @@
     import { getContext } from 'svelte';
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
+    import { base } from '$app/paths';
     import Footer from '../lib/components/footer.svelte'
     
     const { metadata } = getContext('core')
@@ -75,9 +76,9 @@
     </div>
 
     <div class="flex flex-wrap justify-center mt-10">
-        <Card title='Learn more' href="./datasets" icon="fas fa-graduation-cap" description='Brain Integrative Transcriptome Hub is a web resource that allows integrative exploration of large-scale transcriptiomic studies of the human post-mortem brain.'/>
-        <Card title='Advanced search' href="./search" icon="fas fa-magnifying-glass" description='Complete an advanced search...'/>
-        <Card title='Load data' href="./search?open=custom" icon="fas fa-file-upload" description='Load your own custom data and explore it in combination.'/>
+        <Card title='Learn more' href="{base}/datasets" icon="fas fa-graduation-cap" description='Brain Integrative Transcriptome Hub is a web resource that allows integrative exploration of large-scale transcriptiomic studies of the human post-mortem brain.'/>
+        <Card title='Advanced search' href="{base}/search" icon="fas fa-magnifying-glass" description='Complete an advanced search...'/>
+        <Card title='Load data' href="{base}/search?open=custom" icon="fas fa-file-upload" description='Load your own custom data and explore it in combination.'/>
     </div>
 </div>
 <Footer/>

@@ -1,7 +1,7 @@
 import chroma from "chroma-js";
 
 // Editable constants
-const gradientColors = ['#7a1dc2', '#6d97a3', '#ffa500']
+const gradientColors = ['#0b06b8', '#ffffff', '#b80641']
 const gradientStops = [-2, 0, 3]
 const primary = {
     DEFAULT: '#d98b06',

@@ -17,7 +17,7 @@
                 if(e.key === "Enter" && inputElement.value) {
                     let query = new URLSearchParams($page.url.searchParams.toString());
                     query.set('terms', inputElement.value);
-                    goto(`/search?${query.toString()}`, {replaceState: false});
+                    goto(`${base}/search?${query.toString()}`, {replaceState: false});
                 }
             }
         }

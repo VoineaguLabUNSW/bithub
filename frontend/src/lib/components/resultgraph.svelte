@@ -38,7 +38,6 @@
                 filterSelect.set(undefined)
                 set({ filterOpts: new Map([['', []]])})
             } else {
-                console.log(data.value.get('metadata/' + datasetSelect.id + '/zscores').attrs)
                 const {customFilterCategory, customFilterName} = data.value.get('metadata/' + datasetSelect.id + '/zscores').attrs;
                 const filterOptVals = customFilterCategory.map(h => ({id: datasetSelect.id + '|' + h, name: h}));
                 filterSelect.set(filterOptVals[0]);
@@ -51,23 +50,23 @@
     const filterObj2 = createFilterObj(datasetSelect2, filterSelect2);
 
     const plotlyArgs = derived([datasetSelect1, datasetSelect2, filterSelect1, filterSelect2, data, filteredStore], ([$datasetSelect1, $datasetSelect2, $filterSelect1, $filterSelect2, $data, $filteredStore], set) => {
-        if(!$datasetSelect1 || !$datasetSelect2 || !$filterSelect1 || !$filterSelect2 || !$data) {
+        if(!$datasetSelect1 || !$datasetSelect2 || !$data) {
             set(getPlotEmpty('No data'));
             return
         }
-        const [ds1, fl1] = $filterSelect1.id.split('|', 2);
-        const [ds2, fl2] = $filterSelect2.id.split('|', 2);
+        let [ds1, fl1] = [$datasetSelect1.id, 'All']
+        if($filterSelect1) [ds1, fl1] = $filterSelect1.id.split('|', 2);
+        let [ds2, fl2] = [$datasetSelect2.id, 'All']
+        if($filterSelect2) [ds2, fl2] = $filterSelect2.id.split('|', 2);
 
-        console.log(ds1, $datasetSelect1.id)
-        console.log(ds2, $datasetSelect2.id)
-        
         if(ds1 !== $datasetSelect1.id || ds2 !== $datasetSelect2.id) return;
 
-        const xAll = $data.value.get('metadata/' + ds1 + '/zscores/' + fl1).value;
-        const yAll = $data.value.get('metadata/' + ds2 + '/zscores/' + fl2).value;
-
+        const xAll = fl1 !== 'All' ? $data.value.get('metadata/' + ds1 + '/zscores/' + fl1).value : $filteredStore.columns[$filteredStore.headings.indexOf(ds1)];
+        const yAll = fl2 !== 'All' ? $data.value.get('metadata/' + ds1 + '/zscores/' + fl2).value : $filteredStore.columns[$filteredStore.headings.indexOf(ds2)];
+        
         const x = $filteredStore.results.map(row_i => xAll[row_i]);
         const y = $filteredStore.results.map(row_i => yAll[row_i]);
+        
         const names = $filteredStore.results.map(row_i => $filteredStore.columns[1][row_i]);
         let xName = ds1 + (fl1 == 'All' ? '' : ` (${fl1})`);
         let yName = ds2 + (fl2 == 'All' ? '' : ` (${fl2})`);

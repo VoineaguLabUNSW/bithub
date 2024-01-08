@@ -1,54 +1,54 @@
 {
-  "data_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub_data/out.hdf5",
+  "data_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/out.hdf5",
   "count": 34440,
   "last_updated": "December 2023",
   "meta_files": [
     {
       "name": "BrainSpan",
-      "meta_url": "",
-      "matrix_url": "",
+      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/BrainSpan-metadata-all.csv",
+      "matrix_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/BrainSpan_RPKM.csv.gz",
       "samples": 524
     },
     {
       "name": "GTEx",
-      "meta_url": "",
-      "matrix_url": "",
+      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/GTEx-metadata-all.csv",
+      "matrix_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/GTEx_TPM.csv.gz",
       "samples": 2642
     },
     {
       "name": "BrainSeq",
-      "meta_url": "",
-      "matrix_url": "",
+      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/BrainSeq-metadata-all.csv",
+      "matrix_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/BrainSeq_RPKM.csv.gz",
       "samples": 900
     },
     {
       "name": "PsychENCODE",
-      "meta_url": "",
-      "matrix_url": "",
+      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/PsychEncode-metadata-all.csv",
+      "matrix_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/PsychENCODE_TPM.csv.gz",
       "samples": 1369
     },
     {
       "name": "HDBR",
-      "meta_url": "",
-      "matrix_url": "",
+      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/HDBR-metadata-all.csv",
+      "matrix_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/HDBR_RPKM.csv.gz",
       "samples": 649
     },
     {
       "name": "Cameron",
-      "meta_url": "",
-      "matrix_url": "",
+      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/Cameron-metadata-fixed.csv",
+      "matrix_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/Cameron_CPM.csv.gz",
       "samples": 69284
     },
     {
       "name": "HCA",
-      "meta_url": "",
-      "matrix_url": "",
+      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/HCA-metadata-subset.csv",
+      "matrix_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/HCA_CPM.csv.gz",
       "samples": 46958
     },
     {
       "name": "Velmeshev",
-      "meta_url": "",
-      "matrix_url": "",
+      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/Velmeshev-metadata.csv",
+      "matrix_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/Velmeshev_CPM.csv.gz",
       "samples": 81215
     }
   ]

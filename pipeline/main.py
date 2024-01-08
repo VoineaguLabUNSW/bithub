@@ -28,7 +28,7 @@ def calc_s3_etag(path, multipart_threshold, multipart_chunksize):
             chunks_hashes.append(hashlib.md5(chunk).digest())
         return hashlib.md5(b''.join(chunks_hashes)).hexdigest() + '-' + str(len(chunks_hashes))
       
-def manage_deploy_cloudfront(asset_paths, cloudfront_url=None, chunk_size=8388608, prefix='bithub_data'):
+def manage_deploy_cloudfront(asset_paths, cloudfront_url=None, chunk_size=8388608, prefix='bithub'):
     '''Upload list of files and return URL mapping'''
     s3 = boto3.client('s3')
     for path, name in zip(asset_paths, map(os.path.basename, asset_paths)):
@@ -167,7 +167,7 @@ def read_compressed_ranges(path: str):
 @contextlib.contextmanager
 def iterate_csv(path: str, strip_numeric: bool=False, comment=None, skip=0, delimiter=',', csv_kwargs={}, file_kwargs={}):
     '''Iterate over a CSV file, optional .gz, optional leading numeric column'''
-    csv_kwargs.setdefault('delimiter', delimiter)
+    csv_kwargs = {**csv_kwargs, 'delimiter': delimiter}
     with gzip.open(path, mode='rt', newline='') if path.endswith('.gz') else open(path,  mode='r', newline='', **file_kwargs) as f:
         rows = csv.reader(f, **csv_kwargs)
         if comment: rows = filter(lambda row: not row or not row[0].startswith(comment), rows)
@@ -870,10 +870,9 @@ if __name__ == '__main__':
             matrix_path = os.path.join(d['dir'], m['path'])
             matrix_dst = os.path.join(OUTPUT_FOLDER, get_matrix_name(d, m) + '.csv.gz')
 
-            # TODO: Re-enable this
-            #asset_paths.extend([os.path.join(OUTPUT_FOLDER, d['meta']), matrix_dst])
-            #shutil.copy2(meta_path, OUTPUT_FOLDER)
-            #os.system(f'gzip -c {matrix_path} > {matrix_dst}')
+            asset_paths.extend([os.path.join(OUTPUT_FOLDER, d['meta']), matrix_dst])
+            shutil.copy2(meta_path, OUTPUT_FOLDER)
+            os.system(f'gzip -c {matrix_path} > {matrix_dst}')
         
         asset_urls = deploy(asset_paths)
 

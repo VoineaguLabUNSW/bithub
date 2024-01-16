@@ -20,7 +20,7 @@ function getColumnDownloader(heading, data, xName, yName, zName) {
     }
 }
 
-function getTablDownloader(heading, headingsX, headingsY, values) {
+function getTableDownloader(heading, headingsX, headingsY, values) {
     return () => {
         const csv = createRowWriter(heading.toLowerCase().replaceAll(' ', '_') + '.csv', ',')
         csv.write(['', ...headingsX])
@@ -231,7 +231,7 @@ function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, 
                 },
                 legendgroup: data[i-1].z,
                 name: data[i-1].z,
-                box: { visible: true },
+                box: { visible: false },
                 meanline: { visible: true },
             });
             range[0] = i;
@@ -265,4 +265,4 @@ function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, 
     }
 }
 
-export { getPlotEmpty, getPlotViolinBasic, getPlotScatter, getColumnDownloader, getZipped, getWithNA, getTablDownloader }
+export { getPlotEmpty, getPlotViolinBasic, getPlotScatter, getColumnDownloader, getZipped, getWithNA, getTableDownloader }

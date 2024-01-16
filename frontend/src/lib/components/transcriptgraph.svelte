@@ -4,7 +4,7 @@
     import { writable } from "@square/svelte-store";
     import { getContext } from "svelte";
     import { derived } from 'svelte/store';
-    import { getPlotEmpty, getTablDownloader } from '../utils/plot';
+    import { getPlotEmpty, getTableDownloader } from '../utils/plot';
     import { gradientPairs  } from '../utils/colors'
 
     export let filteredStore;
@@ -116,7 +116,7 @@
                     }
                 },
                 config: { responsive: false },
-                downloadCSV: getTablDownloader(combinedHeading, headingsX, headingsY, values)
+                downloadCSV: getTableDownloader(combinedHeading, headingsX, headingsY, values)
             });
         }
     })

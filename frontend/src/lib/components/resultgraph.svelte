@@ -62,7 +62,7 @@
         if(ds1 !== $datasetSelect1.id || ds2 !== $datasetSelect2.id) return;
 
         const xAll = fl1 !== 'All' ? $data.value.get('metadata/' + ds1 + '/zscores/' + fl1).value : $filteredStore.columns[$filteredStore.headings.indexOf(ds1)];
-        const yAll = fl2 !== 'All' ? $data.value.get('metadata/' + ds1 + '/zscores/' + fl2).value : $filteredStore.columns[$filteredStore.headings.indexOf(ds2)];
+        const yAll = fl2 !== 'All' ? $data.value.get('metadata/' + ds2 + '/zscores/' + fl2).value : $filteredStore.columns[$filteredStore.headings.indexOf(ds2)];
         
         const x = $filteredStore.results.map(row_i => xAll[row_i]);
         const y = $filteredStore.results.map(row_i => yAll[row_i]);

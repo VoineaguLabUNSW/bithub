@@ -70,7 +70,7 @@
 
     <div class="flex justify-center mt-10 gap-x-3">
         <label class="inactive" bind:this={labelElement}>
-            <input bind:this={inputElement} class="transition ease-in-out delay-15 w-[600px] h-12 focus:border-red-600 focus:ring-red-600 caret-red-600 shadow-md hover:shadow-lg rounded-xl" type="search" placeholder='Try "MARCHF6" or "ENSG00000099785, ENSG00000136536"'/>
+            <input bind:this={inputElement} class="transition ease-in-out delay-15 w-[600px] h-12 focus:border-primary-600 focus:ring-primary-600 caret-primary-600 shadow-md hover:shadow-lg rounded-xl" type="search" placeholder='Try "MARCHF6" or "ENSG00000099785, ENSG00000136536"'/>
         </label>
         <i class="fa-solid fa-arrow-turn-up text-3xl"></i>
     </div>

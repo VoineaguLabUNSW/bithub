@@ -4,13 +4,13 @@
     import { writable } from "@square/svelte-store";
     import { getContext } from "svelte";
     import { derived } from 'svelte/store';
-    import { getPlotEmpty, getTablDownloader } from '../utils/plot';
-    import { gradientPairs  } from '../utils/colors'
+    import { getPlotEmpty, getTableDownloader } from '../utils/plot';
 
     export let filteredStore;
     export let heading;
 
     const { data } = getContext('core');
+    const { colorRange } = getContext('palettes')
 
     let datasetsSelect = writable();
     let transcriptSelect = writable();
@@ -47,7 +47,7 @@
         return () => expressionSub()
     })
 
-    const plotlyArgs = derived([expressionDataObj, transcriptSelect, scaleSelect], ([$expressionDataObj, $transcriptSelect, $scaleSelect], set) => {
+    const plotlyArgs = derived([expressionDataObj, transcriptSelect, scaleSelect, colorRange], ([$expressionDataObj, $transcriptSelect, $scaleSelect, $colorRange], set) => {
         if(!$expressionDataObj) set(getPlotEmpty('No data'));
         else if($expressionDataObj.expression.loading) set(getPlotEmpty('Loading'));
         else {
@@ -80,7 +80,7 @@
                     hoverongaps: false,
                     xgap: 0.5,
                     ygap: 0.5,
-                    colorscale: gradientPairs,
+                    colorscale: [[0, $colorRange[0]], [0.5, $colorRange[1]], [1, $colorRange[2]]],
                     zmin: range[0],
                     zmax: range[1]
                 }],
@@ -116,19 +116,17 @@
                     }
                 },
                 config: { responsive: false },
-                downloadCSV: getTablDownloader(combinedHeading, headingsX, headingsY, values)
+                downloadCSV: getTableDownloader(combinedHeading, headingsX, headingsY, values)
             });
         }
     })
 </script>
 
 <Plot plotlyArgs={plotlyArgs}>
+    <svelte:fragment slot="title">
+        <i class='fas fa-gears'/> Dataset
+    </svelte:fragment>
     <span slot="controls">
-        <div class="flex justify-between">
-            <h5 id="drawer-label" class="inline-flex items-center mb-4 text-base font-semibold text-gray-500 dark:text-gray-400">
-                <i class='fas fa-gears m-2'/>Dataset
-            </h5>
-        </div>
         <div class='w-48 flex flex-col items-stretch gap-3'>
             <Dropdown title='Dataset' selected={datasetsSelect} groups={$datasetOptsObj.datasetsOpts}/>
             <Dropdown title='Transcripts' selected={transcriptSelect} groups={$transcriptOptsObj?.transcriptOpts}/>

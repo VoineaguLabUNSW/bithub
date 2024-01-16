@@ -15,6 +15,7 @@
     export let heading;
 
     const core = getContext('core')
+    const { colorWay } = getContext('palettes')
     const metadataStore = createMetadataStore(core)
 
     let datasetsSelect = writable();
@@ -82,7 +83,7 @@
         return () => expressionSub()
     })
 
-    const plotlyArgs = derived([expressionDataObj, metadataSelect1, metadataSelect2, scaleSelect, customSelect], ([$expressionDataObj, $metadataSelect1, $metadataSelect2, $scaleSelect, $customSelect], set) => {
+    const plotlyArgs = derived([expressionDataObj, metadataSelect1, metadataSelect2, scaleSelect, customSelect, colorWay], ([$expressionDataObj, $metadataSelect1, $metadataSelect2, $scaleSelect, $customSelect, $colorWay], set) => {
         if(!$expressionDataObj || !$metadataSelect1) {
             return
         } else if (!$expressionDataObj.expression.data) {
@@ -125,21 +126,19 @@
             if($scaleSelect.id != 'Linear') headingY = `${headingY} (${$scaleSelect.id})`
             
             if((typeof data[0].x) == 'string' || data[0].x instanceof String) {
-                set(getPlotViolinBasic(headingMain, data, headingX, headingY, headingZ, orderX, orderZ, groupLabelsX, groupSizesX))
+                set(getPlotViolinBasic(headingMain, data, headingX, headingY, headingZ, orderX, orderZ, groupLabelsX, groupSizesX, $colorWay))
             } else {
-                set(getPlotScatter(headingMain, data, headingX, headingY, headingZ, orderZ))   
+                set(getPlotScatter(headingMain, data, headingX, headingY, headingZ, orderZ, $colorWay))   
             }
         }
     });
 </script>
 
 <Plot plotlyArgs={plotlyArgs}>
+    <svelte:fragment slot="title">
+        <i class='fas fa-gears'/> Metadata
+    </svelte:fragment>
     <span slot="controls">
-        <div class="flex justify-between">
-            <h5 id="drawer-label" class="inline-flex items-center mb-4 text-base font-semibold text-gray-500 dark:text-gray-400">
-                <i class='fas fa-gears m-2'/>Metadata
-            </h5>
-        </div>
         <div class='w-48 flex flex-col items-stretch gap-3'>
             <Dropdown title='Dataset' selected={datasetsSelect} groups={$datasetOptsObj.datasetsOpts}/>
             

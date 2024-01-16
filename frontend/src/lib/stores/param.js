@@ -24,5 +24,15 @@ function createListParam(param, sep=',', preventSideEffects=false) {
     return createParam(param, [], (v) => v && v.split(sep), preventSideEffects);
 }
 
-export { createIntParam, createParam, createListParam};
+function createPaletteParam(param, defaultPalette=[], fixedSize=undefined, preventSideEffects=false) {
+    function checkSize(v) {
+        if(!v) return
+        let splits = v.split(',');
+        if(fixedSize === undefined || splits.length === fixedSize) return splits;
+        window.alert(`Palette ${param} expects exactly ${fixedSize} values`);
+    }
+    return createParam(param, defaultPalette, checkSize, preventSideEffects);
+}
+
+export { createIntParam, createParam, createListParam, createPaletteParam};
   

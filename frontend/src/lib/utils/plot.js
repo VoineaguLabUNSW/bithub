@@ -20,7 +20,7 @@ function getColumnDownloader(heading, data, xName, yName, zName) {
     }
 }
 
-function getTablDownloader(heading, headingsX, headingsY, values) {
+function getTableDownloader(heading, headingsX, headingsY, values) {
     return () => {
         const csv = createRowWriter(heading.toLowerCase().replaceAll(' ', '_') + '.csv', ',')
         csv.write(['', ...headingsX])
@@ -69,7 +69,7 @@ function getPlotEmpty(message) {
     }
 }
 
-function getPlotScatter(heading, data, xName, yName, zName, orderZ) {
+function getPlotScatter(heading, data, xName, yName, zName, orderZ, colorway=undefined) {
     const [hasZ, hasName] = [data[0].z !== undefined, data[0].name !== undefined];
     const orderZDic = hasZ ? getOrderIndexed(data.map(d => d.z), orderZ || []) : new Map()
     const seenZ = [...orderZDic.entries()].filter(([_, v]) => v.seen).map(([k, _]) => k)
@@ -128,12 +128,13 @@ function getPlotScatter(heading, data, xName, yName, zName, orderZ) {
                     font: { family: 'Times New Roman', size: 18, color: '#7f7f7f' }
                 }
             },
+            colorway: colorway,
         },
         downloadCSV: getColumnDownloader(heading, data, xName, yName, zName)
     }
 }
 
-function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, groupLabelsX, groupSizesX) {
+function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, groupLabelsX, groupSizesX, colorway=undefined) {
     const hasZ = data[0].z !== undefined 
     const orderXDic = getOrderIndexed(data.map(d => d.x), orderX || [])
     const orderZDic = hasZ ? getOrderIndexed(data.map(d => d.z), orderZ || []) : new Map()
@@ -231,8 +232,9 @@ function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, 
                 },
                 legendgroup: data[i-1].z,
                 name: data[i-1].z,
-                box: { visible: true },
+                box: { visible: false },
                 meanline: { visible: true },
+                spanmode: 'hard'
             });
             range[0] = i;
         }
@@ -259,10 +261,11 @@ function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, 
             },
             shapes: groupShapes,
             annotations: groupAnnotations,
-            legend: { x: 1, y: 0.5, title: {text: zName} }
+            legend: { x: 1, y: 0.5, title: {text: zName} },
+            colorway: colorway,
         },
         downloadCSV: getColumnDownloader(heading, data, xName, yName, zName)
     }
 }
 
-export { getPlotEmpty, getPlotViolinBasic, getPlotScatter, getColumnDownloader, getZipped, getWithNA, getTablDownloader }
+export { getPlotEmpty, getPlotViolinBasic, getPlotScatter, getColumnDownloader, getZipped, getWithNA, getTableDownloader }

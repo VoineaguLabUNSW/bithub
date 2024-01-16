@@ -5,12 +5,12 @@
     import { getContext } from "svelte";
     import { derived } from 'svelte/store';
     import { getColumnDownloader, getPlotEmpty, getZipped } from '../utils/plot';
-    import { primary } from '../utils/colors'
 
     export let filteredStore;
     export let heading;
 
     const { data } = getContext('core');
+    const { colorPrimary } = getContext('palettes')
 
     let datasetsSelect = writable();
 
@@ -32,7 +32,7 @@
         return () => expressionSub()
     })
 
-    const plotlyArgs = derived(varianceDataObj, ($varianceDataObj, set) => {
+    const plotlyArgs = derived([varianceDataObj, colorPrimary], ([$varianceDataObj, $colorPrimary], set) => {
         if(!$varianceDataObj) set(getPlotEmpty('No data'));
         else if($varianceDataObj.varpart.loading) set(getPlotEmpty('Loading'));
         else if($varianceDataObj.varpart.error) set(getPlotEmpty($varianceDataObj.varpart.error))
@@ -47,7 +47,7 @@
                     x: x,
                     y: y,
                     orientation: 'v',
-                    //marker: { color: primary[900] }
+                    marker: { color: $colorPrimary[0] }
                 }],
                 layout: { 
                     showlegend: false,
@@ -76,12 +76,10 @@
 </script>
 
 <Plot plotlyArgs={plotlyArgs}>
+    <svelte:fragment slot="title">
+        <i class='fas fa-gears'/> Dataset
+    </svelte:fragment>
     <span slot="controls">
-        <div class="flex justify-between">
-            <h5 id="drawer-label" class="inline-flex items-center mb-4 text-base font-semibold text-gray-500 dark:text-gray-400">
-                <i class='fas fa-gears m-2'/>Dataset
-            </h5>
-        </div>
         <div class='w-48 flex flex-col items-stretch gap-3'>
             <Dropdown title='Dataset' selected={datasetsSelect} groups={$datasetOptsObj.datasetsOpts}/>
         </div>

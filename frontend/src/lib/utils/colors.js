@@ -1,22 +1,25 @@
 import chroma from "chroma-js";
 
 // Editable constants
-const gradientColors = ['#0b06b8', '#ffffff', '#b80641']
+const gradientColors = ['#0b06b8', '#ffffff', '#b80641'];
 const gradientStops = [-2, 0, 3]
 const primary = {
-    DEFAULT: '#e74c4c',
-    '50': '#fdf3f3',
-    '100': '#fde3e3',
-    '200': '#fbcdcd',
-    '300': '#f8a9a9',
-    '400': '#ef6060',
-    '500': '#e74c4c',
-    '600': '#d32f2f',
-    '700': '#b12424',
-    '800': '#932121',
-    '900': '#7a2222',
-    '950': '#420d0d',
+        DEFAULT: 'cf648a',
+        '50': '#fcf4f5',
+        '100': '#f9eaee',
+        '200': '#f4d7e0',
+        '300': '#ebb6c7',
+        '400': '#df8fa9',
+        '500': '#cf648a',
+        '600': '#b94574',
+        '700': '#9b3560',
+        '800': '#822f55',
+        '900': '#702b4c',
+        '950': '#3d1426',
 }
+
+//https://github.com/plotly/plotly.js/blob/v2.14.0/src/components/color/attributes.js#L5-L16
+const paletteColors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
 
 // Helper functions
 function gradientHelper(colors, stops) {
@@ -41,4 +44,4 @@ function gradientHelper(colors, stops) {
 
 const { toColorScale, gradientCSS, gradientRange, gradientPairs } = gradientHelper(gradientColors, gradientStops);
 
-export { primary, toColorScale, gradientCSS, gradientRange, gradientColors, gradientPairs}
+export { primary, toColorScale, gradientCSS, gradientRange, gradientColors, gradientPairs, paletteColors}

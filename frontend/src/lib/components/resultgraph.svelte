@@ -3,13 +3,13 @@
     import Dropdown from '../components/dropdown.svelte';
     import Plot from '../components/plot.svelte';
     import { writable, get, derived } from "svelte/store";
-    import { primary } from '../utils/colors'
     import { getContext } from 'svelte';
    
     export let filteredStore;
     export let heading;
 
-    const { data } = getContext('core')
+    const { data } = getContext('core');
+    const { colorPrimary } = getContext('palettes');
 
     let datasetSelect1 = writable();
     let datasetSelect2 = writable();
@@ -49,7 +49,7 @@
     const filterObj1 = createFilterObj(datasetSelect1, filterSelect1);
     const filterObj2 = createFilterObj(datasetSelect2, filterSelect2);
 
-    const plotlyArgs = derived([datasetSelect1, datasetSelect2, filterSelect1, filterSelect2, data, filteredStore], ([$datasetSelect1, $datasetSelect2, $filterSelect1, $filterSelect2, $data, $filteredStore], set) => {
+    const plotlyArgs = derived([datasetSelect1, datasetSelect2, filterSelect1, filterSelect2, data, filteredStore, colorPrimary], ([$datasetSelect1, $datasetSelect2, $filterSelect1, $filterSelect2, $data, $filteredStore, $colorPrimary], set) => {
         if(!$datasetSelect1 || !$datasetSelect2 || !$data) {
             set(getPlotEmpty('No data'));
             return
@@ -62,7 +62,7 @@
         if(ds1 !== $datasetSelect1.id || ds2 !== $datasetSelect2.id) return;
 
         const xAll = fl1 !== 'All' ? $data.value.get('metadata/' + ds1 + '/zscores/' + fl1).value : $filteredStore.columns[$filteredStore.headings.indexOf(ds1)];
-        const yAll = fl2 !== 'All' ? $data.value.get('metadata/' + ds1 + '/zscores/' + fl2).value : $filteredStore.columns[$filteredStore.headings.indexOf(ds2)];
+        const yAll = fl2 !== 'All' ? $data.value.get('metadata/' + ds2 + '/zscores/' + fl2).value : $filteredStore.columns[$filteredStore.headings.indexOf(ds2)];
         
         const x = $filteredStore.results.map(row_i => xAll[row_i]);
         const y = $filteredStore.results.map(row_i => yAll[row_i]);
@@ -93,8 +93,9 @@
                         name: '',
                         x: x,
                         y: y,
-                        marker : {color: primary[600], ...extraMarkerArgs},
-                        text: names
+                        marker : {color: $colorPrimary[0], ...extraMarkerArgs},
+                        text: names,
+                        hoverlabel: { bgcolor: "white" },
                     }
                 ],
                 layout: { 
@@ -124,12 +125,10 @@
 </script>
 
 <Plot plotlyArgs={plotlyArgs}>
-    <span slot="controls">
-        <div class="flex justify-between">
-            <h5 id="drawer-label" class="inline-flex items-center mb-4 text-base font-semibold text-gray-500 dark:text-gray-400">
-                <i class='fas fa-gears m-2'/>Datasets
-            </h5>
-        </div>
+    <svelte:fragment slot="title">
+        <i class='fas fa-gears'/> Datasets
+    </svelte:fragment>
+    <svelte:fragment slot="controls">
         <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">
             Select from different datasets to compare z-scores for any number of search results.
         </p>
@@ -138,11 +137,11 @@
             <Dropdown title='Dataset 2' placeholder='No Datasets' selected={datasetSelect2} groups={$datasetsObj.datasetOpts}/>
             <hr>
             {#if $filterObj1?.title }
-                <Dropdown title={'Dataset 1 Filter (' + $filterObj1.title + ')'} selected={filterSelect1} groups={$filterObj1.filterOpts}/>
+                <Dropdown title={'Dataset 1 Subset (' + $filterObj1.title + ')'} selected={filterSelect1} groups={$filterObj1.filterOpts}/>
             {/if}
             {#if $filterObj2?.title }
-                <Dropdown title={'Dataset 2 Filter (' + $filterObj2.title + ')'} selected={filterSelect2} groups={$filterObj2.filterOpts}/>
+                <Dropdown title={'Dataset 2 Subset (' + $filterObj2.title + ')'} selected={filterSelect2} groups={$filterObj2.filterOpts}/>
             {/if}
         </div>
-    </span>
+    </svelte:fragment>
 </Plot>

@@ -93,7 +93,7 @@ function createCore(url) {
 
         // Perform single combined request
         const controller = new AbortController();
-        const response = await fetch('https://d33ldq8s2ek4w8.cloudfront.net/bithub_data/expression.bin'/*'http://localhost:5501/expression.bin'*/, {
+        const response = await fetch('https://d33ldq8s2ek4w8.cloudfront.net/bithub/expression.bin'/*'http://localhost:5501/expression.bin'*/, {
             signal: controller.signal,
             headers: {'Range': 'bytes=' + `${requests[0].byteStart}-${requests[requests.length-1].byteEnd-1}`},
         });

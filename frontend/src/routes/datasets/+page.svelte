@@ -4,6 +4,7 @@ import * as tocbot from 'tocbot';
 import { onMount, getContext } from 'svelte'
 import { Breadcrumb, BreadcrumbItem } from 'flowbite-svelte';
 import { base } from '$app/paths';
+import { primary } from '../../lib/utils/colors'
 
 import Footer from '../../lib/components/footer.svelte'
 import ProgressHeader from '../../lib/components/progress.svelte'
@@ -31,12 +32,12 @@ onMount(() => {
 <style>
     /* Override color of tocbot active sidebar */
     :global(.is-active-link::before) {
-        background-color: #ff0000;
+        background-color: var(--toc-color);
     }
 </style>
   
 <ProgressHeader/>
-<div class='m-12 mt-4 mb-[10%]'>
+<div class='m-12 mt-4 mb-[10%]' style="--toc-color: {primary[500]}">
     <div class='pb-4'>
         <Breadcrumb aria-label="Home breadcrumbs">
             <BreadcrumbItem href="{base}" home>Home</BreadcrumbItem>
@@ -84,10 +85,10 @@ onMount(() => {
                                         {meta_file.name}
                                     </th>
                                     <td class="px-6 py-4">
-                                        <a class='underline text-red-600' href={meta_file.matrix_url}>{meta_file.matrix_url.split('/').pop() || meta_file.name}</a>
+                                        <a class='underline text-primary-600' href={meta_file.matrix_url}>{meta_file.matrix_url.split('/').pop() || meta_file.name}</a>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <a class='underline text-red-600' href={meta_file.meta_url}>{meta_file.meta_url.split('/').pop() || meta_file.name}</a>
+                                        <a class='underline text-primary-600' href={meta_file.meta_url}>{meta_file.meta_url.split('/').pop() || meta_file.name}</a>
                                     </td>
                                     <td class="px-6 py-4">
                                         {meta_file.samples}

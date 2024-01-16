@@ -4,7 +4,7 @@
     import { asyncReadable } from '@square/svelte-store';
 
     let browserContainer = document.createElement('div')
-    let browser =  asyncReadable(undefined, async () => igv.createBrowser(browserContainer, {genome: 'hg38'}))
+    let browser = asyncReadable(undefined, async () => igv.createBrowser(browserContainer, {genome: 'hg38', trackDefaults: { annotation: { autoHeight: true, maxHeight: 150}}}))
 </script>
 
 <script>

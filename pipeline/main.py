@@ -1,13 +1,16 @@
-import tempfile, os, csv, gzip, zlib, contextlib, itertools, re, array, io, shutil, datetime, json, struct, hashlib, math, collections.abc
+import tempfile, os, sys, csv, gzip, zlib, contextlib, itertools, re, array, io, shutil, datetime, json, struct, hashlib, math, collections.abc, logging
 import oyaml, h5py, tqdm, boto3, numpy as np
 import data_pb2
 
 from typing import Callable, Iterable, Tuple, Dict, List
 from unittest.mock import patch
 
-CONFIG_PATH = 'input.yaml'
 MIN_HITS = 2
+LOG2_OFFSET = 0.05
 
+class AnnotationException(Exception):
+    pass
+    
 def safe_access_nested(data, indices, default=None):
     for index in indices:
         if not isinstance(data, collections.abc.Sequence) or not abs(index) < len(data): return default
@@ -130,7 +133,8 @@ def get_reorder_indices(target_order, given_order):
     return [lookup.get(v, None) for v in target_order]
 
 def apply_reorder_indices(input, buffer, steps):
-    '''Apply index transformation to destination buffer (any value missing from target_order will be left uninitialized)'''
+    '''Apply index transformation to destination buffer'''
+    for i in range(len(buffer)): buffer[i] = None
     for i, j in enumerate(steps):
         if j is not None and j < len(input): 
             buffer[i] = input[j]
@@ -193,26 +197,28 @@ def iterate_csv_sorted(path: str, strip_numeric: bool=False, comment: str=None, 
         cache_path = os.path.join(os.getcwd(), 'cache', os.path.basename(path) + '.sorted_cache')
         sort_path = os.path.join(tmpdirname, f'sort_{os.path.basename(path)}')
         if use_cache and os.path.exists(cache_path):
+            logging.info(f're-run and delete cache folder {cache_path} to see annotation errors in this log')
             sort_path = cache_path
         else:
             # Initial mutation pass if necessary
             pre_sort_path = path
             if strip_numeric or skip or comment or mutator:
                 pre_sort_path = os.path.join(tmpdirname, f'annot_{os.path.basename(path)}')
-                with open(os.path.join(tmpdirname, pre_sort_path), 'w') as f, open(os.path.join(OUTPUT_FOLDER, 'errors.tsv'), 'w') as g:
+                with open(os.path.join(tmpdirname, pre_sort_path), 'w') as f:
                     writer = csv.writer(f, **csv_kwargs)
                     with iterate_csv(path,  strip_numeric=strip_numeric, delimiter=delimiter, skip=skip, comment=comment, csv_kwargs=csv_kwargs, file_kwargs=file_kwargs) as reader:
                         headers, rows = reader
 
                         writer.writerow([''] + headers)
-                        g.write('failed_gene_id\tdataset\n')
-
                         for row in rows:
-                            if not (mutator(row) if mutator else row):
-                                g.write(f'{row[0]}\t({path})\n')
-                                continue
+                            if not row: continue
+                            if mutator:
+                                try:
+                                    mutator(row)
+                                except AnnotationException as e:
+                                    logging.warning(f'{path}\t{str(e)}')
+                                    continue
                             writer.writerow(row)
-
 
             # Fast out-of-memory sort
             os.system(f'(head -n 1 {pre_sort_path} && tail -n +2 {pre_sort_path} | sort) > {sort_path}')
@@ -259,7 +265,7 @@ def get_ncbi_annotator(gene_info_path: str, gtf_path: str, gene_alias_path: str)
                 if id and name and (row[0].isnumeric() or row[0] in CHR_WHITELIST):
                     id, name = id.group(1), name.group(1)
                     gene_to_gene[id] = [id, name, row[0], int(row[3]), int(row[4]), row[6], '-']
-            elif row[2] in ['CDS', 'exon']:
+            elif row[2] in ['transcript']:
                 id = re.search(r'gene_id "([A-Z0-9]+)"', row[8])
                 transcript_id = re.search(r'transcript_id "([A-Z0-9]+)"', row[8])
                 if id and transcript_id:
@@ -289,7 +295,7 @@ def get_ncbi_annotator(gene_info_path: str, gtf_path: str, gene_alias_path: str)
             if row[5] and (data := gene_to_gene.get(row[5], None)):
                     for alias in (row[1] + ',' + row[3] + ',' + row[4]).split(','):
                         if alias and (alias := alias.strip()): 
-                            gene_to_gene[alias] = data
+                            gene_to_gene.setdefault(alias, data)
 
     return gene_to_gene, transcript_to_transcript, transcript_to_gene
 
@@ -340,7 +346,7 @@ def parallel_matrix_context(dataset, mutator, debug=False):
             def _iter(dataset, matrix, rows, headers):
                 for row in iterate_unique(rows, lambda x: x and x[0]): 
                     yield (dataset, matrix, headers, row[0], row[1:])
-                    if debug: print(f'{matrix["name"]} yielded {row[0]}')
+                    logging.debug(f'{matrix["name"]} yielded {row[0]}')
             
             sorted_iters.append(_iter(dataset, matrix, rows, headers))
             sorted_headers.append(headers)
@@ -354,7 +360,8 @@ def parallel_transcript_iterator(dataset, transcript_to_gene):
     def transcript_row_mutator(row):
         if annot := transcript_to_gene.get(row[0], None):
             row.insert(0, annot[0])
-        return annot is not None
+        else:
+            raise AnnotationException(f'failed to annotate\ttranscript\t{row[0]}')
 
     with context_closer() as contexts:
         sorted_iters, sorted_headers = [], []
@@ -372,7 +379,8 @@ def parallel_dataset_context(datasets, gene_to_gene, transcript_to_gene, debug=F
     def gene_row_mutator(row):
         if annot := gene_to_gene.get(row[0], None):
             row[0] = annot[0]
-        return annot is not None
+        else:
+            raise AnnotationException(f'failed to annotate\tgene\t{row[0]}')
 
     with context_closer() as contexts:
         firsts, yields = [], []
@@ -570,6 +578,10 @@ def test_compressed_ranges():
                     assert v == data[i]
 
 if __name__ == '__main__':
+    if len(sys.argv) != 2 or sys.argv[1] in ('-h', '--help'): 
+        print("Error: First argument should be input.yaml path, see example")
+        exit(1)
+        
     with patch('builtins.open', open_with_progress):
         test_parallel_iteration()
         test_accumulate_iteration()
@@ -581,7 +593,7 @@ if __name__ == '__main__':
         
         # Read file locations and metadata from input YAML
         inputObj = None
-        with open(CONFIG_PATH, 'r') as stream:
+        with open(sys.argv[1], 'r') as stream:
             try:
                 inputObj = oyaml.safe_load(stream)    
             except oyaml.YAMLError as e:
@@ -593,7 +605,17 @@ if __name__ == '__main__':
 
         for p in [OUTPUT_FOLDER, OUTPUT_RESOURCES]:
             os.makedirs(p, exist_ok=True)
+            
+        log_num, log_path = 0, None
+        while os.path.exists(log_path := os.path.join(OUTPUT_FOLDER, f'warnings{("." + str(log_num)) if log_num else ""}.log')): 
+            log_num += 1
 
+        logging.basicConfig(filename=log_path,
+                            filemode='w',
+                            format='%(asctime)s,bithub,%(levelname)s\t%(message)s',
+                            datefmt='%H:%M:%S',
+                            level=logging.INFO)
+        
         def deploy(paths):
             return manage_deploy_local(paths) if inputObj['deploy_local'] else manage_deploy_cloudfront(paths, inputObj['deploy_url'])
 
@@ -605,7 +627,7 @@ if __name__ == '__main__':
         gene_to_gene, transcript_to_transcript, transcript_to_gene = get_ncbi_annotator(inputObj.get('ncbi_gene_info', None), inputObj.get('ncbi_gtf'), inputObj.get('genenames_alias', None))
         all_ranges = []
 
-        with h5py.File(os.path.join(OUTPUT_FOLDER, 'out.hdf5'), 'w') as root:
+        with h5py.File(os.path.join(OUTPUT_FOLDER, 'out.hdf5'), 'w') as root, open(os.path.join(OUTPUT_FOLDER, 'errors.tsv'), 'w') as f_err:
             with context_closer() as contexts:
                 contexts.append(write_compressed_ranges(EXPRESSION_PATH))
                 writer, teller = contexts[-1].__enter__()
@@ -687,8 +709,13 @@ if __name__ == '__main__':
                         m_groups_per_dataset = tuple(safe_access_nested(c, MATRIX_INDICES, None) for c in combined)
                         t_groups_per_dataset = tuple(safe_access_nested(c, TRANSCRIPT_INDICES, None) for c in combined)                   
 
-                        if MIN_HITS > len(m_groups_per_dataset) - m_groups_per_dataset.count(None): continue
-                        if not (annot := gene_to_gene.get(gene, None)): continue
+                        if not (annot := gene_to_gene.get(gene, None)):
+                            raise AnnotationException(f'unexpected gene {gene} - annotation/sorted cache likely outdated')
+                        
+                        if MIN_HITS > (len(m_groups_per_dataset) - m_groups_per_dataset.count(None)): 
+                            which_ds = [inputObj['datasets'][mi]['id'] for mi, m in enumerate(m_groups_per_dataset) if m is not None]
+                            logging.warning(f'pipeline\tonly in {",".join(which_ds)}\tgene\t{gene}')
+                            continue
 
                         annots_written.append(annot)
                         total_written += 1
@@ -719,15 +746,15 @@ if __name__ == '__main__':
                                 ranges.append(writer(row.SerializeToString()))
 
                                 # Get logs for zscore calc
-                                _logs = [math.log2(abs(v) + 0.01) for v in fixed]
-                                logs.append(np.mean(_logs))
+                                fixed_logged = [math.log2(abs(v) + LOG2_OFFSET) for v in fixed]
+                                logs.append(np.mean(fixed_logged))
                 
                                 # Determine region subset
                                 if logs_filter_enum:
                                     _, filter_indices, logs_filter = logs_filter_enum
                                     for i in range(len(filter_indices)):
-                                        logs_filter[i].append(sum((_logs[j] for j in filter_indices[i])) / len(filter_indices[i]))
-                                
+                                        logs_filter[i].append(np.mean([fixed_logged[j] for j in filter_indices[i]]))
+                                        
                             if 'transcript_matrices' in dataset:
                                 for transcript_matrix, accumulated in zip(dataset['transcript_matrices'], transcripts or dataset['_null_transcripts']):
                                     ranges, categories = transcript_matrix['_internal']
@@ -742,7 +769,7 @@ if __name__ == '__main__':
 
                 all_ranges.append((last_range_end, teller()))
 
-            print(f'\nProcessed {total_written} entries')
+            logging.info(f'processed {total_written} entries')
 
             # Point to which datasets need to be pulled
             remote_range_datasets = []

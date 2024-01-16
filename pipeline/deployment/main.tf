@@ -84,7 +84,7 @@ resource "aws_cloudfront_distribution" "my_app" {
       cookies {
         forward = "none"
       }
-      headers = ["Origin", "Cache-Control", "ETag"]
+      #headers = ["Origin", "Cache-Control", "ETag"]
     }
 
     viewer_protocol_policy = "redirect-to-https"

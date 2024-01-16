@@ -1,8 +1,11 @@
+<script>
+    import { primary } from '../utils/colors'
+</script>
+
 <style>
     rect.st0 {
         animation: blinker 1.3s cubic-bezier(.7,0,.3,1) infinite;
     }
-
     @keyframes blinker {
         50% {
             opacity: 0;
@@ -14,10 +17,7 @@
 <svg version="1.1" id="Layer_2_00000177457292130175857980000014700644612307228825_"
 xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 353.4 99.2"
 style="enable-background:new 0 0 353.4 99.2;" xml:space="preserve">
-    <style type="text/css">
-    .st0{fill:#EF6060;}
-    </style>
-    <rect x="322.3" class="st0" width="31.1" height="99.2"/>
+    <rect x="322.3" class="st0" width="31.1" height="99.2" fill={primary[500]}/>
     <g>
     <path d="M0,88V18.2h26.7c5,0,9.2,0.8,12.6,2.4c3.4,1.6,5.9,3.7,7.5,6.5c1.7,2.7,2.5,5.8,2.5,9.3c0,2.8-0.5,5.3-1.6,7.3
         s-2.6,3.6-4.4,4.9c-1.8,1.2-3.9,2.1-6.2,2.7v0.7c2.5,0.1,4.9,0.9,7.1,2.3c2.3,1.4,4.2,3.3,5.6,5.8c1.5,2.5,2.2,5.5,2.2,9.1

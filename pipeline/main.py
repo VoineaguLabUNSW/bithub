@@ -358,7 +358,9 @@ def parallel_matrix_context(dataset, mutator, debug=False):
 def parallel_transcript_iterator(dataset, transcript_to_gene):
     '''Iterate over transcripts grouped by gene'''
     def transcript_row_mutator(row):
-        if annot := transcript_to_gene.get(row[0], None):
+        versionless = row[0].split('.', 1)[0]
+        if annot := transcript_to_gene.get(versionless, None):
+            row[0] = versionless
             row.insert(0, annot[0])
         else:
             raise AnnotationException(f'failed to annotate\ttranscript\t{row[0]}')
@@ -377,7 +379,8 @@ def parallel_transcript_iterator(dataset, transcript_to_gene):
 @contextlib.contextmanager
 def parallel_dataset_context(datasets, gene_to_gene, transcript_to_gene, debug=False):
     def gene_row_mutator(row):
-        if annot := gene_to_gene.get(row[0], None):
+        versionless = row[0].split('.', 1)[0]
+        if annot := gene_to_gene.get(versionless, None):
             row[0] = annot[0]
         else:
             raise AnnotationException(f'failed to annotate\tgene\t{row[0]}')

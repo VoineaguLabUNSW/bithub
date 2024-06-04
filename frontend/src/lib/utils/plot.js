@@ -83,7 +83,7 @@ function getPlotScatter(heading, data, xName, yName, zName, orderZ, colorway=und
                 type: "scattergl",
                 mode: 'markers+text',
                 name: cat,
-                hovertext: hasName ? data.map(d => d.name) : undefined,
+                hovertext: hasName ? filtered.map(d => d.name) : undefined,
                 hoverinfo: "x+y+text+name",
                 hoverlabel: {
                     bgcolor: 'white',

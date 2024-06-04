@@ -74,7 +74,7 @@
                 const matrix = $metadataContent.result;
                 metadataNames = matrix[0].splice(1)
                 const sampleNames = matrix.slice(1).map(row => row[0]);
-                const sampleMatches = findMatchesSorted([sampleNames], $dataProcessed.result.sampleNames);
+                const sampleMatches = findMatchesSorted([sampleNames.map(s => s.toUpperCase())], $dataProcessed.result.sampleNames);
                 commonSamples = sampleMatches.map(m => sampleNames[m.rowIndex])
                 if(commonSamples.length == 0) {
                     set({error: 'Sample column in metadata must match first row of expression matrix'})

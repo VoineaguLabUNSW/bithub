@@ -61,7 +61,7 @@
 
             let combinedHeading = heading + ` - ${ds} (${headingsY.length} Transcripts)`;
 
-            let range = [0, 20]
+            let range = [0, Math.max(...values)]
             if($scaleSelect.id !== 'Linear') {
                 range = [-5, 5]
                 combinedHeading += ` - ${$scaleSelect.id}`

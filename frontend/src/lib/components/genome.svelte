@@ -4,7 +4,27 @@
     import { asyncReadable } from '@square/svelte-store';
 
     let browserContainer = document.createElement('div')
-    let browser = asyncReadable(undefined, async () => igv.createBrowser(browserContainer, {genome: 'hg38', trackDefaults: { annotation: { autoHeight: true, maxHeight: 150}}}))
+    let browser = asyncReadable(undefined, async () => igv.createBrowser(browserContainer, {
+        genome: 'hg38', 
+        trackDefaults: { annotation: { autoHeight: true, maxHeight: 100}},
+        tracks:[{
+                name: "Ensembl (release 94)",
+                type: "annotation",
+                url: "https://s3.amazonaws.com/igv.org.genomes/hg38/Homo_sapiens.GRCh38.94.chr.gff3.gz",
+                indexURL: "https://s3.amazonaws.com/igv.org.genomes/hg38/Homo_sapiens.GRCh38.94.chr.gff3.gz.csi",
+                displayMode: "EXPANDED",
+                color: "purple"
+            },{
+                name: "Fantom5",
+                type: "annotation",
+                format: "bigBed",
+                url: "https://d33ldq8s2ek4w8.cloudfront.net/bithub/fantom5.bb",
+                displayMode: "EXPANDED",
+                color: "crimson"
+                
+            },
+        ]
+    }))
 </script>
 
 <script>

@@ -17,11 +17,10 @@
             },{
                 name: "Fantom5",
                 type: "annotation",
-                format: "bigBed",
-                url: "https://d33ldq8s2ek4w8.cloudfront.net/bithub/fantom5.bb",
+                url: "https://d33ldq8s2ek4w8.cloudfront.net/bithub/FCAT_lv3_liftover_sorted.gtf.gz",
+                indexURL: "https://d33ldq8s2ek4w8.cloudfront.net/bithub/FCAT_lv3_liftover_sorted.gtf.gz.tbi",
                 displayMode: "EXPANDED",
                 color: "crimson"
-                
             },
         ]
     }))

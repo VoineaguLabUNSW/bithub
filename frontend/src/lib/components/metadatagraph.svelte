@@ -10,6 +10,8 @@
 
     import { getContext } from "svelte";
     import { createMetadataStore } from '../stores/metadata'
+    
+    import { LOG_OFFSET } from '../utils/math'
 
     export let filteredStore;
     export let heading;
@@ -24,7 +26,7 @@
     let metadataSelect2 = writable();
 
     let scaleSelect = writable({id: 'Linear', name: 'Linear'});
-    const scaleOpts = new Map([['', ['Linear', 'Log e', 'Log 10'].map(l => ({id: l, name: l}))]])
+    const scaleOpts = new Map([['', ['Linear', 'Log e', 'Log 2', 'Log 10'].map(l => ({id: l, name: l}))]])
 
     let customSelect = writable()
     let customSelectName = 'Filter'
@@ -113,8 +115,9 @@
             let headingY = $expressionDataObj.$matrixSelect.name;
             const headingZ = ms2;
 
-            if($scaleSelect.id === 'Log e') y = y.map(v => Math.log(v))
-            if($scaleSelect.id === 'Log 10') y = y.map(v => Math.log10(v))
+            if($scaleSelect.id === 'Log e') y = y.map(v => Math.log(v + LOG_OFFSET))
+            if($scaleSelect.id === 'Log 2') y = y.map(v => Math.log2(v + LOG_OFFSET))
+            if($scaleSelect.id === 'Log 10') y = y.map(v => Math.log10(v + LOG_OFFSET))
 
             let data = getZipped({x, y, z, name: names})
             if(cs) {

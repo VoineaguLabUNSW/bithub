@@ -18,8 +18,8 @@ const primary = {
         '950': '#3d1426',
 }
 
-//https://github.com/plotly/plotly.js/blob/v2.14.0/src/components/color/attributes.js#L5-L16
-const paletteColors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
+// https://sashamaps.net/docs/resources/20-colors/
+const paletteColors = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080','#000000']
 
 // Helper functions
 function gradientHelper(colors, stops) {

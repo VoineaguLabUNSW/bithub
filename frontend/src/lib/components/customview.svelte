@@ -5,7 +5,7 @@
     import { base } from '$app/paths';
     import { asCSV } from '../stores/custom'
     import { findMatchesSorted } from "../utils/hdf5";
-    import {count, mean, sd} from '../utils/math'
+    import {count, mean, sd, LOG_OFFSET} from '../utils/math';
 
     export let customModal;
     
@@ -48,7 +48,7 @@
                 const rowData = matrix[i].slice(1).map(v => parseFloat(v))
                 nanCount += count(rowData, isNaN)
                 matrix[i] = rowData
-                logs.push(mean(rowData.map(v => Math.log2(Math.abs(v || 0) + 0.01))))
+                logs.push(mean(rowData.map(v => Math.log2(Math.abs(v || 0) + LOG_OFFSET))))
             }
             const logMean = mean(logs)
             const logSD = sd(logs, logMean) || 0.0000000001

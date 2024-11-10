@@ -5,6 +5,7 @@
     import { getContext } from "svelte";
     import { derived } from 'svelte/store';
     import { getPlotEmpty, getTableDownloader } from '../utils/plot';
+    import { LOG_OFFSET } from '../utils/math';
 
     export let filteredStore;
     export let heading;
@@ -15,10 +16,9 @@
     let datasetsSelect = writable();
     let transcriptSelect = writable();
     
-    let scaleSelect = writable({id: 'Linear', name: 'Linear'});
-    const scaleOpts = new Map([['', ['Linear', 'Log e', 'Log 10'].map(l => ({id: l, name: l}))]])
-
-
+    let scaleSelect = writable({id: 'Log 2', name: 'Log 2'});
+    const scaleOpts = new Map([['', ['Linear', 'Log e', 'Log 2', 'Log 10'].map(l => ({id: l, name: l}))]])
+    
     const datasetOptsObj = derived([data, filteredStore], ([$data, $filteredStore], set) => {
         if(!$data || !$filteredStore) return;
         const datasetOptVals = $filteredStore.datasetIndicesResults.map(col_i => $filteredStore.headings[col_i]).map(h => ({id: h, name: h}));
@@ -62,11 +62,15 @@
             let combinedHeading = heading + ` - ${ds} (${headingsY.length} Transcripts)`;
 
             let range = [0, Math.max(...values)]
+            let colorscale = [[0, $colorRange[1]], [1, $colorRange[2]]]
             if($scaleSelect.id !== 'Linear') {
-                range = [-5, 5]
                 combinedHeading += ` - ${$scaleSelect.id}`
-                if($scaleSelect.id === 'Log e') values = values.map(v => Math.log(v + 0.05))
-                if($scaleSelect.id === 'Log 10') values = values.map(v => Math.log10(v + 0.05))
+                if($scaleSelect.id === 'Log e') values = values.map(v => Math.log(v + LOG_OFFSET))
+                if($scaleSelect.id === 'Log 2') values = values.map(v => Math.log2(v + LOG_OFFSET))
+                if($scaleSelect.id === 'Log 10') values = values.map(v => Math.log10(v + LOG_OFFSET))
+                const maxAbs = Math.max(...values.map(v => Math.abs(v)))
+                range = [-maxAbs, +maxAbs]
+                colorscale = [[0, $colorRange[0]], [0.5, $colorRange[1]], [1, $colorRange[2]]]
             }
 
             values = headingsY.map((_, i) => values.slice(i*headingsX.length, (i+1)*headingsX.length))
@@ -80,7 +84,7 @@
                     hoverongaps: false,
                     xgap: 0.5,
                     ygap: 0.5,
-                    colorscale: [[0, $colorRange[0]], [0.5, $colorRange[1]], [1, $colorRange[2]]],
+                    colorscale: colorscale,
                     zmin: range[0],
                     zmax: range[1]
                 }],

@@ -13,3 +13,4 @@ dependencies:
     - tqdm
     - boto3
     - numpy
+    - scipy

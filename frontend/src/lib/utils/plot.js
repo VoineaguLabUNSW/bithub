@@ -134,7 +134,7 @@ function getPlotScatter(heading, data, xName, yName, zName, orderZ, colorway=und
     }
 }
 
-function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, groupLabelsX, groupSizesX, colorway=undefined) {
+function getPlotDistribution(heading, data, xName, yName, zName, orderX, orderZ, groupLabelsX, groupSizesX, colorway=undefined, type='violin', separateXTraces=false) {
     const hasZ = data[0].z !== undefined 
     const orderXDic = getOrderIndexed(data.map(d => d.x), orderX || [])
     const orderZDic = hasZ ? getOrderIndexed(data.map(d => d.z), orderZ || []) : new Map()
@@ -205,13 +205,13 @@ function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, 
         }
     }
 
-    // Create violins
+    // Create violins/box plots
     //Since it's sorted by (Z || X), changes in Z are the major group dividers
     const plotData = [];
     const range = [0, 1]
     for(let i=1; i<data.length; ++i) {
         const isLast = (i == (data.length-1));
-        const didChange = data[i-1].z != data[i].z
+        const didChange = hasZ ? (data[i-1].z != data[i].z) : (separateXTraces && (data[i-1].x != data[i].x))
 
         if(!didChange || isLast) {
             ++range[1] 
@@ -220,10 +220,10 @@ function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, 
         if((didChange || isLast) && ((range[1] - range[0]) || groupSizesX)) {
             const dataRange = data.slice(...range)
             plotData.push({
-                type: 'violin',
+                type: type, // 'violin' or 'box'
                 // NaN for each possible category forces plotly to create empty spaces for them
-                x: (groupSizesX ? seenX : []).concat(dataRange.map(d => d.x)),
-                y: (groupSizesX ? new Array(seenX.length).fill(NaN) : []).concat(dataRange.map(d => d.y)),
+                x: ((groupSizesX && hasZ) ? seenX : []).concat(dataRange.map(d => d.x)),
+                y: ((groupSizesX && hasZ) ? new Array(seenX.length).fill(NaN) : []).concat(dataRange.map(d => d.y)),
                 hovertext: (groupSizesX ? new Array(seenX.length).fill('') : []).concat(dataRange.map(d => d.name)),
                 hoverinfo: "y+text",
                 hoverlabel: {
@@ -234,7 +234,7 @@ function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, 
                 name: data[i-1].z,
                 box: { visible: false },
                 meanline: { visible: true },
-                spanmode: 'hard'
+                spanmode: 'hard',
             });
             range[0] = i;
         }
@@ -242,7 +242,9 @@ function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, 
     return { 
         plotData, 
         layout: {
+            showlegend: hasZ,
             violinmode: hasZ && 'group',
+            boxmode: hasZ && 'group',
             title: {
                 text: heading,
                 font: { family: "Times New Roman", size: 20 }
@@ -268,4 +270,4 @@ function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, 
     }
 }
 
-export { getPlotEmpty, getPlotViolinBasic, getPlotScatter, getColumnDownloader, getZipped, getWithNA, getTableDownloader }
+export { getPlotEmpty, getPlotDistribution, getPlotScatter, getColumnDownloader, getZipped, getWithNA, getTableDownloader }

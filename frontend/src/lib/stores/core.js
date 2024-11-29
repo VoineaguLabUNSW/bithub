@@ -51,7 +51,7 @@ function createCore(url) {
         async ($metadata) => {
             try {
                 const rowStreams = {}
-                const obj = await getHDF5($metadata.value.data_url/*'http://localhost:5501/out.hdf5'*/, progress.set);
+                const obj = await getHDF5($metadata.value.data_url, progress.set);
                 for(let i=0; i<obj.attrs.remote.length; i+=3) {
                     rowStreams[obj.attrs.remote[i+0]] = {
                         attrs: obj.get(obj.attrs.remote[i+0]).attrs, 
@@ -71,8 +71,9 @@ function createCore(url) {
     row.subscribe(async ($row) => {
         // NOTE: could not use asyncDerived([row, data]) since data is not json serializable
         let $data;
-        if($row === undefined || !($data = get(data))) return
-
+        let $metadata;
+        if($row === undefined || !($data = get(data)) || !($metadata = get(metadata))) return
+        
         // Determine requests
         const requests = []
         for(const [rangesPath, rowStream] of Object.entries($data.rowStreams)) {
@@ -93,7 +94,7 @@ function createCore(url) {
 
         // Perform single combined request
         const controller = new AbortController();
-        const response = await fetch('https://d33ldq8s2ek4w8.cloudfront.net/bithub/expression.bin'/*'http://localhost:5501/expression.bin'*/, {
+        const response = await fetch($metadata.value.bin_url, {
             signal: controller.signal,
             headers: {'Range': 'bytes=' + `${requests[0].byteStart}-${requests[requests.length-1].byteEnd-1}`},
         });

@@ -4,6 +4,7 @@ import data_pb2
 
 from typing import Callable, Iterable, Tuple, Dict, List
 from unittest.mock import patch
+from scipy.stats import f_oneway, spearmanr
 
 MIN_HITS = 2
 LOG2_OFFSET = 0.05
@@ -19,7 +20,7 @@ def safe_access_nested(data, indices, default=None):
 
 def manage_deploy_local(asset_paths):
     '''Return local URL mapping - local server MUST support range requests'''
-    return {os.path.basename(p): os.path.relpath(p, '../') for p in asset_paths}
+    return {os.path.basename(p): os.path.join('http://localhost:5501', os.path.relpath(p, '../')) for p in asset_paths}
 
 def calc_s3_etag(path, multipart_threshold, multipart_chunksize):
     '''Calculate hash, used to avoid re-deploying identical files'''
@@ -425,12 +426,6 @@ def parse_metadata(dataset, order_entries: Dict[str, List[str]], category_limit:
         side_headers = [r[0] for r in row_list]
 
         top_headers_enum = list(enumerate(top_headers))
-        if  annot:
-            # Sort top headers (index, header) by column type order from annotation file
-            steps = get_reorder_indices(column_types.keys(), top_headers)
-            buffer = [None] * len(column_types)
-            top_headers_enum = filter(lambda x: x is not None, apply_reorder_indices(top_headers_enum, buffer, steps))
-
         filter_factors_enum = None
         if customFilter := dataset.get('customFilter', None):
             h = customFilter['column']
@@ -454,19 +449,19 @@ def parse_metadata(dataset, order_entries: Dict[str, List[str]], category_limit:
                         colors = order_entry.get('color', None)
                         if colors:
                             attrs['colors'] = colors
-                    yield h, column, attrs, column_types.get(h, None)
+                    groups = None
+                    yield h, column, groups, attrs, column_types.get(h, None)
 
         return top_headers, side_headers, filter_factors_enum, columns()
 
-def write_metadata_columns(hdf5_f, columns: Iterable[Tuple[str, np.ndarray, Dict[str, List[str]]]], sample_valid_indices: Iterable[int]=None, extra_attrs={}):
+def write_metadata_columns(hdf5_f, columns: Iterable[Tuple[str, np.ndarray, Dict[str, List[str]]]], extra_attrs={}):
     '''Write each column as a separate dataset since JS struggles to deserialize different types'''
     sample_root = hdf5_f.create_group('samples')
     column_headers, column_types = [], []
-    for header, array, attrs, col_type in columns:
+    for header, array, groups, attrs, col_type in columns:
         if header in column_headers: continue
         column_headers.append(header)
         column_types.append(col_type)
-        if sample_valid_indices: array = array[sample_valid_indices]
         ds = sample_root.create_dataset(header, data=array, chunks=array.shape, compression='gzip', compression_opts=9)
         for k, v in (attrs).items():
             ds.attrs.create(k, v)
@@ -474,7 +469,6 @@ def write_metadata_columns(hdf5_f, columns: Iterable[Tuple[str, np.ndarray, Dict
     for k, v in (extra_attrs).items():
         sample_root.attrs.create(k, v)
     
-
     # Only write types if some are actually defined
     if column_types.count(None) < len(column_types):
         for i, t in enumerate(column_types):
@@ -640,6 +634,7 @@ if __name__ == '__main__':
                 annots_written = []
                 with parallel_dataset_context(inputObj['datasets'], gene_to_gene, transcript_to_gene) as ret:
                     first, iterator = ret
+                    all_metadata_columns = {}
 
                     meta_root = root.create_group('metadata')
                     for dataset, headers in zip(inputObj['datasets'], first):
@@ -650,6 +645,7 @@ if __name__ == '__main__':
                         # Get sample order from metadata first column
                         orders = [o for o in inputObj['customMetadataCategoryOrders'] if dataset['id'] in o['datasets']]
                         top_headers, side_headers, filter_factors_enum, columns = parse_metadata(dataset, orders)
+                        
                         samples_from_metadata = list(iterate_unique(side_headers))
 
                         data_meta_root = meta_root.create_group(dataset['id'])
@@ -670,16 +666,22 @@ if __name__ == '__main__':
                         sample_whitelist = samples_from_matrices.intersection(samples_from_metadata)
                         sample_whitelist_ordered = list(sorted(sample_whitelist))
                         
-                        # Write sample metadata
+                        # Store sample metadata in memory for pvalue calculations
                         column_indices = list(filter(lambda x: x is not None, get_reorder_indices(sample_whitelist_ordered, side_headers)))
-                        write_metadata_columns(data_meta_root, columns, column_indices, extra_attrs)
+                        def filter_metadata(columns):
+                            new_array = columns[1][column_indices]
+                            new_groups = [np.where(new_array == c)[0] for c in set(new_array)] if new_array.dtype.type is np.string_ else None
+                            return (columns[0], new_array, new_groups, columns[3], columns[4])
+                        all_metadata_columns[dataset['id']] = (list(map(filter_metadata, columns)), extra_attrs)
+                        
+                        # Write sample names
                         with contextlib.suppress(Exception):
                             write_string_dataset(data_meta_root, 'sample_names', sample_whitelist_ordered)
                         dataset['_internal_sample_count'] = len(sample_whitelist)
                         dataset['_null_transcripts'] = [None] * len(dataset.get('transcript_matrices', []))
                         
                         for matrix, samples in zip(dataset['matrices'], matrix_headers):
-                            ranges, logs = [], []
+                            ranges, logs, pvalue_ranges = [], [], []
                             # Initialize re-order buffer
                             reorder_indices = get_reorder_indices(sample_whitelist_ordered, samples)
                             reorder_buffer = [None] * len(sample_whitelist_ordered)
@@ -693,7 +695,7 @@ if __name__ == '__main__':
                                     if fv is not None: filter_indices[fv].append(i)
                                 logs_filter_enum = (filter_factors_enum, filter_indices, [[] for _ in filter_factors_enum[1]])
 
-                            matrix['_internal'] = (ranges, reorder_indices, reorder_buffer, logs, logs_filter_enum)
+                            matrix['_internal'] = (ranges, reorder_indices, reorder_buffer, logs, logs_filter_enum, pvalue_ranges)
 
                         if not (transcript_matrices := dataset.get('transcript_matrices', None)): continue
                         
@@ -739,10 +741,23 @@ if __name__ == '__main__':
                             for m in matrices:
                                 if m is None: continue
                                 dataset, matrix, samples, gene, values = m
-                                ranges, reorder_indices, reorder_buffer, logs, logs_filter_enum = matrix['_internal']
+                                ranges, reorder_indices, reorder_buffer, logs, logs_filter_enum, pvalue_ranges = matrix['_internal']
 
                                 # Write re-orderd matrix row and save range (input, buffer, steps)
                                 fixed = apply_reorder_indices([float(v) for v in values], reorder_buffer, reorder_indices)
+                                
+                                # Calculate pvalues for each column against expression data
+                                pvalues = []
+                                for header, array, groups, attrs, col_type in all_metadata_columns[dataset['id']][0]:
+                                    if not groups:
+                                        pvalues.append(spearmanr(fixed, array)[1])
+                                    elif len(groups) == 1:
+                                        pvalues.append(float('nan'))
+                                    else:
+                                        pvalues.append(f_oneway(*[[fixed[i] for i in g] for g in groups])[1])
+                                pvalue_row = data_pb2.RowData()
+                                pvalue_row.values.extend(pvalues)
+                                pvalue_ranges.append(writer(pvalue_row.SerializeToString()))
                                 
                                 row = data_pb2.RowData()
                                 row.values.extend(fixed)
@@ -751,7 +766,7 @@ if __name__ == '__main__':
                                 # Get logs for zscore calc
                                 fixed_logged = [math.log2(abs(v) + LOG2_OFFSET) for v in fixed]
                                 logs.append(np.mean(fixed_logged))
-                
+                                
                                 # Determine region subset
                                 if logs_filter_enum:
                                     _, filter_indices, logs_filter = logs_filter_enum
@@ -769,7 +784,11 @@ if __name__ == '__main__':
                                             table.float_values.extend([float(v) for v in vals])
                                             table.string_values.append(transcript_id)
                                     ranges.append(writer(table.SerializeToString()))
-
+                    
+                    # Write metadata columns and their pvalues
+                    for dataset_id, [columns, extra_attrs] in all_metadata_columns.items():
+                        write_metadata_columns(meta_root[dataset_id], columns, extra_attrs)
+                        
                 all_ranges.append((last_range_end, teller()))
 
             logging.info(f'processed {total_written} entries')
@@ -849,12 +868,15 @@ if __name__ == '__main__':
                 [filter_name, filter_categories] = ['', []]
                 for matrix in d['matrices']:
                     name, shape = matrix['name'], (len(annots_written), d['_internal_sample_count'])
-                    ranges, _, _, logs, logs_filter_enum = matrix['_internal']
+                    ranges, _, _, logs, logs_filter_enum, pvalue_ranges = matrix['_internal']
         
                     curr_matrix_meta_root = matrix_meta_root.create_dataset(name, data=ranges, compression='gzip', compression_opts=9)
                     curr_matrix_meta_root.attrs.create('path', expression_url)
                     curr_matrix_meta_root.attrs.create('shape', shape)
                     remote_range_datasets.append([curr_matrix_meta_root.name, '/data/' + d['id'], 'RowData'])
+                    
+                    curr_matrix_pvalue_root = matrix_meta_root.create_dataset(name + '_pvalues', data=pvalue_ranges, compression='gzip', compression_opts=9)
+                    remote_range_datasets.append([curr_matrix_pvalue_root.name, '/data/' + d['id'], 'RowData'])
 
                     all_logs.setdefault('All', []).append(logs)
                     if logs_filter_enum:
@@ -910,6 +932,7 @@ if __name__ == '__main__':
         with open(os.path.join(OUTPUT_RESOURCES, 'metadata.json'), 'w') as f:
             meta_json = {
                 "data_url": asset_urls.get('out.hdf5', ''),
+                "bin_url": expression_url,
                 "count": total_written,
                 "last_updated": datetime.date.today().strftime("%B %Y"),
                 "meta_files": []

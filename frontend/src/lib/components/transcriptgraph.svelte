@@ -11,7 +11,7 @@
     export let heading;
 
     const { data } = getContext('core');
-    const { colorRange } = getContext('palettes')
+    const { colorRange } = getContext('displaySettings')
 
     let datasetsSelect = writable();
     let transcriptSelect = writable();

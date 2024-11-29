@@ -7,7 +7,7 @@
     import './../../node_modules/@fortawesome/fontawesome-free/css/all.min.css';
     import '../app.css';
 
-    const url = `${base}/metadata.json`/*'http://localhost:5501/metadata.json'*/;
+    const url = `${base}/metadata.json` // 'http://localhost:5501/pipeline/output/metadata.json';
     setContext('core', createCore(url)); 
     
     

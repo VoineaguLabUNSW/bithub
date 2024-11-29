@@ -134,7 +134,7 @@ function getPlotScatter(heading, data, xName, yName, zName, orderZ, colorway=und
     }
 }
 
-function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, groupLabelsX, groupSizesX, colorway=undefined) {
+function getPlotDistribution(heading, data, xName, yName, zName, orderX, orderZ, groupLabelsX, groupSizesX, colorway=undefined, type='violin') {
     const hasZ = data[0].z !== undefined 
     const orderXDic = getOrderIndexed(data.map(d => d.x), orderX || [])
     const orderZDic = hasZ ? getOrderIndexed(data.map(d => d.z), orderZ || []) : new Map()
@@ -205,7 +205,7 @@ function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, 
         }
     }
 
-    // Create violins
+    // Create violins/box plots
     //Since it's sorted by (Z || X), changes in Z are the major group dividers
     const plotData = [];
     const range = [0, 1]
@@ -220,7 +220,7 @@ function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, 
         if((didChange || isLast) && ((range[1] - range[0]) || groupSizesX)) {
             const dataRange = data.slice(...range)
             plotData.push({
-                type: 'violin',
+                type: type, // 'violin' or 'box'
                 // NaN for each possible category forces plotly to create empty spaces for them
                 x: (groupSizesX ? seenX : []).concat(dataRange.map(d => d.x)),
                 y: (groupSizesX ? new Array(seenX.length).fill(NaN) : []).concat(dataRange.map(d => d.y)),
@@ -263,9 +263,10 @@ function getPlotViolinBasic(heading, data, xName, yName, zName, orderX, orderZ, 
             annotations: groupAnnotations,
             legend: { x: 1, y: 0.5, title: {text: zName} },
             colorway: colorway,
+            boxmode: 'group',
         },
         downloadCSV: getColumnDownloader(heading, data, xName, yName, zName)
     }
 }
 
-export { getPlotEmpty, getPlotViolinBasic, getPlotScatter, getColumnDownloader, getZipped, getWithNA, getTableDownloader }
+export { getPlotEmpty, getPlotDistribution, getPlotScatter, getColumnDownloader, getZipped, getWithNA, getTableDownloader }

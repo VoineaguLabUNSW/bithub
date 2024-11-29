@@ -1,11 +1,12 @@
 <script>
     import Dropdown from '../components/dropdown.svelte';
     import Plot from '../components/plot.svelte';
+    import { page } from '$app/stores';
 
     import { getZipped } from '../utils/plot'
     
     import { writable, derived } from "svelte/store";
-    import { getPlotEmpty, getPlotViolinBasic, getPlotScatter } from '../utils/plot';
+    import { getPlotEmpty, getPlotDistribution, getPlotScatter } from '../utils/plot'
     import { withoutNulls } from '../utils/hdf5';
 
     import { getContext } from "svelte";
@@ -15,9 +16,10 @@
 
     export let filteredStore;
     export let heading;
+    export let type;
 
     const core = getContext('core')
-    const { colorWay } = getContext('palettes')
+    const { colorWay } = getContext('displaySettings')
     const metadataStore = createMetadataStore(core)
 
     let datasetsSelect = writable();
@@ -84,22 +86,31 @@
         })
         return () => expressionSub()
     })
+    
+    const pvalueDataObj = derived([matrixOptsObj, matrixSelect], ([$matrixOptsObj, $matrixSelect], set) => {
+        if(!$matrixOptsObj || !$matrixSelect) return;
+        const reader = $matrixOptsObj.$metadataStore.readers[$datasetsSelect.id];
+        const expressionSub = reader.getMatrixStore['/metadata/' +  $datasetsSelect.id + '/matrices/' + $matrixSelect.id + "_pvalues"].current.subscribe(pvalues => {
+            if(pvalues) set({...$matrixOptsObj, pvalues: pvalues, $matrixSelect})
+        })
+        return () => expressionSub()
+    })
 
-    const plotlyArgs = derived([expressionDataObj, metadataSelect1, metadataSelect2, scaleSelect, customSelect, colorWay], ([$expressionDataObj, $metadataSelect1, $metadataSelect2, $scaleSelect, $customSelect, $colorWay], set) => {
-        if(!$expressionDataObj || !$metadataSelect1) {
+    const plotlyArgs = derived([expressionDataObj, pvalueDataObj, metadataSelect1, metadataSelect2, scaleSelect, customSelect, colorWay], ([$expressionDataObj, $pvalueDataObj, $metadataSelect1, $metadataSelect2, $scaleSelect, $customSelect, $colorWay], set) => {
+        if(!$expressionDataObj || !pvalueDataObj || !$metadataSelect1) {
             return
         } else if (!$expressionDataObj.expression.data) {
-            set(getPlotEmpty($expressionDataObj.expression.loading ? 'Loading...' : 'Not in dataset'))
+            set(getPlotEmpty(($expressionDataObj.expression.loading || $pvalueDataObj.pvalues.loading) ? 'Loading...' : 'Not in dataset'))
         } else {
             // Prevent invalid combinations during updates
             const [ds1, ms1] = $metadataSelect1.id.split('|', 2)
             const [ds2, ms2] = ($metadataSelect2?.id || '|').split('|', 2)
             const [ds3, cs] = ($customSelect?.id || '|').split('|', 2)
 
-            if([ds1, ds2, ds3].some(ds => ds && ds !== $expressionDataObj.$datasetsSelect.id)) return
+            if([ds1, ds2, ds3].some(ds => ds && (ds !== $expressionDataObj.$datasetsSelect.id || ds !== $pvalueDataObj.$datasetsSelect.id))) return
             
             const reader = $expressionDataObj.$metadataStore.readers[ds1];
-            const x = withoutNulls(reader.getColumn(ms1).values)
+            let x = withoutNulls(reader.getColumn(ms1).values)
             const z = ms2 && withoutNulls(reader.getColumn(ms2).values)
             
             const names = reader.sampleNames;
@@ -111,10 +122,27 @@
             const groupSizesX = reader.getColumn(ms1).attrs.groupSizes
             const groupLabelsX = reader.getColumn(ms1).attrs.groupLabels
 
-            const headingX = ms1;
+            const headingX = ms2 ? ms1 : `${ms1} (p = ${$pvalueDataObj.pvalues.data.values[reader.order.indexOf(ms1)].toFixed(2)})`
             let headingY = $expressionDataObj.$matrixSelect.name;
             const headingZ = ms2;
-
+            
+            // Calculate % expressing/nonzero and add to x labels if required
+            const isCategorical = (typeof x[0]) == 'string' || x[0] instanceof String
+            if (isCategorical) {
+                let zeroXCounts = {}
+                x.forEach((v, i) => {
+                    let curr = zeroXCounts[v];
+                    if (curr === undefined) curr = zeroXCounts[v] = [0, 0, 0, undefined];
+                    curr[0]++;
+                    if (y[i] !== 0) curr[1]++; // Track nonzero for each category
+                    if (y[i] >= 1) curr[2]++; // Track greater than 1 for each category
+                });
+                for (const [v, curr] of Object.entries(zeroXCounts)) {
+                    curr[3] = ((curr[1] === curr[0]) || !curr[2]) ? v : `${v} (${(curr[1]/curr[0]*100).toFixed(2)}% expr)`                
+                }
+                x = x.map(v => zeroXCounts[v][3])
+            }
+            
             if($scaleSelect.id === 'Log e') y = y.map(v => Math.log(v + LOG_OFFSET))
             if($scaleSelect.id === 'Log 2') y = y.map(v => Math.log2(v + LOG_OFFSET))
             if($scaleSelect.id === 'Log 10') y = y.map(v => Math.log10(v + LOG_OFFSET))
@@ -128,8 +156,8 @@
             const headingMain = `${heading} - ${ds1}`
             if($scaleSelect.id != 'Linear') headingY = `${headingY} (${$scaleSelect.id})`
             
-            if((typeof data[0].x) == 'string' || data[0].x instanceof String) {
-                set(getPlotViolinBasic(headingMain, data, headingX, headingY, headingZ, orderX, orderZ, groupLabelsX, groupSizesX, $colorWay))
+            if(isCategorical) {
+                set(getPlotDistribution(headingMain, data, headingX, headingY, headingZ, orderX, orderZ, groupLabelsX, groupSizesX, $colorWay, $page.url.searchParams.get('plotType') || type, ms1 == reader.customFilterColumn))
             } else {
                 set(getPlotScatter(headingMain, data, headingX, headingY, headingZ, orderZ, $colorWay))   
             }

@@ -39,22 +39,7 @@
 <hr>
 
 <Tabs contentClass='bg-white mt-0 shadow-lg sm:rounded-lg h-[calc(100vh-270px)]'>
-    <TabItem open title="Genome Browser">
-        <Genome currentRow={currentRow} filteredStore={filteredStore}/>
-    </TabItem>
-    <TabItem disabled={$filteredTranscript.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>
-        <div slot='title'>
-            <span>Transcript Expression</span>
-            <button id="ts-help">
-                <i class='fas fa-circle-question'/>
-                <span class="sr-only">Show information</span>
-            </button>
-        </div>
-        <div class="h-[calc(100vh-270px)]">
-            <TranscriptGraph filteredStore={filteredTranscript} heading={$geneInfo?.symbol}/>
-        </div>
-    </TabItem>
-    <TabItem>
+    <TabItem open>
         <div slot='title'>
             <span>Expression Across Datasets</span>
             <button id="exp-help">
@@ -76,7 +61,7 @@
             </button>
         </div>
         <div class="h-[calc(100vh-270px)]">
-            <MetadataGraph filteredStore={filteredBulk} heading={$geneInfo?.symbol}/>
+            <MetadataGraph filteredStore={filteredBulk} heading={$geneInfo?.symbol} type='violin'/>
         </div>
     </TabItem>
     <TabItem disabled={$filteredVarpart.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>
@@ -101,18 +86,32 @@
         </div>
 
         <div class="h-[calc(100vh-270px)]">
-            <MetadataGraph filteredStore={filteredSingleCell} heading={$geneInfo?.symbol}/>
+            <MetadataGraph filteredStore={filteredSingleCell} heading={$geneInfo?.symbol} type='box'/>
+        </div>
+    </TabItem>
+    <TabItem>
+        <div slot='title'>
+            <span>Genome Browser</span>
+            <button id="gb-help">
+                <i class='fas fa-circle-question'/>
+                <span class="sr-only">Show information</span>
+            </button>
+        </div>
+        <Genome currentRow={currentRow} filteredStore={filteredStore}/>
+    </TabItem>
+    <TabItem disabled={$filteredTranscript.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>
+        <div slot='title'>
+            <span>Transcript Expression</span>
+            <button id="ts-help">
+                <i class='fas fa-circle-question'/>
+                <span class="sr-only">Show information</span>
+            </button>
+        </div>
+        <div class="h-[calc(100vh-270px)]">
+            <TranscriptGraph filteredStore={filteredTranscript} heading={$geneInfo?.symbol}/>
         </div>
     </TabItem>
 </Tabs>
-
-<Popover triggeredBy="#ts-help" class="z-[9999] w-[700px] text-sm font-light text-gray-500 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400" placement="bottom-start">
-    <div class="p-3 space-y-2">
-        <h3 class="font-semibold text-gray-900 dark:text-white">Transcript Details</h3>
-        <p>Heatmap displaying transcript specific expression across different tissues (GTEx) and brain developmental stages (BrainSeq). Values were calculated by averaging expression values per transcript per tissue across all tissues (for GTEx data) or per transcript per age interval (BrainSeq). A z-score normalization has been performed to rank the means. </p>
-    </div>
-</Popover>
-
 
 <Popover triggeredBy="#exp-help" class="z-[9999] w-[700px] text-sm font-light text-gray-500 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400" placement="bottom-start">
     <div class="p-3 space-y-2">
@@ -146,4 +145,16 @@
     </div>
 </Popover>
 
+<Popover triggeredBy="#gb-help" class="z-[9999] w-[700px] text-sm font-light text-gray-500 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400" placement="bottom-start">
+    <div class="p-3 space-y-2">
+        <h3 class="font-semibold text-gray-900 dark:text-white">Genone Browser Details</h3>
+        <p>Genome Browser track featuring genomic coordinate information from Ensembl, RefSeq and FANTOM5.</p>
+    </div>
+</Popover>
 
+<Popover triggeredBy="#ts-help" class="z-[9999] w-[700px] text-sm font-light text-gray-500 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400" placement="bottom-start">
+    <div class="p-3 space-y-2">
+        <h3 class="font-semibold text-gray-900 dark:text-white">Transcript Details</h3>
+        <p>Heatmap displaying transcript specific expression across different tissues (GTEx) and brain developmental stages (BrainSeq). Values were calculated by averaging expression values per transcript per tissue across all tissues (for GTEx data) or per transcript per age interval (BrainSeq). A z-score normalization has been performed to rank the means. </p>
+    </div>
+</Popover>

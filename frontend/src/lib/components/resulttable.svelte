@@ -78,7 +78,7 @@
         {@const datasetIndicesFiltered = tableData.datasetIndices.filter(v => currentVisibleIndices.includes(v))}
         {@const databaseIndicesFiltered = tableData.databaseIndices.filter(v => currentVisibleIndices.includes(v))}
         <div>
-            <span class="absolute m-4 gap-1 flex items-center justify-between items-stretch">
+            <span class="absolute m-4 gap-1 flex justify-between items-stretch">
                 <Button on:click={() => downloadTSV(tableData, $filteredStore, currentVisibleIndices)} color="light" class="rounded-e-none"><i class="fas fa-download"/></Button>
                 <span class="w-64"><Dropdown title="Columns" mainClass="rounded-s-none" groups={tableData.headingGroups} selected={currentVisible} disabled={tableData.headings[0]}/></span>
             </span>

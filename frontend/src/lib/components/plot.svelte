@@ -4,7 +4,7 @@
     import { getContext } from 'svelte';
     import { writable, get } from "@square/svelte-store";
     import Plotly from 'plotly.js-dist-min';
-    import { Tabs, TabItem } from 'flowbite-svelte';
+    import { Tabs, TabItem, Input } from 'flowbite-svelte';
     import Palette from '../components/palette.svelte';
     
     export let plotlyArgs;
@@ -12,16 +12,12 @@
     const CONTROLS_WIDTH = 300;
     const TRANSITION_PARAMS = { x: 50, duration: 250, easing: sineIn };
     
-    let { colorPrimary, colorWay, colorRange } = getContext('palettes');
+    let { colorPrimary, colorWay, colorRange, exportWidth, exportHeight } = getContext('displaySettings');
 
     let plotContainer = writable(undefined);
     let isHovering = true; // Show initially until cursor enters plot
     let toggleOn = writable();
     let hoverOn = writable();
-    
-    function plotlySizeHelper(legendCount=0) {
-        return {width: 1920, height: 1080}
-    }
 
     let firstRender = true;
     $: {
@@ -32,12 +28,12 @@
                     //https://fontawesome.com/icons/bezier-curve
                     name: 'Download .svg',
                     icon: pathToIcon('M368 80h32v32H368V80zM352 32c-17.7 0-32 14.3-32 32H128c0-17.7-14.3-32-32-32H32C14.3 32 0 46.3 0 64v64c0 17.7 14.3 32 32 32V352c-17.7 0-32 14.3-32 32v64c0 17.7 14.3 32 32 32H96c17.7 0 32-14.3 32-32H320c0 17.7 14.3 32 32 32h64c17.7 0 32-14.3 32-32V384c0-17.7-14.3-32-32-32V160c17.7 0 32-14.3 32-32V64c0-17.7-14.3-32-32-32H352zM96 160c17.7 0 32-14.3 32-32H320c0 17.7 14.3 32 32 32V352c-17.7 0-32 14.3-32 32H128c0-17.7-14.3-32-32-32V160zM48 400H80v32H48V400zm320 32V400h32v32H368zM48 112V80H80v32H48z'),
-                    click: (gd) => Plotly.downloadImage(gd, {format: 'svg', ...plotlySizeHelper()})
+                    click: (gd) => Plotly.downloadImage(gd, {format: 'svg', width: $exportWidth, height: $exportHeight})
                 }, {
                     //https://fontawesome.com/icons/file-image
                     name: 'Download .png',
                     icon: pathToIcon('M64 0C28.7 0 0 28.7 0 64V448c0 35.3 28.7 64 64 64H320c35.3 0 64-28.7 64-64V160H256c-17.7 0-32-14.3-32-32V0H64zM256 0V128H384L256 0zM64 256a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zm152 32c5.3 0 10.2 2.6 13.2 6.9l88 128c3.4 4.9 3.7 11.3 1 16.5s-8.2 8.6-14.2 8.6H216 176 128 80c-5.8 0-11.1-3.1-13.9-8.1s-2.8-11.2 .2-16.1l48-80c2.9-4.8 8.1-7.8 13.7-7.8s10.8 2.9 13.7 7.8l12.8 21.4 48.3-70.2c3-4.3 7.9-6.9 13.2-6.9z'),
-                    click: (gd) => Plotly.downloadImage(gd, {format: 'png', ...plotlySizeHelper()})
+                    click: (gd) => Plotly.downloadImage(gd, {format: 'png', width: $exportWidth, height: $exportHeight})
                 }, 
                 ...($plotlyArgs.downloadCSV ? [{
                     //https://fontawesome.com/icons/file-image
@@ -166,13 +162,28 @@
             <span slot="title">
                 <i class="fa-solid fa-palette"></i> Display
             </span>
-            <div class="text-sm text-gray-500 dark:text-gray-400">
-                Color Range:
-                <Palette palette={colorRange}/>
-                Primary Color:
-                <Palette palette={colorPrimary}/>
-                Colorway:
-                <Palette palette={colorWay}/>
+            <div class="text-sm text-gray-500 dark:text-gray-400 flex flex-col items-stretch gap-3">
+                <div>
+                    Color Range
+                    <Palette palette={colorRange}/>
+                </div>
+                
+                <div>
+                    Primary Color
+                    <Palette palette={colorPrimary}/>
+                </div>
+                <div>
+                    Colorway
+                    <Palette palette={colorWay}/>
+                </div>
+                <div>
+                    Export Width
+                    <Input bind:value={$exportWidth} type="number" step="1" min="700"/>
+                </div>
+                    Export Height
+                <div>
+                    <Input bind:value={$exportHeight} type="number" step="1" min="450"/>
+                </div> 
             </div>
           </TabItem>
         </Tabs>

@@ -7,7 +7,7 @@ function createMetadataStore(core) {
             metadataColumnReaders[h] = {
                 ...$data.value.get('metadata/' + h + '/samples').attrs, //order, type (optional)
                 sampleNames: $data.value.get('metadata/' + h + '/sample_names').value,
-                matrixNames: $data.value.get('metadata/' + h + '/matrices').keys,
+                matrixNames: $data.value.get('metadata/' + h + '/matrices').keys.filter(m => !m.endsWith('_pvalues')),
                 getMatrixStore: $data.rowStreams,
                 getColumn: (colHeading) => {
                     const sRoot = $data.value.get('metadata/' + h + '/samples/' + colHeading)

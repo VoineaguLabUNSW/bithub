@@ -1,7 +1,8 @@
 {
   "data_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/out.hdf5",
+  "bin_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/expression.bin",
   "count": 34440,
-  "last_updated": "April 2024",
+  "last_updated": "November 2024",
   "meta_files": [
     {
       "name": "BrainSpan",

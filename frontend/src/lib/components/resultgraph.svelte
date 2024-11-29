@@ -9,7 +9,7 @@
     export let heading;
 
     const { data } = getContext('core');
-    const { colorPrimary } = getContext('palettes');
+    const { colorPrimary } = getContext('displaySettings');
 
     let datasetSelect1 = writable();
     let datasetSelect2 = writable();

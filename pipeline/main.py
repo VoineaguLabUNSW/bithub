@@ -8,6 +8,7 @@ from scipy.stats import f_oneway, spearmanr
 
 MIN_HITS = 2
 LOG2_OFFSET = 0.05
+GENE_LIMIT = None
 
 class AnnotationException(Exception):
     pass
@@ -222,7 +223,7 @@ def iterate_csv_sorted(path: str, strip_numeric: bool=False, comment: str=None, 
                             writer.writerow(row)
 
             # Fast out-of-memory sort
-            os.system(f'(head -n 1 {pre_sort_path} && tail -n +2 {pre_sort_path} | sort) > {sort_path}')
+            os.system(f'(head -n 1 {pre_sort_path} && tail -n +2 {pre_sort_path} | sort) | tr -d \'\\r\' > {sort_path}')
             if (pre_sort_path != path): os.remove(pre_sort_path)
 
             if create_cache: 
@@ -438,7 +439,7 @@ def parse_metadata(dataset, order_entries: Dict[str, List[str]], category_limit:
             for i, h in top_headers_enum:
                 column = convert_to_serializable([r[1+i] for r in row_list])
                 attrs = {}
-                if column.dtype.type is not np.string_ or count_unique(column, category_limit) < category_limit:
+                if column.dtype.type is not np.bytes_ or count_unique(column, category_limit) < category_limit:
                     order_entry = next((o for o in order_entries if o['variable'] == h), None)
                     if order_entry:
                         attrs['order'] = order_entry['order']
@@ -490,9 +491,6 @@ def convert_to_serializable(values: Iterable, force_string=False, na_values=['NA
                     except ValueError: continue
                     else: break
         arr = np.array(values)
-
-    if arr is not None and arr.dtype.char != 'U':
-        arr = np.nan_to_num(arr, nan=-1)
         
     if force_string or arr.dtype.char == 'U':
         values = ['Unknown' if v is np.nan else str(v) for v in values]
@@ -574,7 +572,7 @@ def test_compressed_ranges():
                 for i, v in enumerate(row.values):
                     assert v == data[i]
 
-if __name__ == '__main__':
+def run():
     if len(sys.argv) != 2 or sys.argv[1] in ('-h', '--help'): 
         print("Error: First argument should be input.yaml path, see example")
         exit(1)
@@ -670,7 +668,7 @@ if __name__ == '__main__':
                         column_indices = list(filter(lambda x: x is not None, get_reorder_indices(sample_whitelist_ordered, side_headers)))
                         def filter_metadata(columns):
                             new_array = columns[1][column_indices]
-                            new_groups = [np.where(new_array == c)[0] for c in set(new_array)] if new_array.dtype.type is np.string_ else None
+                            new_groups = [np.where(new_array == c)[0] for c in set(new_array)] if new_array.dtype.type is np.bytes_ else None
                             return (columns[0], new_array, new_groups, columns[3], columns[4])
                         all_metadata_columns[dataset['id']] = (list(map(filter_metadata, columns)), extra_attrs)
                         
@@ -707,7 +705,7 @@ if __name__ == '__main__':
 
                     # Loop over all genes
                     VARPART_INDICES, MATRIX_INDICES, TRANSCRIPT_INDICES = (1, 0), (1, 1, 1), (1, 2, 1)
-                    for gene, combined in iterator:
+                    for gene, combined in itertools.islice(iterator, GENE_LIMIT):
 
                         # N.B. verify using json.dump with default - combining parallel primitives leads to lots of nested keys
                         varparts_per_dataset = tuple(safe_access_nested(c, VARPART_INDICES, None) for c in combined)
@@ -750,11 +748,11 @@ if __name__ == '__main__':
                                 pvalues = []
                                 for header, array, groups, attrs, col_type in all_metadata_columns[dataset['id']][0]:
                                     if not groups:
-                                        pvalues.append(spearmanr(fixed, array)[1])
+                                        pvalues.append(spearmanr(fixed, array, nan_policy='omit')[1])
                                     elif len(groups) == 1:
                                         pvalues.append(float('nan'))
                                     else:
-                                        pvalues.append(f_oneway(*[[fixed[i] for i in g] for g in groups])[1])
+                                        pvalues.append(f_oneway(*[[fixed[i] for i in g] for g in groups], nan_policy='omit')[1])
                                 pvalue_row = data_pb2.RowData()
                                 pvalue_row.values.extend(pvalues)
                                 pvalue_ranges.append(writer(pvalue_row.SerializeToString()))
@@ -946,4 +944,6 @@ if __name__ == '__main__':
                     'samples': d['_internal_sample_count']
                 })
             json.dump(meta_json, f, indent=2)
-        
+
+if __name__ == '__main__':
+    run()

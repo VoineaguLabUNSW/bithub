@@ -6,6 +6,8 @@ dependencies:
   - python<3.12
   - terraform
   - awscli
+  - protobuf
+  - uutils-coreutils
   - pip
   - pip:
     - oyaml

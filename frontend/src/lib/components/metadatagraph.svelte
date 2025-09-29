@@ -27,7 +27,7 @@
     let metadataSelect1 = writable();
     let metadataSelect2 = writable();
 
-    let scaleSelect = writable({id: 'Linear', name: 'Linear'});
+    let scaleSelect = writable({id: 'Log 2', name: 'Log 2'});
     const scaleOpts = new Map([['', ['Linear', 'Log e', 'Log 2', 'Log 10'].map(l => ({id: l, name: l}))]])
 
     let customSelect = writable()

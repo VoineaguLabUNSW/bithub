@@ -41,7 +41,7 @@
 <Tabs contentClass='bg-white mt-0 shadow-lg sm:rounded-lg h-[calc(100vh-270px)]'>
     <TabItem open>
         <div slot='title'>
-            <span>Expression Across Datasets</span>
+            <span>Gene Exp Across Datasets</span>
             <button id="exp-help">
                 <i class='fas fa-circle-question'/>
                 <span class="sr-only">Show information</span>
@@ -54,7 +54,7 @@
     </TabItem>
     <TabItem disabled={$filteredBulk.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>
         <div slot='title'>
-            <span>Gene Expression</span>
+            <span>Gene Exp Across Variables (Bulk)</span>
             <button id="bulk-help">
                 <i class='fas fa-circle-question'/>
                 <span class="sr-only">Show information</span>
@@ -66,7 +66,7 @@
     </TabItem>
     <TabItem disabled={$filteredVarpart.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>
         <div slot='title'>
-            <span>Drivers of Variation</span>
+            <span>Drivers of Variation (Bulk)</span>
             <button id="varpart-help">
                 <i class='fas fa-circle-question'/>
                 <span class="sr-only">Show information</span>
@@ -78,7 +78,7 @@
     </TabItem>
     <TabItem disabled={$filteredSingleCell.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>
         <div slot='title'>
-            <span>Single Cell Datasets</span>
+            <span>Gene Exp Across Variables (Single Cell)</span>
             <button id="sc-help">
                 <i class='fas fa-circle-question'/>
                 <span class="sr-only">Show information</span>
@@ -87,6 +87,18 @@
 
         <div class="h-[calc(100vh-270px)]">
             <MetadataGraph filteredStore={filteredSingleCell} heading={$geneInfo?.symbol} type='box'/>
+        </div>
+    </TabItem>
+    <TabItem disabled={$filteredTranscript.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>
+        <div slot='title'>
+            <span>Transcript Exp</span>
+            <button id="ts-help">
+                <i class='fas fa-circle-question'/>
+                <span class="sr-only">Show information</span>
+            </button>
+        </div>
+        <div class="h-[calc(100vh-270px)]">
+            <TranscriptGraph filteredStore={filteredTranscript} heading={$geneInfo?.symbol}/>
         </div>
     </TabItem>
     <TabItem>
@@ -98,18 +110,6 @@
             </button>
         </div>
         <Genome currentRow={currentRow} filteredStore={filteredStore}/>
-    </TabItem>
-    <TabItem disabled={$filteredTranscript.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>
-        <div slot='title'>
-            <span>Transcript Expression</span>
-            <button id="ts-help">
-                <i class='fas fa-circle-question'/>
-                <span class="sr-only">Show information</span>
-            </button>
-        </div>
-        <div class="h-[calc(100vh-270px)]">
-            <TranscriptGraph filteredStore={filteredTranscript} heading={$geneInfo?.symbol}/>
-        </div>
     </TabItem>
 </Tabs>
 

@@ -9,6 +9,7 @@ from scipy.stats import f_oneway, spearmanr
 MIN_HITS = 2
 LOG2_OFFSET = 0.05
 GENE_LIMIT = None
+LOCAL_TMP = "tmp"
 
 class AnnotationException(Exception):
     pass
@@ -195,7 +196,7 @@ def iterate_csv(path: str, strip_numeric: bool=False, comment=None, skip=0, deli
 @contextlib.contextmanager
 def iterate_csv_sorted(path: str, strip_numeric: bool=False, comment: str=None, skip: int=0, delimiter: str=',', mutator: Callable=None, csv_kwargs={}, file_kwargs={}, use_cache=True, create_cache=True):
     '''Iterate over a CSV file, optionally gzipped, annotated by annotator function'''
-    with tempfile.TemporaryDirectory() as tmpdirname:
+    with tempfile.TemporaryDirectory(dir=os.path.abspath(LOCAL_TMP)) as tmpdirname:
         cache_path = os.path.join(os.getcwd(), 'cache', os.path.basename(path) + '.sorted_cache')
         sort_path = os.path.join(tmpdirname, f'sort_{os.path.basename(path)}')
         if use_cache and os.path.exists(cache_path):
@@ -443,13 +444,9 @@ def parse_metadata(dataset, order_entries: Dict[str, List[str]], category_limit:
                     order_entry = next((o for o in order_entries if o['variable'] == h), None)
                     if order_entry:
                         attrs['order'] = order_entry['order']
-                        groups = order_entry.get('groups', None)
-                        if groups:
+                        if groups := order_entry.get('groups', None):
                             attrs['groupSizes'] = list(map(lambda x: x['size'], groups))
                             attrs['groupLabels'] = list(map(lambda x: x['label'], groups))
-                        colors = order_entry.get('color', None)
-                        if colors:
-                            attrs['colors'] = colors
                     groups = None
                     yield h, column, groups, attrs, column_types.get(h, None)
 
@@ -598,7 +595,7 @@ def run():
         OUTPUT_RESOURCES = inputObj['output_resources']
         EXPRESSION_PATH = os.path.join(OUTPUT_FOLDER, 'expression.bin')
 
-        for p in [OUTPUT_FOLDER, OUTPUT_RESOURCES]:
+        for p in [OUTPUT_FOLDER, OUTPUT_RESOURCES, LOCAL_TMP]:
             os.makedirs(p, exist_ok=True)
             
         log_num, log_path = 0, None
@@ -656,6 +653,8 @@ def run():
                                 extra_attrs['customFilterName'] = name_filter.strip()
                             if order_filter := custom_filter.get('column', None):
                                 extra_attrs['customFilterColumn'] = order_filter.strip()
+                        if column_default := dataset.get('default', None):
+                            extra_attrs['customDefaultColumn'] = column_default
 
                         # Determine minimal sample set to write
                         samples_from_matrices = set()
@@ -838,19 +837,13 @@ def run():
             data_root.attrs.create('isDataset', [s[3] for s in display_settings])
             data_root.attrs.create('isBrainDataset', [s[4] for s in display_settings])
 
-            pg_root = root.create_group('panels')
-            pg_root.attrs.create('order', [p['name'] for p in inputObj['panels']])
+            pg_root = root.create_group('groups')
+            pg_root.attrs.create('order', [pg['id'] for pg in inputObj['groups']])
 
-            for pg in inputObj['panels']:
-                p_pg_root = pg_root.create_group(pg['name'])
+            for pg in inputObj['groups']:
+                p_pg_root = pg_root.create_group(pg['id'])
 
-                # Assign description with automatic URL linking
-                description = pg['description']
-                for d in inputObj['datasets']:
-                    description = description.replace('href=' + d['id'], 'href="' + d.get('url', '') + '" target="_blank"')
-                p_pg_root.attrs.create('description', description)
-
-                # Internally hard-link datasets inside relavent panels
+                # Internally hard-link datasets inside relavent groups
                 for d_id in pg['datasets']:
                     with contextlib.suppress(KeyError):
                         p_pg_root[d_id] = root['metadata'][d_id]

@@ -12,8 +12,8 @@
     export let currentRow;
     export let filteredStore;
 
-    const filteredBulk = getFilteredStoreGroup(filteredStore, ['Gene expression', '_custom'])
-    const filteredSingleCell = getFilteredStoreGroup(filteredStore, ['Cell type specific expression'])
+    const filteredBulk = getFilteredStoreGroup(filteredStore, ['Bulk', '_custom'])
+    const filteredSingleCell = getFilteredStoreGroup(filteredStore, ['SingleCell'])
     const filteredVarpart = getFilteredStoreGroup(filteredStore, ['_varpart'])
     const filteredTranscript = getFilteredStoreGroup(filteredStore, ['_transcripts'])
 

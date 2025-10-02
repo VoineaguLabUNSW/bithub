@@ -2,41 +2,41 @@
   "data_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/out.hdf5",
   "bin_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/expression.bin",
   "count": 34440,
-  "last_updated": "November 2024",
+  "last_updated": "October 2025",
   "meta_files": [
     {
+      "name": "BrainSeq",
+      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/BrainSeq-metadata.csv",
+      "matrix_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/BrainSeq_RPKM.csv.gz",
+      "samples": 900
+    },
+    {
       "name": "BrainSpan",
-      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/BrainSpan-metadata-all.csv",
+      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/BrainSpan-metadata.csv",
       "matrix_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/BrainSpan_RPKM.csv.gz",
       "samples": 524
     },
     {
       "name": "GTEx",
-      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/GTEx-metadata-all.csv",
+      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/GTEx-metadata.csv",
       "matrix_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/GTEx_TPM.csv.gz",
       "samples": 2642
     },
     {
-      "name": "BrainSeq",
-      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/BrainSeq-metadata-all.csv",
-      "matrix_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/BrainSeq_RPKM.csv.gz",
-      "samples": 900
-    },
-    {
-      "name": "PsychENCODE",
-      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/PsychEncode-metadata-all.csv",
-      "matrix_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/PsychENCODE_TPM.csv.gz",
-      "samples": 1369
-    },
-    {
       "name": "HDBR",
-      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/HDBR-metadata-all.csv",
+      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/HDBR-metadata.csv",
       "matrix_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/HDBR_RPKM.csv.gz",
       "samples": 649
     },
     {
+      "name": "PsychENCODE",
+      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/PsychEncode-metadata.csv",
+      "matrix_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/PsychENCODE_TPM.csv.gz",
+      "samples": 1369
+    },
+    {
       "name": "Cameron",
-      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/Cameron-metadata-fixed.csv",
+      "meta_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/Cameron-metadata.csv",
       "matrix_url": "https://d33ldq8s2ek4w8.cloudfront.net/bithub/Cameron_CPM.csv.gz",
       "samples": 69284
     },

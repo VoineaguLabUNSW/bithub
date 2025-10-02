@@ -36,8 +36,8 @@ function createCombinedResultsStore(data, customDatasets) {
             const headingGroups = new Map([['', generalIndices.map(i => headings[i])], ['Datasets', datasetIndices.map(i => headings[i])], ['Databases', databaseIndices.map(i => headings[i])]])
             
             const dsKeys = $data.value.get('metadata').keys
-            for(const group of $data.value.get('panels').keys) {
-                groupIndices[group] = dsKeys.filter(h => $data.value.get('panels/' + group).keys.includes(h)).map(h => headings.indexOf(h))
+            for(const group of $data.value.get('groups').keys) {
+                groupIndices[group] = dsKeys.filter(h => $data.value.get('groups/' + group).keys.includes(h)).map(h => headings.indexOf(h))
             }
             groupIndices['_varpart'] = dsKeys.filter(h => $data.value.get('metadata/' + h).keys.includes('variance_partition')).map(h => headings.indexOf(h))
             groupIndices['_transcripts'] = dsKeys.filter(h => $data.value.get('metadata/' + h).keys.includes('transcripts')).map(h => headings.indexOf(h))

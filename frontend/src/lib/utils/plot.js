@@ -89,7 +89,7 @@ function getPlotScatter(heading, data, xName, yName, zName, orderZ, colorway=und
                     bgcolor: 'white',
                     font: {color: 'black'}
                 },
-                x: filtered.map(d => d.x),
+                x: filtered.map(d => d.x + d.xSuffix),
                 y: filtered.map(d => d.y),
                 showlegend: true,
             });
@@ -104,7 +104,7 @@ function getPlotScatter(heading, data, xName, yName, zName, orderZ, colorway=und
                 bgcolor: 'white',
                 font: {color: 'black'}
             },
-            x: data.map(d => d.x),
+            x: data.map(d => d.x + d.xSuffix),
             y: data.map(d => d.y),
             showlegend: false,
         })
@@ -222,7 +222,7 @@ function getPlotDistribution(heading, data, xName, yName, zName, orderX, orderZ,
             plotData.push({
                 type: type, // 'violin' or 'box'
                 // NaN for each possible category forces plotly to create empty spaces for them
-                x: ((groupSizesX && hasZ) ? seenX : []).concat(dataRange.map(d => d.x)),
+                x: ((groupSizesX && hasZ) ? seenX : []).concat(dataRange.map(d => d.x + d.xSuffix)),
                 y: ((groupSizesX && hasZ) ? new Array(seenX.length).fill(NaN) : []).concat(dataRange.map(d => d.y)),
                 hovertext: (groupSizesX ? new Array(seenX.length).fill('') : []).concat(dataRange.map(d => d.name)),
                 hoverinfo: "y+text",

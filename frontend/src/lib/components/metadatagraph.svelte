@@ -5,7 +5,7 @@
 
     import { getZipped } from '../utils/plot'
     
-    import { writable, derived } from "svelte/store";
+    import { writable, derived, get } from "svelte/store";
     import { getPlotEmpty, getPlotDistribution, getPlotScatter } from '../utils/plot'
     import { withoutNulls } from '../utils/hdf5';
 
@@ -70,10 +70,17 @@
 
         const metadataOpts1 = opstToGroups(metadataOptVals1, reader.type)
         const metadataOpts2 = opstToGroups(metadataOptVals2, reader.type)
+
+        // Attempt to keep selected metadata (e.g. age interval) if there is an equivalent
+        let equivalentColumnIndex = metadataOptVals1.findIndex(v => v.name === get(metadataSelect1)?.name);
+        let defaultColumnIndex = reader.customDefaultColumn ? metadataOptVals1.findIndex(v => v.name == reader.customDefaultColumn) : -1;
+        metadataSelect1.set(metadataOptVals1[equivalentColumnIndex !== -1 ? equivalentColumnIndex : Math.max(0, defaultColumnIndex)]);
         
-        metadataSelect1.set(metadataOptVals1[0]);
-        metadataSelect2.set(undefined)
-        customSelect.set(undefined)
+        // Attempt to keep filter (e.g. brain region) if there is an equivalent
+        let equivalentCustomIndex = customOptVals.findIndex(v => v.name === get(customSelect)?.name);
+        customSelect.set(equivalentCustomIndex !== -1 ? customOptVals[equivalentCustomIndex] : undefined);
+        
+        metadataSelect2.set(undefined);
         matrixSelect.set(matrixOptVals[0]);
         set({...$datasetOptsObj, $datasetsSelect, metadataOpts1, metadataOpts2, matrixOpts, customOpts})
     })
@@ -128,26 +135,27 @@
             
             // Calculate % expressing/nonzero and add to x labels if required
             const isCategorical = (typeof x[0]) == 'string' || x[0] instanceof String
+            let xSuffixes = x.map(v => '');
             if (isCategorical) {
                 let zeroXCounts = {}
                 x.forEach((v, i) => {
                     let curr = zeroXCounts[v];
-                    if (curr === undefined) curr = zeroXCounts[v] = [0, 0, 0, undefined];
+                    if (curr === undefined) curr = zeroXCounts[v] = [0, 0, 0, ''];
                     curr[0]++;
                     if (y[i] !== 0) curr[1]++; // Track nonzero for each category
                     if (y[i] >= 1) curr[2]++; // Track greater than 1 for each category
                 });
                 for (const [v, curr] of Object.entries(zeroXCounts)) {
-                    curr[3] = ((curr[1] === curr[0]) || !curr[2]) ? v : `${v} (${(curr[1]/curr[0]*100).toFixed(2)}% expr)`                
+                    if (curr[1] !== curr[0] && curr[2] > 0) curr[3] = ` (${(curr[1]/curr[0]*100).toFixed(2)}% expr)`        
                 }
-                x = x.map(v => zeroXCounts[v][3])
+                xSuffixes = x.map(v => zeroXCounts[v][3])
             }
             
             if($scaleSelect.id === 'Log e') y = y.map(v => Math.log(v + LOG_OFFSET))
             if($scaleSelect.id === 'Log 2') y = y.map(v => Math.log2(v + LOG_OFFSET))
             if($scaleSelect.id === 'Log 10') y = y.map(v => Math.log10(v + LOG_OFFSET))
 
-            let data = getZipped({x, y, z, name: names})
+            let data = getZipped({x, y, z, name: names, xSuffix: xSuffixes})
             if(cs) {
                 const csColumn = withoutNulls(reader.getColumn(reader.customFilterColumn).values)
                 data = data.filter((d, i) => csColumn[i] == cs)

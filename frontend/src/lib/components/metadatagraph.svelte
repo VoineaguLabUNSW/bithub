@@ -129,45 +129,44 @@
             const groupSizesX = reader.getColumn(ms1).attrs.groupSizes
             const groupLabelsX = reader.getColumn(ms1).attrs.groupLabels
 
-            const headingX = ms2 ? ms1 : `${ms1} (p = ${$pvalueDataObj.pvalues.data.values[reader.order.indexOf(ms1)].toFixed(2)})`
+            const headingX = ms2 ? ms1 : `${ms1} (p = ${$pvalueDataObj.pvalues.data.values[reader.order.indexOf(ms1)].toPrecision(2)})`
             let headingY = $expressionDataObj.$matrixSelect.name;
             const headingZ = ms2;
             
             // Calculate % expressing/nonzero and add to x labels if required
             const isCategorical = (typeof x[0]) == 'string' || x[0] instanceof String
-            let xSuffixes = x.map(v => '');
+            let xSuffixes = {};
             if (isCategorical) {
                 let zeroXCounts = {}
                 x.forEach((v, i) => {
                     let curr = zeroXCounts[v];
-                    if (curr === undefined) curr = zeroXCounts[v] = [0, 0, 0, ''];
+                    if (curr === undefined) curr = zeroXCounts[v] = [0, 0, 0];
                     curr[0]++;
                     if (y[i] !== 0) curr[1]++; // Track nonzero for each category
                     if (y[i] >= 1) curr[2]++; // Track greater than 1 for each category
                 });
                 for (const [v, curr] of Object.entries(zeroXCounts)) {
-                    if (curr[1] !== curr[0] && curr[2] > 0) curr[3] = ` (${(curr[1]/curr[0]*100).toFixed(2)}% expr)`        
+                    if (curr[1] !== curr[0] && curr[2] > 0) xSuffixes[v] = ` (${(curr[1]/curr[0]*100).toFixed(2)}% expr)`       
                 }
-                xSuffixes = x.map(v => zeroXCounts[v][3])
             }
             
             if($scaleSelect.id === 'Log e') y = y.map(v => Math.log(v + LOG_OFFSET))
             if($scaleSelect.id === 'Log 2') y = y.map(v => Math.log2(v + LOG_OFFSET))
             if($scaleSelect.id === 'Log 10') y = y.map(v => Math.log10(v + LOG_OFFSET))
 
-            let data = getZipped({x, y, z, name: names, xSuffix: xSuffixes})
+            let data = getZipped({x, y, z, name: names})
             if(cs) {
                 const csColumn = withoutNulls(reader.getColumn(reader.customFilterColumn).values)
                 data = data.filter((d, i) => csColumn[i] == cs)
             }
 
-            const headingMain = `${heading} - ${ds1}`
+            const headingMain = `${heading} - ${ds1}` + (cs ? ` (${cs})` : ``)
             if($scaleSelect.id != 'Linear') headingY = `${headingY} (${$scaleSelect.id})`
             
             if(isCategorical) {
-                set(getPlotDistribution(headingMain, data, headingX, headingY, headingZ, orderX, orderZ, groupLabelsX, groupSizesX, $colorWay, $page.url.searchParams.get('plotType') || type, ms1 == reader.customFilterColumn))
+                set(getPlotDistribution(headingMain, data, headingX, headingY, headingZ, orderX, orderZ, groupLabelsX, groupSizesX, xSuffixes, $colorWay, $page.url.searchParams.get('plotType') || type, ms1 == reader.customFilterColumn))
             } else {
-                set(getPlotScatter(headingMain, data, headingX, headingY, headingZ, orderZ, $colorWay))   
+                set(getPlotScatter(headingMain, data, headingX, headingY, headingZ, orderZ, xSuffixes, $colorWay))   
             }
         }
     });

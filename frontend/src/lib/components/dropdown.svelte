@@ -1,5 +1,6 @@
 <script>
     import { Button, Dropdown, Search} from 'flowbite-svelte';
+    import { CloseCircleSolid, CheckCircleSolid } from 'flowbite-svelte-icons';
 
     export let selected;
     export let optional = false;
@@ -33,11 +34,14 @@
         {#each values as v }
             {#key v}
                 {#if v.disabled}
-                    <li class="rounded pl-4 p-2 bg-gray-100 dark:hover:bg-gray-600">{v.name}</li>
+                    <button class="block flex w-full text-left rounded pl-4 p-2 bg-gray-100 dark:hover:bg-gray-600">{v.name}</button>
                 {:else if v.id == $selected?.id}
-                    <li class="rounded pl-4 p-2 bg-gray-100 dark:bg-gray-600 overflow-x-hidden text-ellipsis" on:click={() => {optional && selected.set(undefined); open=false}}>{v.name}</li>
+                    <button class="block flex w-full text-left rounded pl-4 p-2 bg-gray-100 dark:bg-gray-600 overflow-x-hidden text-ellipsis justify-between items-center" on:click={() => {optional && selected.set(undefined); open=false}}>
+                        {v.name}
+                        {#if optional} <CloseCircleSolid color='gray'/> {:else} <CheckCircleSolid color='gray'/>{/if}
+                    </button>
                 {:else}
-                    <li class="rounded pl-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-600  overflow-x-hidden text-ellipsis" on:click={() => {selected.set(v); open=false}}>{v.name}</li>
+                    <button class="block flex w-full text-left rounded pl-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-600 overflow-x-hidden text-ellipsis" on:click={() => {selected.set(v); open=false}}>{v.name}</button>
                 {/if}
             {/key}
         {/each}

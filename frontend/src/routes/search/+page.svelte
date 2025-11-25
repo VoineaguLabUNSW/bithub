@@ -109,7 +109,7 @@
     </Tabs>
 </div>
 
-<Modal bind:this={geneModalElement} bind:open={$openGeneView} size='xl' outsideclose={true} class='overscroll-contain'>
+<Modal bind:this={geneModalElement} bind:open={$openGeneView} fullscreen size="none" outsideclose={true} closeBtnClass="hidden" class='overscroll-contain'>
     <GeneView filteredStore={selectedStore} currentRow={currentRow}></GeneView>
 </Modal>
 

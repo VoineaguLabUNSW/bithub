@@ -10,10 +10,14 @@ function getZipped(columns) {
     return columns[keys[0]].map((_, i) => keys.reduce((acc, curr) => {acc[curr] = columns[curr][i]; return acc}, {}))
 }
 
+function getFilenameFromHeading(heading) {
+    return (heading ? heading.toLowerCase().replace(/[()]/g, '').replaceAll(' - ', '_').replaceAll(' ', '_') : 'bithub_plot');
+}
+
 function getColumnDownloader(heading, data, xName, yName, zName) {
     return () => {
         const onlyDefined = (arr) =>  arr.filter(v => v !== undefined).map(v => withoutNullsStr(v))
-        const csv = createRowWriter(heading.toLowerCase().replaceAll(' ', '_') + '.csv', ',')
+        const csv = createRowWriter(getFilenameFromHeading(heading) + '.csv', ',')
         csv.write(onlyDefined(['', yName, xName, zName]))
         for(let d of data) csv.write(onlyDefined([d.name, d.y, d.x, d.z]))
         csv.close()
@@ -22,7 +26,7 @@ function getColumnDownloader(heading, data, xName, yName, zName) {
 
 function getTableDownloader(heading, headingsX, headingsY, values) {
     return () => {
-        const csv = createRowWriter(heading.toLowerCase().replaceAll(' ', '_') + '.csv', ',')
+        const csv = createRowWriter(getFilenameFromHeading(heading, '.csv'), ',')
         csv.write(['', ...headingsX])
         for(let [i, h] of headingsY.entries()) csv.write([h, ...values[i]])
         csv.close()
@@ -69,7 +73,7 @@ function getPlotEmpty(message) {
     }
 }
 
-function getPlotScatter(heading, data, xName, yName, zName, orderZ, colorway=undefined) {
+function getPlotScatter(heading, data, xName, yName, zName, orderZ, xSuffixes={}, colorway=undefined) {
     const [hasZ, hasName] = [data[0].z !== undefined, data[0].name !== undefined];
     const orderZDic = hasZ ? getOrderIndexed(data.map(d => d.z), orderZ || []) : new Map()
     const seenZ = [...orderZDic.entries()].filter(([_, v]) => v.seen).map(([k, _]) => k)
@@ -89,7 +93,7 @@ function getPlotScatter(heading, data, xName, yName, zName, orderZ, colorway=und
                     bgcolor: 'white',
                     font: {color: 'black'}
                 },
-                x: filtered.map(d => d.x + d.xSuffix),
+                x: filtered.map(d => d.x + (xSuffixes[d.x] || '')),
                 y: filtered.map(d => d.y),
                 showlegend: true,
             });
@@ -104,7 +108,7 @@ function getPlotScatter(heading, data, xName, yName, zName, orderZ, colorway=und
                 bgcolor: 'white',
                 font: {color: 'black'}
             },
-            x: data.map(d => d.x + d.xSuffix),
+            x: data.map(d => d.x + (xSuffixes[d.x] || '')),
             y: data.map(d => d.y),
             showlegend: false,
         })
@@ -134,7 +138,7 @@ function getPlotScatter(heading, data, xName, yName, zName, orderZ, colorway=und
     }
 }
 
-function getPlotDistribution(heading, data, xName, yName, zName, orderX, orderZ, groupLabelsX, groupSizesX, colorway=undefined, type='violin', separateXTraces=false) {
+function getPlotDistribution(heading, data, xName, yName, zName, orderX, orderZ, groupLabelsX, groupSizesX, xSuffixes={}, colorway=undefined, type='violin', separateXTraces=false) {
     const hasZ = data[0].z !== undefined 
     const orderXDic = getOrderIndexed(data.map(d => d.x), orderX || [])
     const orderZDic = hasZ ? getOrderIndexed(data.map(d => d.z), orderZ || []) : new Map()
@@ -147,6 +151,7 @@ function getPlotDistribution(heading, data, xName, yName, zName, orderX, orderZ,
 
     if(groupSizesX) {
         // Reduce group sizes for unseen values
+        let offset = 0;
         const xToGroup = {}
         for(let group=0, groupStart=0; group<groupSizesX.length; groupStart+=groupSizesX[group++]) {
             for(let i=0; i<groupSizesX[group]; ++i) {
@@ -201,7 +206,7 @@ function getPlotDistribution(heading, data, xName, yName, zName, orderX, orderZ,
                         dash: 'dashdot'
                     }
                 });
-            }            
+            }
         }
     }
 
@@ -222,7 +227,7 @@ function getPlotDistribution(heading, data, xName, yName, zName, orderX, orderZ,
             plotData.push({
                 type: type, // 'violin' or 'box'
                 // NaN for each possible category forces plotly to create empty spaces for them
-                x: ((groupSizesX && hasZ) ? seenX : []).concat(dataRange.map(d => d.x + d.xSuffix)),
+                x: ((groupSizesX && hasZ) ? seenX : []).concat(dataRange.map(d => d.x)).map(x => x + (xSuffixes[x] || '')),
                 y: ((groupSizesX && hasZ) ? new Array(seenX.length).fill(NaN) : []).concat(dataRange.map(d => d.y)),
                 hovertext: (groupSizesX ? new Array(seenX.length).fill('') : []).concat(dataRange.map(d => d.name)),
                 hoverinfo: "y+text",
@@ -270,4 +275,4 @@ function getPlotDistribution(heading, data, xName, yName, zName, orderX, orderZ,
     }
 }
 
-export { getPlotEmpty, getPlotDistribution, getPlotScatter, getColumnDownloader, getZipped, getWithNA, getTableDownloader }
+export { getPlotEmpty, getPlotDistribution, getPlotScatter, getColumnDownloader, getFilenameFromHeading, getZipped, getWithNA, getTableDownloader }

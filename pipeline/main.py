@@ -415,7 +415,7 @@ def parallel_dataset_context(datasets, gene_to_gene, transcript_to_gene, debug=F
 def parse_metadata(dataset, order_entries: Dict[str, List[str]], category_limit: int=50):
     column_types = {}
     if annot := dataset.get('annot', None):
-        with iterate_csv(os.path.join(dataset['dir'], annot), delimiter=',', csv_kwargs={}) as reader:
+        with iterate_csv(os.path.join(dataset['dir'], annot), delimiter=',', strip_numeric=True, csv_kwargs={}) as reader:
             _, rows = reader
             for row in rows: 
                 if len(row) == 4 and row[2] == 'Yes':
@@ -747,11 +747,11 @@ def run():
                                 pvalues = []
                                 for header, array, groups, attrs, col_type in all_metadata_columns[dataset['id']][0]:
                                     if not groups:
-                                        pvalues.append(spearmanr(fixed, array, nan_policy='omit')[1])
+                                        pvalues.extend(spearmanr(fixed, array, nan_policy='omit'))
                                     elif len(groups) == 1:
-                                        pvalues.append(float('nan'))
+                                        pvalues.extend([float('nan'), float('nan')])
                                     else:
-                                        pvalues.append(f_oneway(*[[fixed[i] for i in g] for g in groups], nan_policy='omit')[1])
+                                        pvalues.extend(f_oneway(*[[fixed[i] for i in g] for g in groups], nan_policy='omit'))
                                 pvalue_row = data_pb2.RowData()
                                 pvalue_row.values.extend(pvalues)
                                 pvalue_ranges.append(writer(pvalue_row.SerializeToString()))
@@ -784,7 +784,11 @@ def run():
                     
                     # Write metadata columns and their pvalues
                     for dataset_id, [columns, extra_attrs] in all_metadata_columns.items():
-                        write_metadata_columns(meta_root[dataset_id], columns, extra_attrs)
+                        try:
+                            write_metadata_columns(meta_root[dataset_id], columns, extra_attrs)
+                        except ValueError as e:
+                            print("Error writing metadata for " + dataset_id)
+                            raise
                         
                 all_ranges.append((last_range_end, teller()))
 

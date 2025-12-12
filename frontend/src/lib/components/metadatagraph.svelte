@@ -129,7 +129,16 @@
             const groupSizesX = reader.getColumn(ms1).attrs.groupSizes
             const groupLabelsX = reader.getColumn(ms1).attrs.groupLabels
 
-            const headingX = ms2 ? ms1 : `${ms1} (p = ${$pvalueDataObj.pvalues.data.values[reader.order.indexOf(ms1)].toPrecision(2)})`
+            const pValIdx = reader.order.indexOf(ms1);
+            let headingX = "";
+            if (ms2) {
+                headingX = ms1;
+            } else {
+                let statistic = $pvalueDataObj.pvalues.data.values[2 * pValIdx].toPrecision(2);
+                let pval = $pvalueDataObj.pvalues.data.values[2 * pValIdx + 1].toPrecision(2);
+                if (!isNaN(pval)) headingX = `${ms1} (p = ${pval}, statistic = ${statistic})`;
+            }
+
             let headingY = $expressionDataObj.$matrixSelect.name;
             const headingZ = ms2;
             

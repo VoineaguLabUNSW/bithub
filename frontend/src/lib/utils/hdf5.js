@@ -1,5 +1,5 @@
 function withoutNullsStr(str) {
-    return typeof str == 'string' ? str.replace(/\0.*$/g, '') : str
+    return typeof str == 'string' ? str.replace(/\0/g, '') : str;
 }
 
 function withoutNulls(arr) {

@@ -159,7 +159,7 @@
                             
                             <!-- Normal cells -->
                             {#each generalIndicesFiltered as ci }
-                                <td class="px-6 py-4 whitespace-nowrap overflow-hidden overflow-ellipsis">{tableData.columns[ci][ri]}</td>
+                                <td class="px-6 py-4 whitespace-nowrap overflow-hidden overflow-ellipsis">{withoutNullsStr(tableData.columns[ci][ri])}</td>
                             {/each}
                             
                             <!-- Dataset/Database cells -->

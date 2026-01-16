@@ -696,11 +696,16 @@ def run():
 
                         if not (transcript_matrices := dataset.get('transcript_matrices', None)): continue
                         
-                        for transcript, categories in zip(transcript_matrices, transcript_headers):
+                        for transcript, headers in zip(transcript_matrices, transcript_headers):
                             order_entry = next((o for o in orders if o['variable'] == transcript.get('variable', None)), None)
-                            if order_entry: categories = [k for k in order_entry['order'] if k in categories]
-                            else: categories = categories[1:]
-                            transcript['_internal'] = ([], categories)
+                            categories = []
+                            if order_entry: categories = [k for k in order_entry['order'] if k in headers]
+                            else: categories = headers[1:]
+                            
+                            reorder_indices = get_reorder_indices(categories, headers[1:])
+                            reorder_buffer = [None] * len(categories)
+
+                            transcript['_internal'] = ([], categories, reorder_indices, reorder_buffer)
 
                     # Loop over all genes
                     VARPART_INDICES, MATRIX_INDICES, TRANSCRIPT_INDICES = (1, 0), (1, 1, 1), (1, 2, 1)
@@ -772,13 +777,14 @@ def run():
                                         
                             if 'transcript_matrices' in dataset:
                                 for transcript_matrix, accumulated in zip(dataset['transcript_matrices'], transcripts or dataset['_null_transcripts']):
-                                    ranges, categories = transcript_matrix['_internal']
+                                    ranges, categories, reorder_indices, reorder_buffer = transcript_matrix['_internal']
                                     table = data_pb2.TableData()
                                     if accumulated is not None: 
                                         _, t_list = accumulated
                                         for t in t_list:
-                                            _, transcript_id, *vals = t
-                                            table.float_values.extend([float(v) for v in vals])
+                                            _, transcript_id, *values = t
+                                            fixed = apply_reorder_indices([float(v) for v in values], reorder_buffer, reorder_indices)
+                                            table.float_values.extend(fixed)
                                             table.string_values.append(transcript_id)
                                     ranges.append(writer(table.SerializeToString()))
                     
@@ -892,7 +898,7 @@ def run():
                     transcript_meta_root = meta_root.create_group('transcripts')
                     transcript_meta_root.attrs.create('order', [t['name'] for t in d['transcript_matrices']])
                     for transcript_matrix in d.get('transcript_matrices', []):
-                        ranges, categories = transcript_matrix['_internal']
+                        ranges, categories, _, _ = transcript_matrix['_internal']
                         curr_transcript_meta_root = transcript_meta_root.create_dataset(transcript_matrix['name'], data=ranges, compression='gzip', compression_opts=9)
                         curr_transcript_meta_root.attrs.create('categories', categories)
                         remote_range_datasets.append([curr_transcript_meta_root.name, '/data/' + d['id'], 'TableData'])

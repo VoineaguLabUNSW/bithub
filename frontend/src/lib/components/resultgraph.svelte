@@ -4,6 +4,7 @@
     import Plot from '../components/plot.svelte';
     import { writable, get, derived } from "svelte/store";
     import { getContext } from 'svelte';
+    import { withoutNullsStr } from '$lib/utils/hdf5';
    
     export let filteredStore;
     export let heading;
@@ -67,7 +68,7 @@
         const x = $filteredStore.results.map(row_i => xAll[row_i]);
         const y = $filteredStore.results.map(row_i => yAll[row_i]);
         
-        const names = $filteredStore.results.map(row_i => $filteredStore.columns[1][row_i]);
+        const names = $filteredStore.results.map(row_i => withoutNullsStr($filteredStore.columns[1][row_i]));
         let xName = ds1 + (fl1 == 'All' ? '' : ` (${fl1})`);
         let yName = ds2 + (fl2 == 'All' ? '' : ` (${fl2})`);
 

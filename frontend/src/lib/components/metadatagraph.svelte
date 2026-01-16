@@ -97,10 +97,15 @@
     const pvalueDataObj = derived([matrixOptsObj, matrixSelect], ([$matrixOptsObj, $matrixSelect], set) => {
         if(!$matrixOptsObj || !$matrixSelect) return;
         const reader = $matrixOptsObj.$metadataStore.readers[$datasetsSelect.id];
-        const expressionSub = reader.getMatrixStore['/metadata/' +  $datasetsSelect.id + '/matrices/' + $matrixSelect.id + "_pvalues"].current.subscribe(pvalues => {
-            if(pvalues) set({...$matrixOptsObj, pvalues: pvalues, $matrixSelect})
-        })
-        return () => expressionSub()
+        const pvaluesStore = reader.getMatrixStore['/metadata/' +  $datasetsSelect.id + '/matrices/' + $matrixSelect.id + "_pvalues"];
+        if (pvaluesStore !== undefined) { // N.B. Custom datasets do not have computed pvalues
+            const expressionSub = pvaluesStore.current.subscribe(pvalues => {
+                if(pvalues) set({...$matrixOptsObj, pvalues: pvalues, $matrixSelect});
+            })
+            return () => expressionSub();
+        } else {
+            set({...$matrixOptsObj, pvalues: {data: undefined}, $matrixSelect});
+        }
     })
 
     const plotlyArgs = derived([expressionDataObj, pvalueDataObj, metadataSelect1, metadataSelect2, scaleSelect, customSelect, colorWay], ([$expressionDataObj, $pvalueDataObj, $metadataSelect1, $metadataSelect2, $scaleSelect, $customSelect, $colorWay], set) => {
@@ -122,6 +127,8 @@
             
             const names = reader.sampleNames;
             let y = $expressionDataObj.expression.data.values;
+
+            const isCategorical = (typeof x[0]) == 'string' || x[0] instanceof String
             
             const orderX = reader.getColumn(ms1).attrs.order
             const orderZ = ms2 && reader.getColumn(ms2).attrs.order
@@ -131,19 +138,19 @@
 
             const pValIdx = reader.order.indexOf(ms1);
             let headingX = "";
-            if (ms2) {
+            if (ms2 || $pvalueDataObj.pvalues.data === undefined) {
                 headingX = ms1;
             } else {
                 let statistic = $pvalueDataObj.pvalues.data.values[2 * pValIdx].toPrecision(2);
                 let pval = $pvalueDataObj.pvalues.data.values[2 * pValIdx + 1].toPrecision(2);
-                if (!isNaN(pval)) headingX = `${ms1} (p = ${pval}, statistic = ${statistic})`;
+                let statisticName = isCategorical ? 'f' : 'r';
+                if (!isNaN(pval)) headingX = `${ms1} (p = ${pval}, ${statisticName} = ${statistic})`;
             }
 
             let headingY = $expressionDataObj.$matrixSelect.name;
             const headingZ = ms2;
             
             // Calculate % expressing/nonzero and add to x labels if required
-            const isCategorical = (typeof x[0]) == 'string' || x[0] instanceof String
             let xSuffixes = {};
             if (isCategorical) {
                 let zeroXCounts = {}

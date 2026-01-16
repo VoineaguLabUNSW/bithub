@@ -5,7 +5,7 @@
     import { getContext } from "svelte";
     import { derived } from 'svelte/store';
     import { getPlotEmpty, getTableDownloader } from '../utils/plot';
-    import { LOG_OFFSET } from '../utils/math';
+    import {count, mean, sd, LOG_OFFSET} from '../utils/math';
 
     export let filteredStore;
     export let heading;
@@ -18,6 +18,9 @@
     
     let scaleSelect = writable({id: 'Log 2', name: 'Log 2'});
     const scaleOpts = new Map([['', ['Linear', 'Log e', 'Log 2', 'Log 10'].map(l => ({id: l, name: l}))]])
+
+    let normalizationSelect = writable({id: 'None', name: 'None'});
+    const normalizationOpts = new Map([['', ['None', 'Z-Score (within transcript)', 'Z-Score (within category)'].map(l => ({id: l, name: l}))]])
     
     const datasetOptsObj = derived([data, filteredStore], ([$data, $filteredStore], set) => {
         if(!$data || !$filteredStore) return;
@@ -47,7 +50,7 @@
         return () => expressionSub()
     })
 
-    const plotlyArgs = derived([expressionDataObj, transcriptSelect, scaleSelect, colorRange], ([$expressionDataObj, $transcriptSelect, $scaleSelect, $colorRange], set) => {
+    const plotlyArgs = derived([expressionDataObj, transcriptSelect, scaleSelect, normalizationSelect, colorRange], ([$expressionDataObj, $transcriptSelect, $scaleSelect, $normalizationSelect, $colorRange], set) => {
         if(!$expressionDataObj) set(getPlotEmpty('No data'));
         else if($expressionDataObj.expression.loading) set(getPlotEmpty('Loading'));
         else {
@@ -63,8 +66,9 @@
 
             let range = [0, Math.max(...values)]
             let colorscale = [[0, $colorRange[1]], [1, $colorRange[2]]]
+            let modifiers = [];
             if($scaleSelect.id !== 'Linear') {
-                combinedHeading += ` - ${$scaleSelect.id}`
+                modifiers.push($scaleSelect.id);
                 if($scaleSelect.id === 'Log e') values = values.map(v => Math.log(v + LOG_OFFSET))
                 if($scaleSelect.id === 'Log 2') values = values.map(v => Math.log2(v + LOG_OFFSET))
                 if($scaleSelect.id === 'Log 10') values = values.map(v => Math.log10(v + LOG_OFFSET))
@@ -72,8 +76,30 @@
                 range = [-maxAbs, +maxAbs]
                 colorscale = [[0, $colorRange[0]], [0.5, $colorRange[1]], [1, $colorRange[2]]]
             }
+            
+            // Convert to 2D
+            values = headingsY.map((_, i) => values.slice(i*headingsX.length, (i+1)*headingsX.length));
 
-            values = headingsY.map((_, i) => values.slice(i*headingsX.length, (i+1)*headingsX.length))
+            if ($normalizationSelect.id != 'None') {
+                modifiers.push($normalizationSelect.id);
+                if ($normalizationSelect.id == 'Z-Score (within transcript)') {
+                    for(let i=0; i<values.length; ++i) {
+                        const groupVals = values[i];
+                        const valsMean = mean(groupVals);
+                        const valsSD = sd(groupVals, valsMean) || 0.0000000001;
+                        values[i] = groupVals.map(x => (x - valsMean) / valsSD);
+                    }
+                } else {
+                    for(let i=0; i<values[0].length; ++i) {
+                        const groupVals = values.map((_, j) => values[j][i]);
+                        const valsMean = mean(groupVals);
+                        const valsSD = sd(groupVals, valsMean) || 0.0000000001;
+                        for(let j=0; j<values.length; ++j) values[j][i] = ((values[j][i] - valsMean) / valsSD) 
+                    }
+                }
+            }
+
+            if (modifiers.length) combinedHeading += ` - ${modifiers.join("/")}`;
 
             set({
                 plotData: [{
@@ -135,6 +161,7 @@
             <Dropdown title='Dataset' selected={datasetsSelect} groups={$datasetOptsObj.datasetsOpts}/>
             <Dropdown title='Transcripts' selected={transcriptSelect} groups={$transcriptOptsObj?.transcriptOpts}/>
             <Dropdown title='Scale' selected={scaleSelect} groups={scaleOpts}/>
+            <Dropdown title='Normalization' selected={normalizationSelect} groups={normalizationOpts}/>
         </div>
     </span>
 </Plot>

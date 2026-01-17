@@ -1,124 +1,161 @@
 <script>
-import '../../../node_modules/tocbot/dist/tocbot.css'
-import * as tocbot from 'tocbot';
-import { onMount, getContext } from 'svelte'
-import { Breadcrumb, BreadcrumbItem } from 'flowbite-svelte';
-import { base } from '$app/paths';
-import { primary } from '../../lib/utils/colors'
+  import 'tocbot/dist/tocbot.css';
+  import * as tocbot from 'tocbot';
+  import { onMount, getContext } from 'svelte';
+  import { Breadcrumb, BreadcrumbItem } from 'flowbite-svelte';
+  import { base } from '$app/paths';
+  import { primary } from '../../lib/utils/colors';
 
-import Footer from '../../lib/components/footer.svelte'
-import ProgressHeader from '../../lib/components/progress.svelte'
+  import Footer from '../../lib/components/footer.svelte';
+  import ProgressHeader from '../../lib/components/progress.svelte';
 
-import videoUsingSearch from '../../lib/assets/1 Using Search.webm'
-import videoNavigatingResults1 from '../../lib/assets/2 Navigating Results 1.webm'
-import videoNavigatingResults2 from '../../lib/assets/3 Navigating Results 2.webm'
-import videoTranscriptExpression from '../../lib/assets/4 Transcript Expression.webm'
+  import videoUsingSearch from '../../lib/assets/1 Using Search.webm';
+  import videoNavigatingResults1 from '../../lib/assets/2 Navigating Results 1.webm';
+  import videoNavigatingResults2 from '../../lib/assets/3 Navigating Results 2.webm';
+  import videoTranscriptExpression from '../../lib/assets/4 Transcript Expression.webm';
 
-const { metadata } = getContext('core')
+  const { metadata } = getContext('core');
 
-let tocElement;
-let contentElement;
+  let tocElement;
+  let contentElement;
 
-// NEW: UI state
-let showIntroMore = false;
+  // UI state
+  let showIntroMore = false;
 
-// NEW: derived dataset groupings + stats
-$: metaFiles = $metadata?.value?.meta_files ?? [];
-// Heuristic: bulk sample counts are small; snRNA-seq "samples" here are actually cells and are much larger
-$: bulkFiles = metaFiles.filter((d) => (Number(d.samples) || 0) < 10000);
-$: snFiles   = metaFiles.filter((d) => (Number(d.samples) || 0) >= 10000);
+  // Derived dataset groupings + stats (your existing logic)
+  $: metaFiles = $metadata?.value?.meta_files ?? [];
+  $: bulkFiles = metaFiles.filter((d) => (Number(d.samples) || 0) < 10000);
+  $: snFiles = metaFiles.filter((d) => (Number(d.samples) || 0) >= 10000);
 
-$: bulkSampleTotal = bulkFiles.reduce((acc, d) => acc + (Number(d.samples) || 0), 0);
-$: snCellTotal     = snFiles.reduce((acc, d) => acc + (Number(d.samples) || 0), 0);
+  $: bulkSampleTotal = bulkFiles.reduce((acc, d) => acc + (Number(d.samples) || 0), 0);
+  $: snCellTotal = snFiles.reduce((acc, d) => acc + (Number(d.samples) || 0), 0);
 
-// --- Metadata dictionary table state ---
-let dictRows = [];
-let dictLoading = true;
-let dictError = null;
+  // ---------- Helpers ----------
+  function groupDictRows(rows) {
+    const map = new Map();
 
-$: groupedRows = (() => {
-  const map = new Map();
-
-  for (const r of dictRows ?? []) {
-    const key = `${r.Metadata}|||${r.Description}|||${r.Type}`;
-    if (!map.has(key)) {
-      map.set(key, {
-        Metadata: r.Metadata,
-        Description: r.Description,
-        Type: r.Type,
-        Datasets: []
-      });
+    for (const r of rows ?? []) {
+      const key = `${r.Metadata}|||${r.Description}|||${r.Type}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          Metadata: r.Metadata,
+          Description: r.Description,
+          Type: r.Type,
+          Datasets: []
+        });
+      }
+      const entry = map.get(key);
+      if (r.Dataset && !entry.Datasets.includes(r.Dataset)) {
+        entry.Datasets.push(r.Dataset);
+      }
     }
-    const entry = map.get(key);
-    if (r.Dataset && !entry.Datasets.includes(r.Dataset)) {
-      entry.Datasets.push(r.Dataset);
-    }
+
+    for (const v of map.values()) v.Datasets.sort();
+
+    return Array.from(map.values()).sort((a, b) =>
+      String(a.Metadata).localeCompare(String(b.Metadata))
+    );
   }
 
-  // Optional: sort datasets within each row
-  for (const v of map.values()) v.Datasets.sort();
+  function toggleSetItem(setValue, item) {
+    const next = new Set(setValue);
+    if (next.has(item)) next.delete(item);
+    else next.add(item);
+    return next;
+  }
 
-  // Optional: sort rows by Metadata
-  return Array.from(map.values()).sort((a, b) =>
-    String(a.Metadata).localeCompare(String(b.Metadata))
-  );
-})();
+  // ---------- Bulk table state ----------
+  let bulkRows = [];
+  let bulkLoading = true;
+  let bulkError = null;
 
-// Step 4: dataset legend toggle + filtering
+  $: bulkGroupedRows = groupDictRows(bulkRows);
 
-// All dataset names present in the raw dictionary
-$: allDatasets = Array.from(
-  new Set((dictRows ?? []).map((r) => r.Dataset).filter(Boolean))
-).sort();
+  $: bulkAllDatasets = Array.from(
+    new Set((bulkRows ?? []).map((r) => r.Dataset).filter(Boolean))
+  ).sort();
 
-// Which datasets are currently shown (by default: all)
-let activeDatasets = new Set();
+  let bulkActiveDatasets = new Set();
+  $: if (bulkAllDatasets.length && bulkActiveDatasets.size === 0) {
+    bulkActiveDatasets = new Set(bulkAllDatasets);
+  }
 
-// Initialize activeDatasets once when datasets first appear
-$: if (allDatasets.length && activeDatasets.size === 0) {
-  activeDatasets = new Set(allDatasets);
-}
+  function toggleBulkDataset(ds) {
+    bulkActiveDatasets = toggleSetItem(bulkActiveDatasets, ds);
+  }
 
-function toggleDataset(ds) {
-  const next = new Set(activeDatasets);
-  if (next.has(ds)) next.delete(ds);
-  else next.add(ds);
-  activeDatasets = next;
-}
+  $: bulkFilteredGroupedRows = (bulkGroupedRows ?? [])
+    .map((r) => ({
+      ...r,
+      Datasets: (r.Datasets ?? []).filter((ds) => bulkActiveDatasets.has(ds))
+    }))
+    .filter((r) => r.Datasets.length > 0);
 
-// Filter grouped rows based on activeDatasets
-$: filteredGroupedRows = (groupedRows ?? [])
-  .map((r) => ({
-    ...r,
-    Datasets: (r.Datasets ?? []).filter((ds) => activeDatasets.has(ds))
-  }))
-  .filter((r) => r.Datasets.length > 0);
+  // ---------- Single-cell table state ----------
+  let scRows = [];
+  let scLoading = true;
+  let scError = null;
 
+  $: scGroupedRows = groupDictRows(scRows);
 
-onMount(async () => {
-  // 1) init TOC
-  tocbot.init({
-    tocElement,
-    contentElement,
-    headingSelector: 'h3, h4, h5',
-    hasInnerContainers: true,
+  $: scAllDatasets = Array.from(
+    new Set((scRows ?? []).map((r) => r.Dataset).filter(Boolean))
+  ).sort();
+
+  let scActiveDatasets = new Set();
+  $: if (scAllDatasets.length && scActiveDatasets.size === 0) {
+    scActiveDatasets = new Set(scAllDatasets);
+  }
+
+  function toggleScDataset(ds) {
+    scActiveDatasets = toggleSetItem(scActiveDatasets, ds);
+  }
+
+  $: scFilteredGroupedRows = (scGroupedRows ?? [])
+    .map((r) => ({
+      ...r,
+      Datasets: (r.Datasets ?? []).filter((ds) => scActiveDatasets.has(ds))
+    }))
+    .filter((r) => r.Datasets.length > 0);
+
+  // ---------- Mount ----------
+  onMount(async () => {
+    // TOC
+    tocbot.init({
+      tocElement,
+      contentElement,
+      headingSelector: 'h3, h4, h5',
+      hasInnerContainers: true
+    });
+
+    // Load BOTH dictionaries
+    try {
+      const [bulkRes, scRes] = await Promise.all([
+        fetch('/api/metadata?mode=bulk'),
+        fetch('/api/metadata?mode=sc')
+      ]);
+
+      if (!bulkRes.ok) throw new Error(`Bulk HTTP ${bulkRes.status}`);
+      if (!scRes.ok) throw new Error(`SC HTTP ${scRes.status}`);
+
+      const bulkPayload = await bulkRes.json();
+      const scPayload = await scRes.json();
+
+      bulkRows = bulkPayload.rows;
+      scRows = scPayload.rows;
+    } catch (e) {
+      const msg = e?.message ?? String(e);
+      bulkError = msg;
+      scError = msg;
+    } finally {
+      bulkLoading = false;
+      scLoading = false;
+    }
+
+    return () => tocbot.destroy();
   });
-
-  // 2) load metadata dictionary
-  try {
-    const res = await fetch('/api/metadata');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    dictRows = await res.json();
-  } catch (e) {
-    dictError = e.message ?? String(e);
-  } finally {
-    dictLoading = false;
-  }
-
-  // cleanup
-  return () => tocbot.destroy();
-});
 </script>
+
 
 <style>
   /* Tocbot: active link indicator (uses CSS var; falls back if missing) */
@@ -438,59 +475,57 @@ onMount(async () => {
             Visualizations adapt to metadata type, using box plots for categorical variables and scatterplots for continuous variables, with ANOVA or correlation statistics displayed on the x-axis and interactive zooming and filtering enabled.
             A data dictionary and the availability of metadata variables across curated datasets are shown in the table below.
            </p>
-           <div class="legend">
-                <span class="legend-title">Datasets:</span>
-                <div class="chip-row">
-                    {#each allDatasets as ds}
-                    <button
-                        type="button"
-                        class={"chip chip-btn chip-" + ds.replace(/\s+/g, '') + (activeDatasets.has(ds) ? "" : " chip-off")}
-                        on:click={() => toggleDataset(ds)}
-                        aria-pressed={activeDatasets.has(ds)}
-                        title={activeDatasets.has(ds) ? "Click to hide" : "Click to show"}
-                    >
-                        {ds}
-                    </button>
-                    {/each}
-                </div>
-                </div>
+         {#if bulkLoading}
+            <p>Loading metadata dictionary…</p>
+        {:else if bulkError}
+            <p style="color: red;">Failed to load metadata: {bulkError}</p>
+        {:else}
+            <div class="legend">
+            <span class="legend-title">Datasets:</span>
+            <div class="chip-row">
+                {#each bulkAllDatasets as ds}
+                <button
+                    type="button"
+                    class={"chip chip-btn chip-" + ds.replace(/\s+/g, '') + (bulkActiveDatasets.has(ds) ? "" : " chip-off")}
+                    on:click={() => toggleBulkDataset(ds)}
+                    aria-pressed={bulkActiveDatasets.has(ds)}
+                    title={bulkActiveDatasets.has(ds) ? "Click to hide" : "Click to show"}
+                >
+                    {ds}
+                </button>
+                {/each}
+            </div>
+            </div>
 
-            {#if dictLoading}
-                <p>Loading metadata dictionary…</p>
-            {:else if dictError}
-                <p style="color: red;">Failed to load metadata: {dictError}</p>
-            {:else}
-                <div class="meta-table-wrap">
-                    <table class="meta-table">
-                    <thead>
-                        <tr>
-                        <th>Metadata</th>
-                        <th>Description</th>
-                        <th>Type</th>
-                        <th>Dataset</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {#each filteredGroupedRows as r}
-                            <tr>
-                            <td>{r.Metadata}</td>
-                            <td>{r.Description}</td>
-                            <td>{r.Type}</td>
-                            <td>
-                                <div class="chip-row">
-                                {#each r.Datasets as ds}
-                                    <span class={"chip chip-" + ds.replace(/\s+/g, '')}>
-                                    {ds}
-                                    </span>
-                                {/each}
-                                </div>
-                            </td>
-                            </tr>
+            <div class="meta-table-wrap">
+            <table class="meta-table">
+                <thead>
+                <tr>
+                    <th>Metadata</th>
+                    <th>Description</th>
+                    <th>Type</th>
+                    <th>Datasets</th>
+                </tr>
+                </thead>
+                <tbody>
+                {#each bulkFilteredGroupedRows as r}
+                    <tr>
+                    <td>{r.Metadata}</td>
+                    <td>{r.Description}</td>
+                    <td>{r.Type}</td>
+                    <td>
+                        <div class="chip-row">
+                        {#each r.Datasets as ds}
+                            <span class={"chip chip-" + ds.replace(/\s+/g, '')}>{ds}</span>
                         {/each}
-                        </tbody>
-                    </table>
-                </div>
-                {/if}
+                        </div>
+                    </td>
+                    </tr>
+                {/each}
+                </tbody>
+            </table>
+            </div>
+        {/if}
           </li>
         <li>
            <p>Drivers of variation </p>
@@ -508,6 +543,58 @@ onMount(async () => {
             Visualisatiçns adapt to metadata type, using box plots for categorical variables and scatterplots for continuous variables, with ANOVA or correlation statistics displayed on the x-axis and interactive zooming and filtering enabled.
             A data dictionary and the availability of metadata variables across curated datasets are shown in the table below.
            </p>
+
+           {#if scLoading}
+                <p>Loading metadata dictionary…</p>
+            {:else if scError}
+                <p style="color: red;">Failed to load metadata: {scError}</p>
+            {:else}
+                <div class="legend">
+                <span class="legend-title">Datasets:</span>
+                <div class="chip-row">
+                    {#each scAllDatasets as ds}
+                    <button
+                        type="button"
+                        class={"chip chip-btn chip-" + ds.replace(/\s+/g, '') + (scActiveDatasets.has(ds) ? "" : " chip-off")}
+                        on:click={() => toggleScDataset(ds)}
+                        aria-pressed={scActiveDatasets.has(ds)}
+                        title={scActiveDatasets.has(ds) ? "Click to hide" : "Click to show"}
+                    >
+                        {ds}
+                    </button>
+                    {/each}
+                </div>
+                </div>
+
+                <div class="meta-table-wrap">
+                <table class="meta-table">
+                    <thead>
+                    <tr>
+                        <th>Metadata</th>
+                        <th>Description</th>
+                        <th>Type</th>
+                        <th>Datasets</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {#each scFilteredGroupedRows as r}
+                        <tr>
+                        <td>{r.Metadata}</td>
+                        <td>{r.Description}</td>
+                        <td>{r.Type}</td>
+                        <td>
+                            <div class="chip-row">
+                            {#each r.Datasets as ds}
+                                <span class={"chip chip-" + ds.replace(/\s+/g, '')}>{ds}</span>
+                            {/each}
+                            </div>
+                        </td>
+                        </tr>
+                    {/each}
+                    </tbody>
+                </table>
+                </div>
+            {/if}
           </li>
           <li>
             Transcript Exp

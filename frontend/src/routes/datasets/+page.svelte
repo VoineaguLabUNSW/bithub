@@ -9,10 +9,15 @@
   import Footer from '../../lib/components/footer.svelte';
   import ProgressHeader from '../../lib/components/progress.svelte';
 
-  import videoUsingSearch from '../../lib/assets/1 Using Search.webm';
+  import videoUsingSearch from '../../lib/assets/1 Use Gene Search.webm';
   import videoNavigatingResults1 from '../../lib/assets/2 Navigating Results 1.webm';
   import videoNavigatingResults2 from '../../lib/assets/3 Navigating Results 2.webm';
   import videoTranscriptExpression from '../../lib/assets/4 Transcript Expression.webm';
+  import videoVisualiseZscore from '../../lib/assets/3 Visualise Zscore.webm';
+  import videoVisualiseBulkExp1 from '../../lib/assets/3 Visualise Bulk Exp 1.webm';
+  import videoVisualiseBulkExp2 from '../../lib/assets/3 Visualise Bulk Exp 2.webm';
+  import videoVariance from '../../lib/assets/3 Visualise Variance.webm';
+  import videoVisualisesSNexp from '../../lib/assets/3 Visualise Expression SN.webm';
 
   const { metadata } = getContext('core');
 
@@ -465,6 +470,13 @@
                 Selecting any two datasets generates a scatterplot of z-score–transformed mean log₂ expression values for genes shared between the datasets, with each point representing a gene and the queried gene highlighted in pink.
                  Z-scores can also be viewed for specific brain regions or developmental stages using the subset menu. When interpreting these plots, note that datasets differ in developmental coverage, regional sampling, and expression quantification methods (see Dataset description)
             </p>
+
+             <video class="w-5/6 py-5 m-auto select-none"
+              src={videoVisualiseZscore}
+              loop
+              autoplay
+              muted
+            />
           </li>
           <li>
            <p>Gene Exp Across Variables (Bulk) </p>
@@ -473,8 +485,24 @@
             Users may also restrict analyses to specific brain regions using the Select Brain Region menu. 
 
             Visualizations adapt to metadata type, using box plots for categorical variables and scatterplots for continuous variables, with ANOVA or correlation statistics displayed on the x-axis and interactive zooming and filtering enabled.
-            A data dictionary and the availability of metadata variables across curated datasets are shown in the table below.
+            
            </p>
+
+           
+        <video class="w-5/6 py-5 m-auto select-none"
+        src={videoVisualiseBulkExp1}
+        loop
+        autoplay
+        muted
+      />
+
+      <video class="w-5/6 py-5 m-auto select-none"
+        src={videoVisualiseBulkExp2}
+        loop
+        autoplay
+        muted
+      />
+      <p>A data dictionary and the availability of metadata variables across curated datasets are shown in the table below.</p>
          {#if bulkLoading}
             <p>Loading metadata dictionary…</p>
         {:else if bulkError}
@@ -533,6 +561,13 @@
             Interactive charts show the fraction of variance explained in each dataset. 
             “Unknown” indicates that variancePartition results are unavailable for that gene due to filtering.
            </p>
+
+           <video class="w-5/6 py-5 m-auto select-none"
+            src={videoVariance}
+            loop
+            autoplay
+            muted
+          />
           </li>
 
              <li>
@@ -543,6 +578,13 @@
             Visualisatiçns adapt to metadata type, using box plots for categorical variables and scatterplots for continuous variables, with ANOVA or correlation statistics displayed on the x-axis and interactive zooming and filtering enabled.
             A data dictionary and the availability of metadata variables across curated datasets are shown in the table below.
            </p>
+
+          <video class="w-5/6 py-5 m-auto select-none"
+            src={videoVisualisesSNexp}
+            loop
+            autoplay
+            muted
+          />
 
            {#if scLoading}
                 <p>Loading metadata dictionary…</p>
@@ -614,6 +656,14 @@
             <p>
                 This panel provides a genome browser view displaying genomic coordinates and annotations from Ensembl, RefSeq, and FANTOM5. Users can navigate genomic regions and expand individual transcripts to examine isoform-specific structure and expression.
             </p>
+
+             <video class="w-5/6 py-5 m-auto select-none"
+            src={videoTranscriptExpression}
+            loop
+            autoplay
+            muted
+          />
+
         </ul>
       </div>
     </div>

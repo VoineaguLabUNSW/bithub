@@ -18,7 +18,8 @@
   import videoVisualiseBulkExp2 from '../../lib/assets/3 Visualise Bulk Exp 2.webm';
   import videoVariance from '../../lib/assets/3 Visualise Variance.webm';
   import videoVisualisesSNexp from '../../lib/assets/3 Visualise Expression SN.webm';
-
+  import videoGenomeBrowser from '../../lib/assets/3 Visualise Expression SN.webm';
+  
   const { metadata } = getContext('core');
 
   let tocElement;
@@ -503,58 +504,7 @@
         muted
       />
       <p>A data dictionary and the availability of metadata variables across curated datasets are shown in the table below.</p>
-         {#if bulkLoading}
-            <p>Loading metadata dictionary…</p>
-        {:else if bulkError}
-            <p style="color: red;">Failed to load metadata: {bulkError}</p>
-        {:else}
-            <div class="legend">
-            <span class="legend-title">Datasets:</span>
-            <div class="chip-row">
-                {#each bulkAllDatasets as ds}
-                <button
-                    type="button"
-                    class={"chip chip-btn chip-" + ds.replace(/\s+/g, '') + (bulkActiveDatasets.has(ds) ? "" : " chip-off")}
-                    on:click={() => toggleBulkDataset(ds)}
-                    aria-pressed={bulkActiveDatasets.has(ds)}
-                    title={bulkActiveDatasets.has(ds) ? "Click to hide" : "Click to show"}
-                >
-                    {ds}
-                </button>
-                {/each}
-            </div>
-            </div>
 
-            <div class="meta-table-wrap">
-            <table class="meta-table">
-                <thead>
-                <tr>
-                    <th>Metadata</th>
-                    <th>Description</th>
-                    <th>Type</th>
-                    <th>Datasets</th>
-                </tr>
-                </thead>
-                <tbody>
-                {#each bulkFilteredGroupedRows as r}
-                    <tr>
-                    <td>{r.Metadata}</td>
-                    <td>{r.Description}</td>
-                    <td>{r.Type}</td>
-                    <td>
-                        <div class="chip-row">
-                        {#each r.Datasets as ds}
-                            <span class={"chip chip-" + ds.replace(/\s+/g, '')}>{ds}</span>
-                        {/each}
-                        </div>
-                    </td>
-                    </tr>
-                {/each}
-                </tbody>
-            </table>
-            </div>
-        {/if}
-          </li>
         <li>
            <p>Drivers of variation </p>
            <p>This panel displays the metadata variables that contribute to expression variation for the selected gene across datasets, estimated using variancePartition (Hoffman & Schadt). 
@@ -586,58 +536,6 @@
             muted
           />
 
-           {#if scLoading}
-                <p>Loading metadata dictionary…</p>
-            {:else if scError}
-                <p style="color: red;">Failed to load metadata: {scError}</p>
-            {:else}
-                <div class="legend">
-                <span class="legend-title">Datasets:</span>
-                <div class="chip-row">
-                    {#each scAllDatasets as ds}
-                    <button
-                        type="button"
-                        class={"chip chip-btn chip-" + ds.replace(/\s+/g, '') + (scActiveDatasets.has(ds) ? "" : " chip-off")}
-                        on:click={() => toggleScDataset(ds)}
-                        aria-pressed={scActiveDatasets.has(ds)}
-                        title={scActiveDatasets.has(ds) ? "Click to hide" : "Click to show"}
-                    >
-                        {ds}
-                    </button>
-                    {/each}
-                </div>
-                </div>
-
-                <div class="meta-table-wrap">
-                <table class="meta-table">
-                    <thead>
-                    <tr>
-                        <th>Metadata</th>
-                        <th>Description</th>
-                        <th>Type</th>
-                        <th>Datasets</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {#each scFilteredGroupedRows as r}
-                        <tr>
-                        <td>{r.Metadata}</td>
-                        <td>{r.Description}</td>
-                        <td>{r.Type}</td>
-                        <td>
-                            <div class="chip-row">
-                            {#each r.Datasets as ds}
-                                <span class={"chip chip-" + ds.replace(/\s+/g, '')}>{ds}</span>
-                            {/each}
-                            </div>
-                        </td>
-                        </tr>
-                    {/each}
-                    </tbody>
-                </table>
-                </div>
-            {/if}
-          </li>
           <li>
             Transcript Exp
           </li>
@@ -657,8 +555,8 @@
                 This panel provides a genome browser view displaying genomic coordinates and annotations from Ensembl, RefSeq, and FANTOM5. Users can navigate genomic regions and expand individual transcripts to examine isoform-specific structure and expression.
             </p>
 
-             <video class="w-5/6 py-5 m-auto select-none"
-            src={videoTranscriptExpression}
+            <video class="w-5/6 py-5 m-auto select-none"
+            src={videoGenomeBrowser}
             loop
             autoplay
             muted

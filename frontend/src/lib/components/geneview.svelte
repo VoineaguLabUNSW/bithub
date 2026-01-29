@@ -61,7 +61,7 @@
             </button>
         </div>
         <div class="h-[calc(100vh-270px)]">
-            <MetadataGraph filteredStore={filteredBulk} heading={$geneInfo?.symbol} type='violin'/>
+            <MetadataGraph filteredStore={filteredBulk} heading={$geneInfo?.symbol} allowedPlotTypes={["Violin", "Box"]}/>
         </div>
     </TabItem>
     <TabItem disabled={$filteredVarpart.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>
@@ -86,7 +86,7 @@
         </div>
 
         <div class="h-[calc(100vh-270px)]">
-            <MetadataGraph filteredStore={filteredSingleCell} heading={$geneInfo?.symbol} type='box'/>
+            <MetadataGraph filteredStore={filteredSingleCell} heading={$geneInfo?.symbol} allowedPlotTypes={["Box", "Bar"]} allowSecondMetadataSelect={false}/>
         </div>
     </TabItem>
     <TabItem disabled={$filteredTranscript.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>

@@ -10,6 +10,7 @@ MIN_HITS = 2
 LOG2_OFFSET = 0.05
 GENE_LIMIT = None
 LOCAL_TMP = "tmp"
+CATEGORY_LIMIT = None
 
 class AnnotationException(Exception):
     pass
@@ -235,22 +236,6 @@ def iterate_csv_sorted(path: str, strip_numeric: bool=False, comment: str=None, 
         with iterate_csv(sort_path, csv_kwargs=csv_kwargs, file_kwargs=file_kwargs) as reader:
             yield reader
 
-def get_biomart_annotator(path: str):
-    '''Create a function that returns the gene symbol, start, and end of a gene given a gene name or transcript ID'''
-    get_data = {}
-    with iterate_csv(path, delimiter='\t') as reader:
-        _, rows = reader
-        prev = None
-        for row in rows:
-            if row[0] != prev: 
-                # ID, symbol, start, end
-                data = (row[0], row[13], int(row[5]), int(row[6]))
-                get_data[row[0]] = data
-                get_data[row[4]] = data
-                prev = row[0]
-                
-    return lambda gene: get_data.get(gene, None)
-
 def get_ncbi_annotator(gene_info_path: str, gtf_path: str, gene_alias_path: str):
     gene_to_gene = {}
     transcript_to_gene = {}
@@ -412,7 +397,7 @@ def parallel_dataset_context(datasets, gene_to_gene, transcript_to_gene, debug=F
 
         yield firsts, parallel_iterator(yields, lambda kv: kv[0], debug=debug)
 
-def parse_metadata(dataset, order_entries: Dict[str, List[str]], category_limit: int=50):
+def parse_metadata(dataset, order_entries: Dict[str, List[str]], category_limit: int | None = 50):
     column_types = {}
     if annot := dataset.get('annot', None):
         with iterate_csv(os.path.join(dataset['dir'], annot), delimiter=',', strip_numeric=True, csv_kwargs={}) as reader:
@@ -440,7 +425,7 @@ def parse_metadata(dataset, order_entries: Dict[str, List[str]], category_limit:
             for i, h in top_headers_enum:
                 column = convert_to_serializable([r[1+i] for r in row_list])
                 attrs = {}
-                if column.dtype.type is not np.bytes_ or count_unique(column, category_limit) < category_limit:
+                if column.dtype.type is not np.bytes_ or (category_limit is None or count_unique(column, category_limit) < category_limit):
                     order_entry = next((o for o in order_entries if o['variable'] == h), None)
                     if order_entry:
                         attrs['order'] = order_entry['order']
@@ -639,7 +624,7 @@ def run():
 
                         # Get sample order from metadata first column
                         orders = [o for o in inputObj['customMetadataCategoryOrders'] if dataset['id'] in o['datasets']]
-                        top_headers, side_headers, filter_factors_enum, columns = parse_metadata(dataset, orders)
+                        top_headers, side_headers, filter_factors_enum, columns = parse_metadata(dataset, orders, CATEGORY_LIMIT)
                         
                         samples_from_metadata = list(iterate_unique(side_headers))
 

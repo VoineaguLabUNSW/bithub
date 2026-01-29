@@ -4,16 +4,17 @@
     import { getContext } from 'svelte';
     import { writable, get } from "@square/svelte-store";
     import Plotly from 'plotly.js-dist-min';
-    import { Tabs, TabItem, Input } from 'flowbite-svelte';
+    import { Tabs, TabItem, Input, Toggle } from 'flowbite-svelte';
     import Palette from '../components/palette.svelte';
     import { getFilenameFromHeading } from '../utils/plot';
+    import { groupPaletteColors } from '$lib/utils/colors';
     
     export let plotlyArgs;
     
     const CONTROLS_WIDTH = 300;
     const TRANSITION_PARAMS = { x: 50, duration: 250, easing: sineIn };
     
-    let { colorPrimary, colorWay, colorRange, exportWidth, exportHeight } = getContext('displaySettings');
+    let { colorPrimary, colorWay, groupColorWay, colorRange, exportWidth, exportHeight, alwaysApplyColorWay } = getContext('displaySettings');
 
     let plotContainer = writable(undefined);
     let isHovering = true; // Show initially until cursor enters plot
@@ -178,6 +179,10 @@
                     <Palette palette={colorWay}/>
                 </div>
                 <div>
+                    Group Colorway
+                    <Palette palette={groupColorWay}/>
+                </div>
+                <div>
                     Export Width
                     <Input bind:value={$exportWidth} type="number" step="1" min="700"/>
                 </div>
@@ -185,6 +190,9 @@
                 <div>
                     <Input bind:value={$exportHeight} type="number" step="1" min="450"/>
                 </div> 
+                <div>
+                    <Toggle bind:checked={$alwaysApplyColorWay}>Apply colorway to single variable violin/box plots</Toggle>
+                </div>
             </div>
           </TabItem>
         </Tabs>

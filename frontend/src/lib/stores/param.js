@@ -20,6 +20,10 @@ function createIntParam(param, defaultVal=1, preventSideEffects=false) {
     return createParam(param, defaultVal, parseInt, preventSideEffects);
 }
 
+function createBoolParam(param, defaultVal=true, preventSideEffects=false) {
+    return createParam(param, defaultVal, (v) => v && v == "true", preventSideEffects);
+}
+
 function createListParam(param, sep=',', preventSideEffects=false) {
     return createParam(param, [], (v) => v && v.split(sep), preventSideEffects);
 }
@@ -34,5 +38,5 @@ function createPaletteParam(param, defaultPalette=[], fixedSize=undefined, preve
     return createParam(param, defaultPalette, checkSize, preventSideEffects);
 }
 
-export { createIntParam, createParam, createListParam, createPaletteParam};
+export { createIntParam, createBoolParam, createParam, createListParam, createPaletteParam};
   

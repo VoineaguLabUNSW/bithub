@@ -21,6 +21,8 @@ const primary = {
 // https://sashamaps.net/docs/resources/20-colors/
 const paletteColors = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080','#000000']
 
+const groupPaletteColors = ['#fc03f0', 'blue']
+
 // Helper functions
 function gradientHelper(colors, stops) {
     const norm = (v, min, max) => (v - min) / (max-min)
@@ -44,4 +46,4 @@ function gradientHelper(colors, stops) {
 
 const { toColorScale, gradientCSS, gradientRange, gradientPairs } = gradientHelper(gradientColors, gradientStops);
 
-export { primary, toColorScale, gradientCSS, gradientRange, gradientColors, gradientPairs, paletteColors}
+export { primary, toColorScale, gradientCSS, gradientRange, gradientColors, gradientPairs, paletteColors, groupPaletteColors}

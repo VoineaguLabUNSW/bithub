@@ -138,7 +138,7 @@ function getPlotScatter(heading, data, xName, yName, zName, orderZ, xSuffixes={}
     }
 }
 
-function getPlotDistribution(heading, data, xName, yName, zName, orderX, orderZ, groupLabelsX, groupSizesX, xSuffixes={}, colorway=undefined, type='violin', separateXTraces=false) {
+function getPlotDistribution(heading, data, xName, yName, zName, orderX, orderZ, groupLabelsX, groupSizesX, xSuffixes={}, colorway=undefined, groupColorway=undefined, type='violin', separateXTraces=false) {
     const hasZ = data[0].z !== undefined 
     const orderXDic = getOrderIndexed(data.map(d => d.x), orderX || [])
     const orderZDic = hasZ ? getOrderIndexed(data.map(d => d.z), orderZ || []) : new Map()
@@ -161,7 +161,6 @@ function getPlotDistribution(heading, data, xName, yName, zName, orderX, orderZ,
         orderX.forEach(x => !orderXDic.get(x)?.seen && (groupSizesX[xToGroup[x]] -= 1))
 
         // Create labelled group boxes with dividers
-        const groupColorsX = ['#fc03f0', 'blue']
         for(let group=0, prevStart=0, nextStart=groupSizesX[0]; group<groupSizesX.length; ++group, prevStart=nextStart, nextStart+=groupSizesX[group]) {
             if(prevStart === nextStart) continue
 
@@ -173,7 +172,7 @@ function getPlotDistribution(heading, data, xName, yName, zName, orderX, orderZ,
                 y0: 0,
                 x1: nextStart-0.5,
                 y1: 1,
-                fillcolor: groupColorsX[group % groupColorsX.length],
+                fillcolor: groupColorway && groupColorway[group % groupColorway.length],
                 opacity: 0.03,
                 line: { width: 1}
             })
@@ -210,20 +209,19 @@ function getPlotDistribution(heading, data, xName, yName, zName, orderX, orderZ,
         }
     }
 
+    // Prevents per-group scaling when groups are for display only
+    let scalesettings = (!hasZ && separateXTraces) ? {scalemode: "width", scalegroup: "all"} : {}
+
     // Create violins/box plots
     //Since it's sorted by (Z || X), changes in Z are the major group dividers
     const plotData = [];
-    const range = [0, 1]
+    let j = 0;
     for(let i=1; i<data.length; ++i) {
         const isLast = (i == (data.length-1));
         const didChange = hasZ ? (data[i-1].z != data[i].z) : (separateXTraces && (data[i-1].x != data[i].x))
 
-        if(!didChange || isLast) {
-            ++range[1] 
-        }
-
-        if((didChange || isLast) && ((range[1] - range[0]) || groupSizesX)) {
-            const dataRange = data.slice(...range)
+        if((didChange || isLast) && ((i > j) || groupSizesX)) {
+            const dataRange = data.slice(j, i)
             plotData.push({
                 type: type, // 'violin' or 'box'
                 // NaN for each possible category forces plotly to create empty spaces for them
@@ -240,8 +238,9 @@ function getPlotDistribution(heading, data, xName, yName, zName, orderX, orderZ,
                 box: { visible: false },
                 meanline: { visible: true },
                 spanmode: 'hard',
+                ...scalesettings
             });
-            range[0] = i;
+            j = i;
         }
     }
     return { 
@@ -275,4 +274,36 @@ function getPlotDistribution(heading, data, xName, yName, zName, orderX, orderZ,
     }
 }
 
-export { getPlotEmpty, getPlotDistribution, getPlotScatter, getColumnDownloader, getFilenameFromHeading, getZipped, getWithNA, getTableDownloader }
+function getPlotBar(heading, x, y, xName, yName, color = "red") {
+    return {
+        plotData: [{
+            type: 'bar',
+            x: x,
+            y: y,
+            orientation: 'v',
+            marker: { color: color }
+        }],
+        layout: { 
+            showlegend: false,
+            title: {
+                text: heading,
+                font: { family: "Times New Roman", size: 20 },
+            },
+            xaxis: {
+                title: {
+                    text: xName,
+                    font: { family: 'Times New Roman', size: 18, color: '#7f7f7f' }
+                },
+            },
+            yaxis: {
+                title: {
+                    text: yName,
+                    font: { family: 'Times New Roman', size: 18, color: '#7f7f7f' }
+                }
+            },
+        },
+        downloadCSV: getColumnDownloader(heading, getZipped({x, y}), xName, yName)
+    }
+}
+
+export { getPlotEmpty, getPlotDistribution, getPlotScatter, getPlotBar, getColumnDownloader, getFilenameFromHeading, getZipped, getWithNA, getTableDownloader }

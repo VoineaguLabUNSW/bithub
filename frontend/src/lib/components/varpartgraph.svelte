@@ -4,7 +4,7 @@
     import { writable } from "@square/svelte-store";
     import { getContext } from "svelte";
     import { derived } from 'svelte/store';
-    import { getColumnDownloader, getPlotEmpty, getZipped } from '../utils/plot';
+    import { getPlotEmpty, getPlotBar } from '../utils/plot';
 
     export let filteredStore;
     export let heading;
@@ -35,43 +35,8 @@
     const plotlyArgs = derived([varianceDataObj, colorPrimary], ([$varianceDataObj, $colorPrimary], set) => {
         if(!$varianceDataObj) set(getPlotEmpty('No data'));
         else if($varianceDataObj.varpart.loading) set(getPlotEmpty('Loading'));
-        else if($varianceDataObj.varpart.error) set(getPlotEmpty($varianceDataObj.varpart.error))
-        else {
-            const combinedHeading = heading + ` - ${$datasetsSelect?.id}`;
-            const [x, y] = [$varianceDataObj.headings, $varianceDataObj.varpart.data.values];
-            const xName = 'Metadata Variable';
-            const yName = 'Fraction Variance Explained';
-            set({
-                plotData: [{
-                    type: 'bar',
-                    x: x,
-                    y: y,
-                    orientation: 'v',
-                    marker: { color: $colorPrimary[0] }
-                }],
-                layout: { 
-                    showlegend: false,
-                    title: {
-                        text: combinedHeading,
-                        font: { family: "Times New Roman", size: 20 },
-                    },
-                    xaxis: {
-                        title: {
-                            text: xName,
-                            font: { family: 'Times New Roman', size: 18, color: '#7f7f7f' }
-                        },
-                    },
-                    yaxis: {
-                        title: {
-                            text: yName,
-                            font: { family: 'Times New Roman', size: 18, color: '#7f7f7f' }
-                        }
-                    },
-                },
-                downloadCSV: getColumnDownloader(combinedHeading, getZipped({x, y}), xName, yName)
-            })
-        }
-    
+        else if($varianceDataObj.varpart.error) set(getPlotEmpty($varianceDataObj.varpart.error));
+        else set(getPlotBar(heading + ` - ${$datasetsSelect?.id}`, $varianceDataObj.headings, $varianceDataObj.varpart.data.values, 'Metadata Variable', 'Fraction Variance Explained', $colorPrimary[0]));
     })
 </script>
 

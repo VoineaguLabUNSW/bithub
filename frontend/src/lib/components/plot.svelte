@@ -10,6 +10,7 @@
     import { groupPaletteColors } from '$lib/utils/colors';
     
     export let plotlyArgs;
+    export let controlsEnabled = writable(true);
     
     const CONTROLS_WIDTH = 300;
     const TRANSITION_PARAMS = { x: 50, duration: 250, easing: sineIn };
@@ -152,49 +153,51 @@
     }
 </style>
 <div id='plot-container' class="relative h-full w-full overflow-x-hidden" bind:this={$plotContainer}>
-    <Drawer placement="right" activateClickOutside={false} backdrop={false} transitionType="fly" transitionParams={TRANSITION_PARAMS} hidden={!($toggleOn || ($hoverOn && isHovering))} id="sidebar1" class='absolute bg-gray-50 rounded-md outline outline-[0.1px] outline-gray-300 m-2 shadow-md backdrop-blur-md bg-white/80' style='width:{CONTROLS_WIDTH}px'>
-        <Tabs style="full" defaultClass="flex rounded-lg divide-x rtl:divide-x-reverse divide-gray-200 shadow dark:divide-gray-700 gap-1">
-          <TabItem class="w-full" open>
-            <span slot="title">
-                 <slot name='title'></slot>
-            </span>
-            <slot name='controls'></slot>
-          </TabItem>
-          <TabItem class="w-full">
-            <span slot="title">
-                <i class="fa-solid fa-palette"></i> Display
-            </span>
-            <div class="text-sm text-gray-500 dark:text-gray-400 flex flex-col items-stretch gap-3">
-                <div>
-                    Color Range
-                    <Palette palette={colorRange}/>
-                </div>
-                
-                <div>
-                    Primary Color
-                    <Palette palette={colorPrimary}/>
-                </div>
-                <div>
-                    Colorway
-                    <Palette palette={colorWay}/>
-                </div>
-                <div>
-                    Group Colorway
-                    <Palette palette={groupColorWay}/>
-                </div>
-                <div>
-                    Export Width
-                    <Input bind:value={$exportWidth} type="number" step="1" min="700"/>
-                </div>
-                    Export Height
-                <div>
-                    <Input bind:value={$exportHeight} type="number" step="1" min="450"/>
-                </div> 
-                <div>
-                    <Toggle bind:checked={$alwaysApplyColorWay}>Apply colorway to single variable violin/box plots</Toggle>
-                </div>
-            </div>
-          </TabItem>
-        </Tabs>
-    </Drawer>
+    {#if $controlsEnabled}
+        <Drawer placement="right" activateClickOutside={false} backdrop={false} transitionType="fly" transitionParams={TRANSITION_PARAMS} hidden={!($toggleOn || ($hoverOn && isHovering))} id="sidebar1" class='absolute bg-gray-50 rounded-md outline outline-[0.1px] outline-gray-300 m-2 shadow-md backdrop-blur-md bg-white/80' style='width:{CONTROLS_WIDTH}px'>
+            <Tabs style="full" defaultClass="flex rounded-lg divide-x rtl:divide-x-reverse divide-gray-200 shadow dark:divide-gray-700 gap-1">
+                <TabItem class="w-full" open>
+                    <span slot="title">
+                        <slot name='title'></slot>
+                    </span>
+                    <slot name='controls'></slot>
+                </TabItem>
+                <TabItem class="w-full">
+                    <span slot="title">
+                        <i class="fa-solid fa-palette"></i> Display
+                    </span>
+                    <div class="text-sm text-gray-500 dark:text-gray-400 flex flex-col items-stretch gap-3">
+                        <div>
+                            Color Range
+                            <Palette palette={colorRange}/>
+                        </div>
+                        
+                        <div>
+                            Primary Color
+                            <Palette palette={colorPrimary}/>
+                        </div>
+                        <div>
+                            Colorway
+                            <Palette palette={colorWay}/>
+                        </div>
+                        <div>
+                            Group Colorway
+                            <Palette palette={groupColorWay}/>
+                        </div>
+                        <div>
+                            Export Width
+                            <Input bind:value={$exportWidth} type="number" step="1" min="700"/>
+                        </div>
+                            Export Height
+                        <div>
+                            <Input bind:value={$exportHeight} type="number" step="1" min="450"/>
+                        </div> 
+                        <div>
+                            <Toggle bind:checked={$alwaysApplyColorWay}>Apply colorway to single variable violin/box plots</Toggle>
+                        </div>
+                    </div>
+                </TabItem>
+            </Tabs>
+        </Drawer>
+    {/if}
 </div>

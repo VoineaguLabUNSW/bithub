@@ -10,7 +10,7 @@
     import { getPlotEmpty, getPlotDistribution, getPlotScatter, getPlotBar } from '../utils/plot'
     import { withoutNulls } from '../utils/hdf5';
 
-    import { getContext } from "svelte";
+    import { getContext, onMount, tick } from "svelte";
     import { createMetadataStore } from '../stores/metadata'
     
     import { LOG_OFFSET } from '../utils/math'
@@ -19,7 +19,7 @@
     export let heading;
     export let allowedPlotTypes = ["Violin", "Box", "Bar"];
     export let allowSecondMetadataSelect = true;
-
+    
     const core = getContext('core')
     const { colorWay, groupColorWay, colorPrimary, alwaysApplyColorWay } = getContext('displaySettings')
     const metadataStore = createMetadataStore(core)
@@ -28,6 +28,9 @@
     let matrixSelect = writable();
     let metadataSelect1 = writable();
     let metadataSelect2 = writable();
+    let showLoading = writable(true);
+
+    onMount(() => { setTimeout(() => showLoading.set(false), 1) });
     
     const plotTypeOpts = new Map([['', ["Violin", "Box", "Bar"].filter(v => allowedPlotTypes.includes(v)).map(l => ({id: l, name: l}))]])
     let plotType = writable(plotTypeOpts.values().next().value[0]);
@@ -46,8 +49,8 @@
         expressionLinearThreshold.set(newVal);
     }
     
-    const datasetOptsObj = derived([metadataStore, filteredStore], ([$metadataStore, $filteredStore], set) => {
-        if(!$metadataStore || !$filteredStore) return;
+    const datasetOptsObj = derived([metadataStore, filteredStore, showLoading], ([$metadataStore, $filteredStore, $showLoading], set) => {
+        if($showLoading || !$metadataStore || !$filteredStore) return;
         let datasetOptStrs = $filteredStore.datasetIndicesResults.map(col_i => $filteredStore.headings[col_i]);
         datasetOptStrs = datasetOptStrs.filter(ds => $metadataStore.readers[ds] !== undefined)
         const datasetOptVals = datasetOptStrs.map(h => ({id: h, name: h}));
@@ -122,10 +125,8 @@
     })
 
     const plotlyArgs = derived([expressionDataObj, pvalueDataObj, metadataSelect1, metadataSelect2, plotType, expressionLinearThreshold, scaleSelect, customSelect, colorWay, groupColorWay, colorPrimary, alwaysApplyColorWay], ([$expressionDataObj, $pvalueDataObj, $metadataSelect1, $metadataSelect2, $plotType, $expressionLinearThreshold, $scaleSelect, $customSelect, $colorWay, $groupColorWay, $colorPrimary, $alwaysApplyColorWay], set) => {
-        if(!$expressionDataObj || !pvalueDataObj || !$metadataSelect1) {
-            return
-        } else if (!$expressionDataObj.expression.data) {
-            set(getPlotEmpty(($expressionDataObj.expression.loading || $pvalueDataObj.pvalues.loading) ? 'Loading...' : 'Not in dataset'))
+        if (!$expressionDataObj || !pvalueDataObj || !$metadataSelect1 || !$expressionDataObj.expression.data) {
+            set(getPlotEmpty((!$expressionDataObj || $expressionDataObj.expression.loading || $pvalueDataObj.pvalues.loading) ? 'Loading...' : 'Not in dataset'))
         } else {
             // Prevent invalid combinations during updates
             const [ds1, ms1] = $metadataSelect1.id.split('|', 2)
@@ -225,10 +226,11 @@
     });
 </script>
 
-<Plot plotlyArgs={plotlyArgs}>
+<Plot plotlyArgs={plotlyArgs} controlsEnabled={datasetOptsObj}>
     <svelte:fragment slot="title">
         <i class='fas fa-gears'/> Metadata
     </svelte:fragment>
+    
     <span slot="controls">
         <div class='w-48 flex flex-col items-stretch gap-3'>
             <Dropdown title='Dataset' selected={datasetsSelect} groups={$datasetOptsObj.datasetsOpts}/>
@@ -264,4 +266,5 @@
             {/if}
         </div>
     </span>
+    
 </Plot>

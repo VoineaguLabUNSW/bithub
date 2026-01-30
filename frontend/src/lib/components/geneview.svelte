@@ -155,6 +155,6 @@
 <Popover triggeredBy="#ts-help" class="z-[9999] w-[700px] text-sm font-light text-gray-500 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400" placement="bottom-start">
     <div class="p-3 space-y-2">
         <h3 class="font-semibold text-gray-900 dark:text-white">Transcript Details</h3>
-        <p>Heatmap displaying transcript specific expression across different tissues (GTEx) and brain developmental stages (BrainSeq). Values were calculated by averaging expression values per transcript per tissue across all tissues (for GTEx data) or per transcript per age interval (BrainSeq). A z-score normalization has been performed to rank the means. </p>
+        <p>Heatmap displaying transcript specific expression for the selected gene across different tissues (GTEx) or brain developmental stages (BrainSeq). Transcript expression values were calculated by averaging expression values for each transcript either per tissue across all tissues (for GTEx data) or per age interval (BrainSeq). Users have the option for row-wise or column-wise z-score normalisation.</p>
     </div>
 </Popover>

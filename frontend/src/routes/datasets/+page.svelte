@@ -1,170 +1,571 @@
 <script>
-import '../../../node_modules/tocbot/dist/tocbot.css'
-import * as tocbot from 'tocbot';
-import { onMount, getContext } from 'svelte'
-import { Breadcrumb, BreadcrumbItem } from 'flowbite-svelte';
-import { base } from '$app/paths';
-import { primary } from '../../lib/utils/colors'
+  import 'tocbot/dist/tocbot.css';
+  import * as tocbot from 'tocbot';
+  import { onMount, getContext } from 'svelte';
+  import { Breadcrumb, BreadcrumbItem } from 'flowbite-svelte';
+  import { base } from '$app/paths';
+  import { primary } from '../../lib/utils/colors';
 
-import Footer from '../../lib/components/footer.svelte'
-import ProgressHeader from '../../lib/components/progress.svelte'
+  import Footer from '../../lib/components/footer.svelte';
+  import ProgressHeader from '../../lib/components/progress.svelte';
 
-import videoUsingSearch from '../../lib/assets/1 Using Search.webm'
-import videoNavigatingResults1 from '../../lib/assets/2 Navigating Results 1.webm'
-import videoNavigatingResults2 from '../../lib/assets/3 Navigating Results 2.webm'
-import videoTranscriptExpression from '../../lib/assets/4 Transcript Expression.webm'
+  import videoUsingSearch from '../../lib/assets/1 Use Gene Search.webm';
+  import videoNavigatingResults1 from '../../lib/assets/2 Navigating Results 1.webm';
+  import videoNavigatingResults2 from '../../lib/assets/3 Navigating Results 2.webm';
+  import videoTranscriptExpression from '../../lib/assets/4 Transcript Expression.webm';
+  import videoVisualiseZscore from '../../lib/assets/3 Visualise Zscore.webm';
+  import videoVisualiseBulkExp1 from '../../lib/assets/3 Visualise Bulk Exp 1.webm';
+  import videoVisualiseBulkExp2 from '../../lib/assets/3 Visualise Bulk Exp 2.webm';
+  import videoVariance from '../../lib/assets/3 Visualise Variance.webm';
+  import videoVisualisesSNexp from '../../lib/assets/3 Visualise Expression SN.webm';
+  import videoGenomeBrowser from '../../lib/assets/3 Visualise Expression SN.webm';
+  
+  const { metadata } = getContext('core');
 
-const { metadata } = getContext('core')
+  let tocElement;
+  let contentElement;
 
-let tocElement;
-let contentElement;
+  // UI state
+  let showIntroMore = false;
 
-onMount(() => {
-    tocbot.init({ tocElement, contentElement,
-        headingSelector: 'h3, h4, h5',
-        hasInnerContainers: true,
+  // Derived dataset groupings + stats (your existing logic)
+  $: metaFiles = $metadata?.value?.meta_files ?? [];
+  $: bulkFiles = metaFiles.filter((d) => (Number(d.samples) || 0) < 10000);
+  $: snFiles = metaFiles.filter((d) => (Number(d.samples) || 0) >= 10000);
+
+  $: bulkSampleTotal = bulkFiles.reduce((acc, d) => acc + (Number(d.samples) || 0), 0);
+  $: snCellTotal = snFiles.reduce((acc, d) => acc + (Number(d.samples) || 0), 0);
+
+  // ---------- Helpers ----------
+  function groupDictRows(rows) {
+    const map = new Map();
+
+    for (const r of rows ?? []) {
+      const key = `${r.Metadata}|||${r.Description}|||${r.Type}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          Metadata: r.Metadata,
+          Description: r.Description,
+          Type: r.Type,
+          Datasets: []
+        });
+      }
+      const entry = map.get(key);
+      if (r.Dataset && !entry.Datasets.includes(r.Dataset)) {
+        entry.Datasets.push(r.Dataset);
+      }
+    }
+
+    for (const v of map.values()) v.Datasets.sort();
+
+    return Array.from(map.values()).sort((a, b) =>
+      String(a.Metadata).localeCompare(String(b.Metadata))
+    );
+  }
+
+  function toggleSetItem(setValue, item) {
+    const next = new Set(setValue);
+    if (next.has(item)) next.delete(item);
+    else next.add(item);
+    return next;
+  }
+
+  // ---------- Bulk table state ----------
+  let bulkRows = [];
+  let bulkLoading = true;
+  let bulkError = null;
+
+  $: bulkGroupedRows = groupDictRows(bulkRows);
+
+  $: bulkAllDatasets = Array.from(
+    new Set((bulkRows ?? []).map((r) => r.Dataset).filter(Boolean))
+  ).sort();
+
+  let bulkActiveDatasets = new Set();
+  $: if (bulkAllDatasets.length && bulkActiveDatasets.size === 0) {
+    bulkActiveDatasets = new Set(bulkAllDatasets);
+  }
+
+  function toggleBulkDataset(ds) {
+    bulkActiveDatasets = toggleSetItem(bulkActiveDatasets, ds);
+  }
+
+  $: bulkFilteredGroupedRows = (bulkGroupedRows ?? [])
+    .map((r) => ({
+      ...r,
+      Datasets: (r.Datasets ?? []).filter((ds) => bulkActiveDatasets.has(ds))
+    }))
+    .filter((r) => r.Datasets.length > 0);
+
+  // ---------- Single-cell table state ----------
+  let scRows = [];
+  let scLoading = true;
+  let scError = null;
+
+  $: scGroupedRows = groupDictRows(scRows);
+
+  $: scAllDatasets = Array.from(
+    new Set((scRows ?? []).map((r) => r.Dataset).filter(Boolean))
+  ).sort();
+
+  let scActiveDatasets = new Set();
+  $: if (scAllDatasets.length && scActiveDatasets.size === 0) {
+    scActiveDatasets = new Set(scAllDatasets);
+  }
+
+  function toggleScDataset(ds) {
+    scActiveDatasets = toggleSetItem(scActiveDatasets, ds);
+  }
+
+  $: scFilteredGroupedRows = (scGroupedRows ?? [])
+    .map((r) => ({
+      ...r,
+      Datasets: (r.Datasets ?? []).filter((ds) => scActiveDatasets.has(ds))
+    }))
+    .filter((r) => r.Datasets.length > 0);
+
+  // ---------- Mount ----------
+  onMount(async () => {
+    // TOC
+    tocbot.init({
+      tocElement,
+      contentElement,
+      headingSelector: 'h3, h4, h5',
+      hasInnerContainers: true
     });
-    return () => tocbot.destroy();
-})
 
+    // Load BOTH dictionaries
+    try {
+      const [bulkRes, scRes] = await Promise.all([
+        fetch('/api/metadata?mode=bulk'),
+        fetch('/api/metadata?mode=sc')
+      ]);
+
+      if (!bulkRes.ok) throw new Error(`Bulk HTTP ${bulkRes.status}`);
+      if (!scRes.ok) throw new Error(`SC HTTP ${scRes.status}`);
+
+      const bulkPayload = await bulkRes.json();
+      const scPayload = await scRes.json();
+
+      bulkRows = bulkPayload.rows;
+      scRows = scPayload.rows;
+    } catch (e) {
+      const msg = e?.message ?? String(e);
+      bulkError = msg;
+      scError = msg;
+    } finally {
+      bulkLoading = false;
+      scLoading = false;
+    }
+
+    return () => tocbot.destroy();
+  });
 </script>
 
+
 <style>
-    /* Override color of tocbot active sidebar */
-    :global(.is-active-link::before) {
-        background-color: var(--toc-color);
-    }
+  /* Tocbot: active link indicator (uses CSS var; falls back if missing) */
+  :global(.is-active-link::before) {
+    background-color: var(--toc-color, #122c48);
+  }
+
+  /* ---- Metadata table ---- */
+  .meta-table-wrap {
+    max-height: 380px;
+    overflow: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #ffffff;
+    margin-top: 12px;
+  }
+
+  .meta-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+  }
+
+  .meta-table th,
+  .meta-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: top;
+    text-align: left;
+  }
+
+  .meta-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .meta-table tbody tr:hover {
+    background: #f8fafc;
+  }
+
+  /* Keep the chip column from getting too wide/tall-looking */
+  .meta-table td:last-child {
+    min-width: 220px;
+  }
+
+  /* ---- Dataset chips ---- */
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    border: 1px solid #e5e7eb;
+    background: #f8fafc;
+    white-space: nowrap;
+  }
+
+  /* Dataset-specific colors */
+  .chip-BrainSeq {
+    background: #fee2e2;
+    border-color: #fecaca;
+  }
+  .chip-BrainSpan {
+    background: #dcfce7;
+    border-color: #bbf7d0;
+  }
+  .chip-GTEx {
+    background: #dbeafe;
+    border-color: #bfdbfe;
+  }
+  .chip-HDBR {
+    background: #f3e8ff;
+    border-color: #e9d5ff;
+  }
+
+.legend {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.legend-title {
+  display: inline-block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.chip-btn {
+  cursor: pointer;
+}
+
+.chip-off {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
 </style>
-  
+
+
 <ProgressHeader/>
 <div class='m-12 mt-4 mb-[10%]' style="--toc-color: {primary[500]}">
-    <div class='pb-4'>
-        <Breadcrumb aria-label="Home breadcrumbs">
-            <BreadcrumbItem href="{base}" home>Home</BreadcrumbItem>
-            <BreadcrumbItem>Datasets</BreadcrumbItem>
-        </Breadcrumb>
+  <div class='pb-4'>
+    <Breadcrumb aria-label="Home breadcrumbs">
+      <BreadcrumbItem href="{base}" home>Home</BreadcrumbItem>
+      <BreadcrumbItem>Datasets</BreadcrumbItem>
+    </Breadcrumb>
+  </div>
+
+  <div class='grid grid-flow-col gap-10'>
+    <!-- TOC -->
+    <div class="col-span-1 select-none h-fit sticky top-24 pt-2 w-48">
+      <div bind:this={tocElement}></div>
     </div>
-    <div class='grid grid-flow-col gap-10'>        
-        <div class="col-span-1 select-none h-fit sticky top-0 pt-2 w-48">
-            <div bind:this={tocElement}></div>
+
+    <!-- CONTENT -->
+    <div bind:this={contentElement} class="col-span-4 max-w-4xl mx-auto">
+      <h1 class='text-4xl font-sans "Helvetica Neue" mb-5'>
+        <span>Brain Integrative Transcriptome Hub </span><span class='text-gray-400'>(BITHub)</span>
+      </h1>
+      <h2 class='text-3xl font-sans "Helvetica Neue" mb-4'>User Guide and Analysis</h2>
+
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 my-6">
+        <div class="rounded-lg border bg-white px-3 py-2 text-sm">
+          <div class="font-semibold text-gray-900">Gene queries</div>
+          <div class="text-gray-500">Search by symbol or Ensembl ID</div>
+        </div>
+        <div class="rounded-lg border bg-white px-3 py-2 text-sm">
+          <div class="font-semibold text-gray-900">Cross-dataset</div>
+          <div class="text-gray-500">Compare expression across studies</div>
+        </div>
+        <div class="rounded-lg border bg-white px-3 py-2 text-sm">
+          <div class="font-semibold text-gray-900">Region & developmental stage</div>
+          <div class="text-gray-500">Filter by brain context</div>
+        </div>
+        <div class="rounded-lg border bg-white px-3 py-2 text-sm">
+          <div class="font-semibold text-gray-900">Genome view</div>
+          <div class="text-gray-500">Transcript-level browsing</div>
+        </div>
+      </div>
+
+      <h3 id='introduction' class='text-2xl font-sans "Helvetica Neue" mb-2'>1. Introduction</h3>
+
+      <!-- NEW: collapsible intro -->
+      <p class="mb-2 text-gray-700">
+        Brain Integrative Transcriptome Hub (BITHub) is a web resource for exploring gene expression across human brain transcriptomic datasets.
+        It integrates 5 large-scale bulk RNA-seq studies and 3 single-nucleus RNA-seq studies spanning brain regions and developmental stages.
+        <button
+          class="ml-2 underline text-primary-600"
+          on:click={() => (showIntroMore = !showIntroMore)}
+          aria-expanded={showIntroMore}
+        >
+          {showIntroMore ? 'Show less' : 'Read more'}
+        </button>
+      </p>
+
+      {#if showIntroMore}
+        <p class="mb-5 text-gray-700">
+          Datasets are provided with curated metadata, inferred cell-type composition, and variance-aware analyses. Interactive visualisations allow users to examine gene expression patterns across datasets and biological contexts in a consistent and accessible way.
+        </p>
+      {:else}
+        <div class="mb-5"></div>
+      {/if}
+
+      <h3 id='datasets' class='text-2xl font-sans "Helvetica Neue" mb-2'>2. Datasets</h3>
+
+      <!-- NEW: stats grid -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+        <div class="rounded-lg border bg-white px-3 py-2">
+          <div class="text-xs text-gray-500">Bulk datasets</div>
+          <div class="text-lg font-semibold">{bulkFiles.length}</div>
+        </div>
+        <div class="rounded-lg border bg-white px-3 py-2">
+          <div class="text-xs text-gray-500">Bulk samples</div>
+          <div class="text-lg font-semibold">{bulkSampleTotal.toLocaleString()}</div>
+        </div>
+        <div class="rounded-lg border bg-white px-3 py-2">
+          <div class="text-xs text-gray-500">snRNA-seq datasets</div>
+          <div class="text-lg font-semibold">{snFiles.length}</div>
+        </div>
+        <div class="rounded-lg border bg-white px-3 py-2">
+          <div class="text-xs text-gray-500">Cells (snRNA-seq)</div>
+          <div class="text-lg font-semibold">{snCellTotal.toLocaleString()}</div>
+        </div>
+      </div>
+
+      <p class="mt-4 text-gray-700">
+        Download links below provide access to the processed files used by BITHub.
+      </p>
+
+      {#if metaFiles.length}
+
+        <!-- NEW: grouped tables -->
+        <h4 class="text-xl font-sans mt-8 mb-2">Bulk RNA-seq datasets</h4>
+        <div class="relative overflow-x-auto shadow-md sm:rounded-lg my-4">
+          <table class="w-full text-sm text-left rtl:text-right text-gray-600 dark:text-gray-400">
+            <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+              <tr>
+                {#each ['Dataset', 'Downloads', 'Samples'] as h}
+                  <th scope="col" class="px-6 py-3">{h}</th>
+                {/each}
+              </tr>
+            </thead>
+            <tbody>
+              {#each bulkFiles as d}
+                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
+                  <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                    {d.name}
+                  </th>
+                  <td class="px-6 py-4">
+                    <a class="underline text-primary-600 mr-4" href={d.matrix_url}>Expression</a>
+                    <a class="underline text-primary-600" href={d.meta_url}>Metadata</a>
+                  </td>
+                  <td class="px-6 py-4">
+                    {Number(d.samples || 0).toLocaleString()}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
         </div>
 
-        <div bind:this={contentElement} class='col-span-4 mx-[15%]'>
-            <h1 class='text-4xl font-sans "Helvetica Neue" mb-5'><span>Brain Integrative Transcriptome Hub </span><span class='text-gray-400'>(BITHub)</span></h1>
-            <h2 class='text-3xl font-sans "Helvetica Neue" mb-y'>User Guide and Analysis</h2>
-
-            <h3 id='introduction' class='text-2xl font-sans "Helvetica Neue" mb-y'>1. Introduction</h3>
-            <p class='mb-5'>
-                Large-scale transcriptomic consortia such as GTEx and BrainSpan have been instrumental in characterizing gene expression in the human brain across developmental stages, brain regions and cell-types. Despite this wealth of data, it is currently difficult to extract and compare gene expression information across these datasets. Their usability of publicly available gene expression data is often limited by the availability of high-quality, standardized biological phenotype and experimental condition information. Additionally, while some datasets are accompanied by data access portals (GTEx), others require significant efforts to retrieve and explore the data.
-            </p>
-            <p class='mb-5'>
-                We introduce Brain Integrative Transcriptome Hub (BITHub), a web tool which allows integrative exploration of gene expression across 10 curated large-scale transcriptome datasets of the human brain. Our resource includes 6,933 samples from 2,933 donors spanning over 21 developmental stages and 49 different brain regions. We have performed rigorous curation and harmonization of metadata, performed cellular deconvolution, and applied a mixed-linear model framework to prioritize drivers of variation across all datasets. Users are able to explore the gene expression properties of their gene of interest through multiple interactive plots that can be populated according to user-selected brain regions, cell-types, age intervals and other technical or biological covariates of interest.
-            </p>
-
-            <h3 id='datasets' class='text-2xl font-sans "Helvetica Neue" mb-y'>2. Dataset Summary</h3>
-            <p>
-                We manually curated gene expression datasets of the human brain from single-nucleus and bulk RNA-seq studies. The bulk datasets total up to 5,550 samples across 31 brain structures and snRNA-seq datasets totalling up to 128, 410 cells across 9 brain cell-types.
-            </p>
-
-            <div class="relative overflow-x-auto shadow-md sm:rounded-lg my-10">
-                <table class="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
-                    <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                        <tr>
-                            {#each ['Dataset', 'Expression File', 'Metadata File', 'Samples'] as h}
-                            <th scope="col" class="px-6 py-3">
-                                {h}
-                            </th>
-                            {/each}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {#if $metadata?.value?.meta_files}
-                            {#each $metadata.value.meta_files as meta_file}
-                                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
-                                    <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-                                        {meta_file.name}
-                                    </th>
-                                    <td class="px-6 py-4">
-                                        <a class='underline text-primary-600' href={meta_file.matrix_url}>{meta_file.matrix_url.split('/').pop() || meta_file.name}</a>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <a class='underline text-primary-600' href={meta_file.meta_url}>{meta_file.meta_url.split('/').pop() || meta_file.name}</a>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        {meta_file.samples}
-                                    </td>
-                                </tr>
-                            {/each}
-                        {/if}
-                    </tbody>
-                </table>
-            </div>
-
-            <h3 id='tutorial' class='text-2xl font-sans "Helvetica Neue" my-2'>3. Tutorial</h3>
-            <p>
-                Analyze spatiotemporal properties of your gene of interest
-            </p>
-            <h5 id='tutorial-submit' class='text-xl font-sans "Helvetica Neue" my-2'>i. Submit your query</h5>
-            <p class='ml-4'>
-                Use the search bar in the home-page by either by entering the HGNC-approved gene symbol or Ensembl IDs. Users can also input multiple genes separated by a comma. Files containing comma separated values (.csv) containing a list of genes can also be uploaded and searched for. You can use the input example genes to gain familiarity with the expected format.
-            </p>
-            <video class="w-5/6 py-5 m-auto select-none"
-                src={videoUsingSearch}
-                loop
-                autoplay
-                muted
-            />
-            <h5 id='tutorial-navigate' class='text-xl font-sans "Helvetica Neue" my-2'>ii. Navigating your results</h5>
-            <p class='ml-4'>
-                Once a query has been sent to the interface, you will be directed to the main page with the results. The gene or genes of interest will be shown in a table with their Ensembl ID, Gene Symbol and a heatmap. The heatmap denotes the relative expression of the gene amongst datasets and if that gene is present in the given dataset. The user can then navigate directly to the corresponding gene page and explore its expression properties for each dataset. Click on the modal to investigate gene expression properties of a specific gene.
-            </p>
-            <video class="w-5/6 py-5 m-auto select-none"
-                src={videoNavigatingResults1}
-                loop
-                autoplay
-                muted
-            />
-            <video class="w-5/6 py-5 m-auto select-none"
-                src={videoNavigatingResults2}
-                loop
-                autoplay
-                muted
-            />
-            <h5 id='tutorial-visualize' class='text-xl font-sans "Helvetica Neue" my-2'>iii. Visualize your results</h5>
-            <div class='ml-4'>
-                <p>BITHub displays interactive plots.</p>
-                <ul class='list-disc ml-8'>
-                    <li>
-                        Genome browser view
-                    </li>
-                    <li>
-                        Transcript heatmaps
-                    </li>
-                    <video class="w-5/6 py-5 m-auto select-none"
-                        src={videoTranscriptExpression}
-                        loop
-                        autoplay
-                        muted
-                    />
-                    <li>
-                        <p>Compare gene expression across datasets</p>
-                        <p>To allow the direct comparison of gene expression across different datasets, we have provided a scatterplot listing z-score log2 mean transformed values of gene expression. This plot shows all genes in a given dataset with the gene of interest highlighted in green. Users can use this plot to determine how well a gene is expressed amongst any two datasets.</p>
-                    </li>
-                    <li>
-                        <p>Interactive exploration of gene expression</p>
-                        <p>For each gene, BITHub displays interactive plots that allow the full exploration of gene expression values (CPM/TPM/RPKM - depending on the original dataset normalization) in the bulk and single-nucleus datasets. By selecting metadata variables, users have the ability to determine how gene expression of interest varies with any metadata properties such as phenotype (e.g Age, Sex ), sample characteristic or sequencing metrics. Users also have the ability to filter the data based on region by selecting their region of interest from the ‘Select Brain Region’ or Cell-type (single-cell data) from the drop down menu.</p>
-                    </li>
-                    <li>
-                        <p>Determine drivers of variation</p>
-                        <div>
-                            <p>Our database incorporates results from varianceParition into our database. The bar-graph for the variance partition shows the fraction of variance explained against selected metadata variables. The varianceParition results are currently only available for the bulk datasets and cannot be filtered by region.</p>
-                            <p>If this panel shows ‘No variance partition’, this is because the gene was likely filtered out in the variancePartition analysis pipeline.</p>
-                        </div>
-                    </li>
-                </ul>
-            </div>
+        <h4 class="text-xl font-sans mt-10 mb-2">Single-nucleus RNA-seq datasets</h4>
+        <div class="relative overflow-x-auto shadow-md sm:rounded-lg my-4">
+          <table class="w-full text-sm text-left rtl:text-right text-gray-600 dark:text-gray-400">
+            <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+              <tr>
+                {#each ['Dataset', 'Downloads', 'Cells'] as h}
+                  <th scope="col" class="px-6 py-3">{h}</th>
+                {/each}
+              </tr>
+            </thead>
+            <tbody>
+              {#each snFiles as d}
+                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
+                  <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                    {d.name}
+                  </th>
+                  <td class="px-6 py-4">
+                    <a class="underline text-primary-600 mr-4" href={d.matrix_url}>Expression</a>
+                    <a class="underline text-primary-600" href={d.meta_url}>Metadata</a>
+                  </td>
+                  <td class="px-6 py-4">
+                    {Number(d.samples || 0).toLocaleString()}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
         </div>
+
+      {/if}
+
+      <h3 id='tutorial' class='text-2xl font-sans "Helvetica Neue" my-4'>3. Tutorial</h3>
+      <p>
+        Analyze spatiotemporal properties of your gene of interest
+      </p>
+
+      <h5 id='tutorial-submit' class='text-xl font-sans "Helvetica Neue" my-2'>i. Submit your query</h5>
+      <p class='ml-4'>
+        Use the search bar in the home-page by either by entering the HGNC-approved gene symbol or Ensembl IDs. Users can also input multiple genes separated by a comma. Files containing comma separated values (.csv) containing a list of genes can also be uploaded and searched for. You can use the input example genes to gain familiarity with the expected format.
+      </p>
+
+      <video class="w-5/6 py-5 m-auto select-none"
+        src={videoUsingSearch}
+        loop
+        autoplay
+        muted
+      />
+
+      <h5 id='tutorial-navigate' class='text-xl font-sans "Helvetica Neue" my-2'>ii. Navigating your results</h5>
+      <p class='ml-4'>
+        Once a query has been sent to the interface, you will be directed to the main page with the results. The gene or genes of interest will be shown in a table with their Ensembl ID, Gene Symbol and a heatmap. The heatmap denotes the relative expression of the gene amongst datasets and if that gene is present in the given dataset. The user can then navigate directly to the corresponding gene page and explore its expression properties for each dataset. Click on the modal to investigate gene expression properties of a specific gene.
+      </p>
+
+      <video class="w-5/6 py-5 m-auto select-none"
+        src={videoNavigatingResults1}
+        loop
+        autoplay
+        muted
+      />
+      <video class="w-5/6 py-5 m-auto select-none"
+        src={videoNavigatingResults2}
+        loop
+        autoplay
+        muted
+      />
+
+      <h5 id='tutorial-visualize' class='text-xl font-sans "Helvetica Neue" my-2'>iii. Visualize your results</h5>
+      <div class='ml-4'>
+        <p>BITHub displays the following panels with interactive visualisations: </p>
+        <ul class='list-disc ml-8'>
+
+            <li>
+            <p>Gene Exp Across Datasets</p>
+            <p>
+                This panel summarises overall gene expression in the human brain. 
+                Selecting any two datasets generates a scatterplot of z-score–transformed mean log₂ expression values for genes shared between the datasets, with each point representing a gene and the queried gene highlighted in pink.
+                 Z-scores can also be viewed for specific brain regions or developmental stages using the subset menu. When interpreting these plots, note that datasets differ in developmental coverage, regional sampling, and expression quantification methods (see Dataset description)
+            </p>
+
+             <video class="w-5/6 py-5 m-auto select-none"
+              src={videoVisualiseZscore}
+              loop
+              autoplay
+              muted
+            />
+          </li>
+          <li>
+           <p>Gene Exp Across Variables (Bulk) </p>
+           <p>This panel enables gene-level exploration of expression patterns of the aggregated datasets.
+            Gene expression values can be visualized in relation to a range of biological and technical metadata variables, including phenotype (e.g. age, sex), sample characteristics, and sequencing metrics. 
+            Users may also restrict analyses to specific brain regions using the Select Brain Region menu. 
+
+            Visualizations adapt to metadata type, using box plots for categorical variables and scatterplots for continuous variables, with ANOVA or correlation statistics displayed on the x-axis and interactive zooming and filtering enabled.
+            
+           </p>
+
+           
+        <video class="w-5/6 py-5 m-auto select-none"
+        src={videoVisualiseBulkExp1}
+        loop
+        autoplay
+        muted
+      />
+
+      <video class="w-5/6 py-5 m-auto select-none"
+        src={videoVisualiseBulkExp2}
+        loop
+        autoplay
+        muted
+      />
+      <p>A data dictionary and the availability of metadata variables across curated datasets are shown in the table below.</p>
+
+        <li>
+           <p>Drivers of variation </p>
+           <p>This panel displays the metadata variables that contribute to expression variation for the selected gene across datasets, estimated using variancePartition (Hoffman & Schadt). 
+            Interactive charts show the fraction of variance explained in each dataset. 
+            “Unknown” indicates that variancePartition results are unavailable for that gene due to filtering.
+           </p>
+
+           <video class="w-5/6 py-5 m-auto select-none"
+            src={videoVariance}
+            loop
+            autoplay
+            muted
+          />
+          </li>
+
+             <li>
+           <p>Gene Exp Across Variables (Single Cell) </p>
+           <p>This panel enables gene-level exploraotion of expression patterns of the aggregated datasets.
+            Gene expression values can be visualisation in relation to a range of biological and technical metadata variables, including phenotype (e.g. age, sex), sample characteristics, and sequencing metrics. 
+            Users may also restrict analyses to specific brain regions using the Select Brain Region menu. 
+            Visualisatiçns adapt to metadata type, using box plots for categorical variables and scatterplots for continuous variables, with ANOVA or correlation statistics displayed on the x-axis and interactive zooming and filtering enabled.
+            A data dictionary and the availability of metadata variables across curated datasets are shown in the table below.
+           </p>
+
+          <video class="w-5/6 py-5 m-auto select-none"
+            src={videoVisualisesSNexp}
+            loop
+            autoplay
+            muted
+          />
+
+          <li>
+            Transcript Exp
+          </li>
+
+          <video class="w-5/6 py-5 m-auto select-none"
+            src={videoTranscriptExpression}
+            loop
+            autoplay
+            muted
+          />
+
+          
+
+          <li>
+            <p>Genome Browser</p>
+            <p>
+                This panel provides a genome browser view displaying genomic coordinates and annotations from Ensembl, RefSeq, and FANTOM5. Users can navigate genomic regions and expand individual transcripts to examine isoform-specific structure and expression.
+            </p>
+
+            <video class="w-5/6 py-5 m-auto select-none"
+            src={videoGenomeBrowser}
+            loop
+            autoplay
+            muted
+          />
+
+        </ul>
+      </div>
     </div>
+  </div>
 </div>
 
 <Footer metadata={metadata}/>

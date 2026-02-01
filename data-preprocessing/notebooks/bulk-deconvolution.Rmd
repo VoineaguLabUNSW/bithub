@@ -1,0 +1,109 @@
+---
+title: "Inferring Cell Type estimates"
+author: "Urwah Nawaz"
+date: "2023-09-24"
+output:
+  html_notebook: default
+  workflowr::wflow_html:
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    autodep = TRUE,
+    eval = TRUE,
+	echo = TRUE,
+	warning = FALSE,
+	message = FALSE
+)
+```
+
+# Introduction 
+
+This R markdown document contains the complete code to perform the deconvolution analysis of the bulk RNA-seq datasets for Brain Integrative Transcriptome Hub (BITHub). All datasets were pre-possessed using the code in `metadata-preprocess.Rmd`. In order to re-run the scripts - make sure to change the directories to the location of where the input files for pre-processing are stored. All directories are defined in each dataset section. 
+
+```{r}
+library(magrittr)
+library(tibble)
+library(reshape2)
+library(SummarizedExperiment)
+library(dplyr)
+library(gridExtra)
+library(preprocessCore)
+library(Metrics)
+library(DTWBI)
+library(purrr)
+source("config/fun-cibersort.R")
+load("data/cell-type-signatures/sigsBrain.rda")
+```
+
+
+```{r load-data and set-up}
+paths <- yaml::read_yaml("config/paths-example.yaml")
+
+read_expr2 <- function(dir, expr, rownames, drop_cols = NULL) {
+
+  df <- readr::read_csv(
+    file.path(dir, expr),
+    show_col_types = FALSE,
+    name_repair = "minimal"
+  )
+  nms <- names(df)
+  if (any(nms == "")) {
+    nms[nms == ""] <- "X"
+    names(df) <- make.unique(nms)
+  }
+
+  if (!is.null(drop_cols)) {
+    df <- df[, !names(df) %in% drop_cols, drop = FALSE]
+  }
+  rn_col <- if (is.numeric(rownames)) names(df)[[rownames]] else rownames
+
+  df <- tibble::column_to_rownames(df, rn_col)
+
+  as.data.frame(df, check.names = FALSE)
+}
+
+e <- purrr::imap(
+  paths$bulk$formatted,
+  \(x, key) read_expr2(
+    dir = x$dir,
+    expr = x$expr,
+    rownames = x$rownames,
+    drop_cols = if (!is.null(x$drop_cols)) x$drop_cols else NULL
+  )
+)
+```
+
+
+## Run deconvolution analysis 
+
+
+```{r}
+set.seed(3)
+
+decon_results <- imap(e, function(exp, d) {
+  message("Now running deconvolution for ", d)
+
+  exp2 <- exp %>%
+    rownames_to_column("EnsID")
+
+  message("Running CIBERSORT for ", d)
+
+  CIBERSORT(sig_matrix = sigsBrain$MB, mixture_file = exp2)
+})
+
+decon_results_flat <- setNames(decon_results, paste0(names(decon_results), "_CIBERSORT"))
+
+
+```
+
+## Goodness-of-fit and deconvolution results 
+
+```{r}
+
+
+```
+

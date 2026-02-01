@@ -1,0 +1,75 @@
+OriginalMetadataColumnName,BITColumnName,Include (Yes/No) - Interest,Type
+SAMPID,SampleID,Yes,Sample characteristics
+SMRIN,RIN,Yes,Sequencing metrics
+SMTSISCH,PMI (hours),Yes,Sequencing metrics
+AGE,Age Interval,Yes,Phenotype
+SEX,Sex,Yes,Phenotype
+SMATSSCR,Autolysis Score,Yes,Sample characteristics
+SMNABTCH,Sequencing Batch,Yes,Sample characteristics
+SMNABTCHT,Type of Batch,Yes,Sample characteristics
+SMNABTCHD,Date of Batch,Yes,Sample characteristics
+SMGEBTCH,Genotype or Expression Batch ID,Yes,Sample characteristics
+SMGEBTCHD,Date of Genotype or Expression Batch,Yes,Sample characteristics
+SMGEBTCHT,Type of Genotype or Expression Batch,No,Sample characteristics
+SMCENTER,BSS Collection side code,Yes,Sample characteristics
+SMTS,Regions,Yes,Sample characteristics
+SMTSD,Structure Acronym,Yes,Sample characteristics
+SMTSPAX,Time spent in PAXgene fixative (mins),Yes,Sequencing metrics
+SME2MPRT,End 2 Mapping Rate,Yes,Sequencing metrics
+SMCHMPRS,Chimeric Pairs,Yes,Sequencing metrics
+SMNTRART,IntragenicRate,Yes,Sequencing metrics
+SMNUMGPS,No of Gaps,No,Sequencing metrics
+SMMAPRT,Mapping Rate,Yes,Sequencing metrics
+SMEXNCRT,Exonic Rate,Yes,Sequencing metrics
+SM550NRM,Based Normalised,No,Sequencing metrics
+SMGNSDTC,Total Assigned Genes,Yes,Sequencing metrics
+SMUNMPRT,Unique Rate mapped,No,Sequencing metrics
+SM350NRM,Base Normilization,No,Sequencing metrics
+SMESTLBS,Library Size,No,Sequencing metrics
+SMMPPD,Reads Mapped,Yes,Sequencing metrics
+SMNTERRT,Intergenic Rate,Yes,Sequencing metrics
+SMRRNANM,rRNA,Yes,Sequencing metrics
+SMRDTTL,Total N Reads,Yes,Sequencing metrics
+SMMNCV,Mean_Coeff_Variation,No,Sequencing metrics
+SMTRSCPT,Transcripts Detected,Yes,Sequencing metrics
+SMMPPDPR,Mapped Pairs,Yes,Sequencing metrics
+SMUNPDRD,Unpaired Reads,No,Sequencing metrics
+SMNTRNRT,Intronic Rate,Yes,Sequencing metrics
+SMMPUNRT,Mapping Rate unique,Yes,Sequencing metrics
+SMEXPEFF,Expression Profiling Efficiency,Yes,Sequencing metrics
+SMMPPDUN,Mapped Unique (no dup flags),Yes,Sequencing metrics
+SME2MMRT,End 2 Mismatch Rate,Yes,Sequencing metrics
+SME2ANTI,End 2 Antisense,Yes,Sequencing metrics
+SME2SNSE,End Sense 2,Yes,Sequencing metrics
+SME1ANTI,End 1 Antisense,Yes,Sequencing metrics
+SME1SNSE,End 1 Sense,Yes,Sequencing metrics
+SME1PCTS,End 1 Sense percentage,Yes,Sequencing metrics
+SMRRNART,rRNA ratio,Yes,Sequencing metrics
+SME1MPRT,End 1 Mapping rate,Yes,Sequencing metrics
+SMNUM5CD,Num of Reads Covered 5prime,No,Sequencing metrics
+SMDPMPRT,Duplication Rate Mapped,Yes,Sequencing metrics
+SME2PCTS,Percentage Intragenic End 2 Reads,Yes,Sequencing metrics
+SUBJID,DonorID,Yes,Phenotype
+DTHHRDY,Hardy Scale,Yes,Phenotype
+NA,Period,Yes,Phenotype
+NA,Diagnosis,Yes,Phenotype
+SMPTHNTS,PathologyNotes,No,Sample characteristics
+SMUBRID,UberonID,No,Sequencing metrics
+SMAFRZE,Samples_in_analysis_freeze,No,Sequencing metrics
+SMGTC,gtc_genotype,No,Sequencing metrics
+SMRDLGTH,MaxReadLength,No,Sequencing metrics
+SMMNCPB,MeanCoverageperBase,No,Sequencing metrics
+SME1MMRT,MismatchRate,No,Sequencing metrics
+SMSFLGTH,FragmentLengthStdDev,No,Sequencing metrics
+SMVQCFL,Failed_vendor_QC_check,No,Sequencing metrics
+SMCGLGTH,CumulativeGapLength,No,Sequencing metrics
+SMGAPPCT,Gap_percentage,No,Sequencing metrics
+SMALTALG,AlternativeAlignments,No,Sequencing metrics
+SMMFLGTH,MeanFragmentLength,No,Sequencing metrics
+SMSPLTRD,SplitReads,No,Sequencing metrics
+SMBSMMRT,BaseMismatchRate,No,Sequencing metrics
+NA,Proportion of Neurons (MultiBrain),Yes,Cell Type
+NA,Proportion of Astrocytes (MultiBrain),Yes,Cell Type
+NA,Proportion of Microglia (MultiBrain),Yes,Cell Type
+NA ,Proportion of Endothelia (MultiBrain),Yes,Cell Type
+NA ,Proportion of Oligodendrocytes (MultiBrain),Yes,Cell Type

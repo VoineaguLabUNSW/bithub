@@ -1,0 +1,26 @@
+############################################################
+# BITHub - data directory
+# Use this to change locations to directories of data
+#############################################################
+
+
+bulk:
+  raw:
+    brainseq: "/home/neuro/Documents/BrainData/Bulk/Brainseq"
+    brainspan: "/home/neuro/Documents/BrainData/Bulk/BrainSpan/Kang/genes_matrix_csv"
+    gtex: "/home/neuro/Documents/BrainData/Bulk/GTEx"
+ #   hdbr: "/home/neuro/Documents/BrainData/" - Downloaded from recount data
+    psychencode: "/home/neuro/Documents/BrainData/Bulk/PsychEncode"
+
+  formatted:
+    brainseq: "/home/neuro/Documents/BrainData/Bulk/Brainseq/Formatted"
+    brainspan: "/home/neuro/Documents/BrainData/Bulk/BrainSpan/Formatted"
+    gtex: "/home/neuro/Documents/BrainData/Bulk/GTEx/Formatted"
+    psychencode: "/home/neuro/Documents/BrainData/Bulk/PsychEncode/Formatted"
+    hdbr: "/home/neuro/Documents/BrainData/Bulk/HDBR/Formatted"
+
+
+single_nucleus:
+  raw:
+    hca: "/home/neuro/Documents/BrainData/single-cell/hca/Raw"
+    cameron: "/home/neuro/Documents/BrainData/single-cell/cameron"

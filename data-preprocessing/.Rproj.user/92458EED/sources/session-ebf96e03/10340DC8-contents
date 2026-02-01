@@ -1,0 +1,162 @@
+---
+title: "snRNAseq-preprocess"
+author: "urwahnawaz"
+date: "2023-10-06"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+## Introduction
+
+```{r}
+## Functions and libraries
+source(here::here("code/preprocess/sn-RNAseq-preprocess.R"))
+source(here::here("code/preprocess/def_stages.R"))
+source(here::here("code/preprocess/functions.R"))
+library(foreach)
+```
+
+```{r}
+sn.dir = file.path("/home/neuro/Documents/BrainData/single-cell")
+```
+
+# HCA 
+
+```{r}
+md = read.csv(file.path(sn.dir, "/hca/Raw/metadata.csv"))
+exp = read.csv(file.path(sn.dir, "/hca/Raw/matrix.csv"))
+```
+
+
+## Aldringer et al 
+
+
+```{r}
+mat <- fread("/home/neuro/Documents/BrainData/single-cell/aldinger/exprMatrix.tsv")
+
+meta <- read.table("/home/neuro/Documents/BrainData/single-cell/aldinger/meta.tsv", header=T, sep="\t", as.is=TRUE)
+  
+obj$CER = CreateSeuratObject(counts = mat, 
+                            min.cells = round(ncol(mat) / 100), 
+                            min.features = min.features, 
+                            project = "Cer")  
+
+
+## Check which cells don't have any classes 
+m <- match(colnames(obj$CER), meta$cellId)
+obj$CER$orig.celltype <- meta$Cluster[m]
+
+keep <- which(!(obj$CER$orig.celltype == ""))
+obj$CER<- subset(obj$CER, cells = keep)
+
+
+## Preprocess and normalise
+max.depth <- get.max.depth(obj$CER)
+obj$CER <- preprocess.fun(obj$CER, max.depth = max.depth)
+
+ PercentageFeatureSet(obj$CER, pattern = "^MT-")
+
+ 
+obj$CER[["percent.mito"]] <- PercentageFeatureSet(object = obj$CER, pattern = "^MT-")
+ 
+ # filter to remove outlier nuclei: 
+ 
+obj$CER <- subset(x = obj$CER, subset = (nCount_RNA > min.depth) & (nCount_RNA < max.depth) & (percent.mito < max.mito))
+ 
+
+## CPM
+dat <- as.data.frame(obj$CER@assays$RNA@counts)
+dat <- make.cpm(dat)
+dat <- cbind(rownames(dat), dat)
+colnames(dat)[1] <- "Symbol"
+rownames(dat) <- 1:nrow(dat)
+
+write.csv(dat, file =  "/home/neuro/Documents/BrainData/single-cell/aldinger/Aldringer-exp.csv", row.names = TRUE, col.names = TRUE, quote = FALSE)
+
+## metadata preprocessing 
+aldringer = file.path("/home/neuro/Documents/BrainData/single-cell/aldinger")
+md.sample = read_excel("/home/neuro/Documents/BrainData/single-cell/aldinger/NIHMS1703002-supplement-Supplementary_Tables.xlsx", sheet =2, skip=3)[,-1] %>% 
+  as.data.frame()
+  dplyr::rename("DonorID" = "Specimen") %>% 
+  dplyr::select(-Sex)
+clust_names = read_excel("/home/neuro/Documents/BrainData/single-cell/aldinger/NIHMS1703002-supplement-Supplementary_Tables.xlsx", sheet =8, skip=2) %>%
+  dplyr::rename("Cluster" = "Cluster-Cell Type Abbreviation") %>% 
+  dplyr::select(Cluster, "Cell Type")
+
+md.cells = read.table("/home/neuro/Documents/BrainData/single-cell/aldinger/meta.tsv", header=TRUE, fill = TRUE, 
+                      sep = "\t") %>% head()
+  dplyr::rename("DonorID" = "sample_id")
+
+md.full = left_join(md.cells, md.sample, by = "DonorID")
+md.full = left_join(md.full, clust_names, by = "Cluster")
+
+
+
+md.full %<>% 
+  dplyr::rename("Sex" = "sex", 
+                "Age" = "age", 
+                "mito_ratio" = "percent.mito", 
+                "CellID" ="cellId") %>% 
+  mutate(Age = gsub("PCW", "pcw", Age)) %>% 
+  mutate(AgeNumeric = Age %>% str_remove(" pcw") %>% 
+           as.numeric() %>% `-` (40) %>% divide_by(52)) %>%
+  mutate(AgeInterval = add_feature(.$Age, age_intervals))
+
+write.csv(md.full, file = "/home/neuro/Documents/BrainData/single-cell/aldinger/Aldringer-metadata.csv")
+
+md_names = colnames(md.full) %>% 
+  as.data.frame() %>% 
+  set_colnames("BIThubnames")
+
+write.csv(md_names , file="/home/neuro/Documents/Brain_integrative_transcriptome/brain_transcriptome/annotations/Aldringer-annotations.csv")
+
+head(md_names)
+
+```
+
+
+
+```{r}
+vel.md = read.csv("/home/neuro/Documents/BrainData/single-cell/velmeshev/FormattedData/Velmeshev-metadata.csv", header=TRUE)
+```
+
+
+```{r}
+colnames(vel.md) = c("CellID", "Cell-type", "SampleID", "DonorID", 
+                     "StructureAcronym", "AgeNumeric", "Sex", "Diagnosus", 
+                     "CaptureBatch","SequencingBatch", "PMI", "RIN", "nGenes", "nUMI",
+                     "mito_Rate", "rRNA_rate", "MajorCellType", "AgeNumeric", "Regions") 
+
+
+write.csv(vel.md,"/home/neuro/Documents/BrainData/single-cell/velmeshev/FormattedData/Velmeshev-metadata.csv")
+```
+
+
+```{r}
+hca.md = read.csv("/home/neuro/Documents/BrainData/single-cell/hca/Processed/HCA-metadata.csv", header=TRUE)
+```
+
+```{r}
+hca.md %<>% 
+  dplyr::select(-c("exp_component_name", "exp_component_name", "specimen_type",
+                   "cluster_color", "cluster_order", "class_color", "class_order",
+                   "class_label", "subclass_color", "subclass_order",
+                   "full_genotype_color", "full_genotype_order", "full_genotype_label",
+                   "donor_sex_color", "donor_sex_order", "region_color", "region_order",
+                   "cortical_layer_color", "cortical_layer_order",
+                   "cell_type_accession_color", "cell_type_accession_order", "cell_type_accession_label",
+                   "cell_type_alias_color", "cell_type_order", "cell_type_alt_alias_color", 
+                   "cell_type_alt_alias_order", "cell_type_alt_alias_label", "cell_type_designation_color",
+                   "cell_type_designation_order", "cell_type_designation_label", "external_donor_name_color",
+                   "external_donor_name_order", "outlier_call", "outlier_type"))
+```
+
+
+```{r}
+colnames(hca.md) = c("CellID", "Cell-Type", "Subclass", "Sex", "StructureAcronym", "CorticalLayer",
+                     "CellTypeAlias", "DonorID", "Age", "AgeNumeric", "AgeIntervals", "Regions")
+
+write.csv(hca.md,"/home/neuro/Documents/BrainData/single-cell/hca/Processed/HCA-metadata.csv")
+
+```

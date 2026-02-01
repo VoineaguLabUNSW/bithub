@@ -1,0 +1,48 @@
+############################################################
+# BITHub - data directory
+# Use this to change locations to directories of data
+#############################################################
+
+
+bulk:
+  raw:
+    brainseq: "/home/neuro/Documents/BrainData/Bulk/Brainseq"
+    brainspan: "/home/neuro/Documents/BrainData/Bulk/BrainSpan/Kang/genes_matrix_csv"
+    gtex: "/home/neuro/Documents/BrainData/Bulk/GTEx"
+    hdbr: "/home/neuro/Documents/BrainData/Bulk/HDBR" # Downloaded from recount data but some files exist
+    psychencode: "/home/neuro/Documents/BrainData/Bulk/PsychEncode"
+
+  formatted:
+    brainseq:
+      dir: "/home/neuro/Documents/BrainData/Bulk/Brainseq/Formatted"
+      expr: "BrainSeq-exp.csv"
+      rownames: 1
+    brainspan:
+      dir: "/home/neuro/Documents/BrainData/Bulk/BrainSpan/Formatted"
+      expr: "BrainSpan-exp.csv"
+      rownames: 1
+    gtex:
+      dir: "/home/neuro/Documents/BrainData/Bulk/GTEx/Formatted"
+      expr: "GTEx-exp.csv"
+      rownames: 1
+    psychencode:
+      dir: "/home/neuro/Documents/BrainData/Bulk/PsychEncode/Formatted"
+      expr: "PsychEncode-exp.csv"
+      rownames: 1
+    hdbr:
+      dir: "/home/neuro/Documents/BrainData/Bulk/HDBR/Formatted"
+      expr: "HDBR-exp.csv"
+      drop_cols: ["X"]
+      rownames: "EnsemblID"
+
+
+single_nucleus:
+  raw:
+    hca: "/home/neuro/Documents/BrainData/single-cell/hca/Raw"
+    cameron: "/home/neuro/Documents/BrainData/single-cell/cameron"
+    velmeshev: "/home/neuro/Documents/BrainData/single-cell/velmeshev/Velmeshev2019"
+
+  formatted:
+    hca: "/home/neuro/Documents/BrainData/single-cell/hca/Formatted"
+    cameron: "/home/neuro/Documents/BrainData/single-cell/cameron/Formatted"
+    velmeshev: "/home/neuro/Documents/BrainData/single-cell/velmeshev/Formatted"

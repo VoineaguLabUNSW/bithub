@@ -1,0 +1,2284 @@
+---
+title: "bulk-deconvolution"
+author: "unawaz1996"
+date: "2023-09-24"
+output:
+  html_notebook: default
+  workflowr::wflow_html:
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    autodep = TRUE,
+    eval = TRUE,
+	echo = TRUE,
+	warning = FALSE,
+	message = FALSE
+)
+```
+
+# Background 
+
+
+This R markdown document contains the complete code for the analysis of deconvolved bulk RNA-seq expression profiles for Brain Integrative Transcriptome Hub (BITHub). All datasets were prepossessed using the code in `01-bulk-preprocess-data.Rmd`. The deconvolution analysis itself was performed using `run-decon.R` code in `/code/deconvolution/` sub directory of this project. The script generates `decon-estimates.Rda` file which contains deconvolution estimates for each bulk RNA-seq datasets. 
+
+In order to re-run the scripts - make sure to change the directories to the location of where the input files for preprocessing are stored. All directories are defined in each dataset section. 
+
+All other files are stored within the data folder of this R workflow directory. 
+
+```{r}
+source("code/preprocess/functions.R")
+source("code/deconvolution/utility_functions.R")
+source("code/deconvolution/fun-cibersort.R")
+load(here::here("data/signatures/sigsBrain.rda"))
+library(recount3)
+library(magrittr)
+library(tibble)
+library(reshape2)
+library(SummarizedExperiment)
+library(corrplot)
+library(dplyr)
+library(ggvenn)
+library(pander)
+library(gridExtra)
+library(variancePartition)
+library(DT)
+library(EnsDb.Hsapiens.v86)
+library(singscore)
+library(AnnotationHub)
+library(stargazer)
+library(ggfortify)
+library(glue)
+library(cowplot)
+library(broom)
+library(glmpca)
+library(naniar)
+library(DeconRNASeq)
+library(dtangle)
+library(e1071)
+library(parallel)
+library(preprocessCore)
+library(Metrics)
+library(DTWBI)
+library(firatheme)
+```
+
+
+```{r}
+source("config/fun-cibersort.R")
+```
+
+
+```{r load-data}
+e <- list()
+
+e$GTEx <- read.csv(file.path(brain.dir, "/GTEx/Formatted/GTEx-exp.csv"),
+                       check.names = FALSE, row.names = 1)
+e$PE <- read.csv(file.path(brain.dir, "/PsychEncode/Formatted/PsychEncode-exp.csv"),
+                     row.names =1, check.names = FALSE)
+e$BSpan <- read.csv(file.path(brain.dir, "/BrainSpan/Formatted/BrainSpan-exp.csv"),
+                        check.names = FALSE, row.names = 1)
+e$BSeq <- read.csv(file.path(brain.dir,"/Brainseq/Formatted/BrainSeq-exp.csv"),
+                       check.names = FALSE, row.names = 1)
+
+e$HDBR <- read.csv(file.path(brain.dir, "/HDBR/Formatted/HDBR-exp.csv"),
+                       check.names = FALSE, row.names = 1)  %>%
+  column_to_rownames("EnsemblID")
+```
+
+
+
+```{r metadata-load}
+md = list()
+md$GTEx <- read.csv(file.path(brain.dir, "/GTEx/Formatted/GTEx-metadata.csv"),
+                       check.names = FALSE, row.names = 1)
+md$PE <- read.csv(file.path(brain.dir,"/PsychEncode/Formatted/PsychEncode-metadata.csv"),
+                  check.names = FALSE)
+md$BSeq <- read.csv(file.path(brain.dir,"/Brainseq/Formatted/BrainSeq-metadata.csv"),
+                       check.names = FALSE)
+md$HDBR <- read.csv(file.path(brain.dir, "/HDBR/Formatted/HDBR-metadata.csv"),
+                       check.names = FALSE, row.names = 1)
+
+md$BSpan <- read.csv(file.path(brain.dir,
+                               "/BrainSpan/Formatted/BrainSpan-metadata.csv"),
+                     check.names = FALSE)
+
+
+
+```
+
+# Analysis
+
+## Goodness of fit 
+
+CIBERSORT is used for the analysis, and MultiBrain signatures generated in Sutton et al (2022) are used for signatures. The performance of the deconvolution analysis was evaluated using a goodness-of-fit (r) measurement, which is based on the Pearson's correlation coefficient between the expression data and measured expression data. 
+
+```{r}
+gof_results = list()
+
+gof_results$BSpan_CBS = write.gof(e$BSpan, decon_results$BSpan_CIBERSORT, sigsBrain$MB) %>%
+  as.data.frame() %>% mutate(Dataset= "BrainSpan",
+                             Deconvolution = "Cibersort")  %>%
+  rownames_to_column("SampleID") %>%
+  mutate(SampleID = gsub("X", "", SampleID)) %>%
+  mutate(SampleID = gsub("\\.", "-", SampleID)) %>%
+  left_join(md$BSpan %>%
+              dplyr::select(SampleID, Regions, Period), by = "SampleID")
+
+gof_results$BSeq_CBS = write.gof(e$BSeq, decon_results$BSeq_CIBERSORT, sigsBrain$MB) %>%
+  as.data.frame() %>% mutate(Dataset= "BrainSeq",
+                             Deconvolution = "Cibersort")%>%
+  rownames_to_column("SampleID") %>%
+  left_join(md$BSeq %>%
+              dplyr::select(SampleID, Regions, Period), by = "SampleID")
+
+gof_results$GTEx_CBS = write.gof(e$GTEx, decon_results$GTEx_CIBERSORT, sigsBrain$MB) %>%
+  as.data.frame() %>% mutate(Dataset= "GTEx",
+                             Deconvolution = "Cibersort") %>%
+  rownames_to_column("SampleID") %>%
+  mutate(SampleID = gsub("\\.", "-", SampleID)) %>%
+  left_join(md$GTEx %>%
+              dplyr::select(SampleID, Regions, Period), by = "SampleID")
+
+gof_results$PE_CBS = write.gof(e$PE, decon_results$PE_CIBERSORT, sigsBrain$MB) %>%
+  as.data.frame() %>% mutate(Dataset= "PsychEncode",
+                             Deconvolution = "Cibersort") %>%
+  rownames_to_column("SampleID") %>%
+  mutate(SampleID = gsub("X", "", SampleID),
+         SampleID = gsub("\\.", "-", SampleID)) %>%
+  left_join(md$PE %>%
+              dplyr::select(SampleID, Regions, Period), by = "SampleID")
+
+gof_results$HDBR_CBS = write.gof(e$HDBR, decon_results$HDBR_CIBERSORT, sigsBrain$MB) %>%
+  as.data.frame() %>% mutate(Dataset= "HDBR",
+                             Deconvolution = "Cibersort") %>%
+  rownames_to_column("SampleID")   %>%
+  left_join(md$HDBR %>%
+              dplyr::select(SampleID, Regions, Period), by = "SampleID")
+
+
+
+```
+
+```{r fig.height=15, fig.width=10}
+cbs_regions = do.call(rbind, gof_results) %>%
+  as.data.frame() %>%
+  drop_na(Regions) %>%
+  dplyr::filter(Deconvolution == "Cibersort") %>% 
+    ggplot(aes(Regions, r, fill = Regions)) + geom_violin(width=1, alpha = 0.85) +
+      geom_boxplot(width=0.1, color="white") +
+      theme_bw() +   scale_fill_manual(values = c("Cortex" = "#E85571", 
+                                 "Subcortex" = "#838DE0", 
+                                 "Cerebellum" = "#FFD256",
+                                 "Spinal Cord" = "#C6D14A", 
+                                 "Forebrain" = "#F6B19D", #
+                                 "Midbrain" = "#AC93AD",
+                                 "Hindbrain" = "#6E8B8E",
+                                 "Brain" = "#FFA6B7", 
+                                 "Forebrain and midbrain" = "#9D696C"
+                                )) + 
+  geom_hline(yintercept = c(0.5,0.7), color = "grey",linetype='dotted') + 
+  ylab("Goodness of fit (r)") + facet_wrap(~Dataset, scales = "free",  nrow = 6) + 
+  theme(legend.position = "none", 
+        axis.text = element_text(size =10),
+        axis.title  = element_text(size =12))
+cbs_regions
+
+cbs_period =do.call(rbind, gof_results) %>%
+  as.data.frame() %>%
+  drop_na(Regions) %>%
+  mutate(Period = factor(Period, levels=c("Prenatal", "Postnatal"))) %>% 
+  dplyr::filter(Deconvolution == "Cibersort") %>% 
+    ggplot(aes(Period, r, fill = Period)) + geom_violin(width=1, alpha = 0.85) +
+      geom_boxplot(width=0.1, color="white") +
+      theme_bw() +  scale_fill_manual(values = c("Prenatal" = "#FD84B8", 
+                                                "Postnatal" = "#54B4E6")) + 
+  geom_hline(yintercept = c(0.5,0.7), color = "black",linetype='dotted') + 
+  ylab("Goodness of fit (r)") + facet_wrap(~Dataset, scales = "free",  nrow = 6) +
+  theme(legend.position = "none", 
+        axis.text = element_text(size =10),
+        axis.title  = element_text(size =12)) 
+
+
+cbs_period 
+
+grid.arrange(cbs_regions, cbs_period, ncol=2)
+```
+
+```{r}
+cortex.gof = do.call(rbind, gof_results) %>%
+  as.data.frame() %>%
+  drop_na(Regions) %>%
+  dplyr::filter(Deconvolution == "Cibersort") %>% 
+  dplyr::filter(Regions == "Cortex")
+
+subcortex.gof = do.call(rbind, gof_results) %>%
+  as.data.frame() %>%
+  drop_na(Regions) %>%
+  dplyr::filter(Deconvolution == "Cibersort") %>% 
+  dplyr::filter(Regions == "Subcortex")
+
+cortex.gof = do.call(rbind, gof_results) %>%
+  as.data.frame() %>%
+  drop_na(Regions) %>%
+  dplyr::filter(Deconvolution == "Cibersort") %>% 
+  dplyr::filter(Regions == "Cortex")
+
+cer.gof = do.call(rbind, gof_results) %>%
+  as.data.frame() %>%
+  drop_na(Regions) %>%
+  dplyr::filter(Deconvolution == "Cibersort") %>% 
+  dplyr::filter(Regions == "Cerebellum")
+
+hdbr.gof = do.call(rbind, gof_results) %>%
+  as.data.frame() %>%
+  drop_na(Regions) %>%
+  dplyr::filter(Deconvolution == "Cibersort") %>% 
+  dplyr::filter(Dataset == "HDBR")
+median(hdbr.gof$r)
+
+
+dev.gof = do.call(rbind, gof_results) %>%
+  as.data.frame() %>%
+  drop_na(Regions) %>%
+  dplyr::filter(Deconvolution == "Cibersort") %>% 
+  dplyr::filter(Period == "Postnatal")
+
+
+median(dev.gof$r)
+```
+
+
+## Cell-type proportion trends 
+
+```{r}
+pe.cbs  = decon_results$PE_CIBERSORT %>% 
+  as.data.frame() %>%
+  mutate(Dataset = "PsychEncode") %>% 
+  rownames_to_column("SampleID") %>% 
+  dplyr::select(SampleID, Neurons, Astrocytes,
+                Oligodendrocytes, Microglia, Endothelia, Dataset) %>%
+  left_join(md$PE %>% 
+              dplyr::select(SampleID, Regions, Period, AgeInterval), by = "SampleID")
+
+
+gtex.cbs = decon_results$GTEx_CIBERSORT %>% 
+  as.data.frame() %>%
+  mutate(Dataset = "GTEx") %>% 
+  rownames_to_column("SampleID") %>%
+  dplyr::select(SampleID, Neurons, Astrocytes,
+                Oligodendrocytes, Microglia, Endothelia, Dataset) %>%
+  left_join(md$GTEx %>% 
+              dplyr::select(SampleID, Regions, Period, AgeInterval), by = "SampleID")
+
+hdbr.cbs = decon_results$HDBR_CIBERSORT %>% 
+  as.data.frame() %>%
+  mutate(Dataset = "HDBR") %>% 
+  rownames_to_column("SampleID") %>% 
+  dplyr::select(SampleID, Neurons, Astrocytes,
+                Oligodendrocytes, Microglia, Endothelia, Dataset) %>%
+  left_join(md$HDBR %>% 
+              dplyr::select(SampleID, Regions, Period, AgeInterval), by = "SampleID")
+
+bseq.cbs = decon_results$BSeq_CIBERSORT %>% 
+  as.data.frame() %>%
+  mutate(Dataset = "BrainSeq") %>% 
+  
+  rownames_to_column("SampleID") %>% 
+  dplyr::select(SampleID, Neurons, Astrocytes,
+                Oligodendrocytes, Microglia, Endothelia, Dataset) %>%
+  left_join(md$BSeq%>% 
+              dplyr::select(SampleID, Regions, Period, AgeInterval), by = "SampleID")
+bspan.csb = decon_results$BSpan_CIBERSORT%>% 
+  as.data.frame() %>%
+  mutate(Dataset = "BrainSpan") %>% 
+  rownames_to_column("SampleID") %>% 
+  dplyr::select(SampleID, Neurons, Astrocytes,
+                Oligodendrocytes, Microglia, Endothelia, Dataset) %>%
+  left_join(md$BSpan %>% 
+              dplyr::select(SampleID, Regions, Period, AgeInterval), by = "SampleID") 
+
+```
+
+
+### Across regions 
+
+```{r}
+cibersort_all = rbind(pe.cbs,
+      bspan.csb,
+      bseq.cbs, 
+      hdbr.cbs, 
+      gtex.cbs) %>% 
+  as.data.frame %>%
+  melt() %>%
+  drop_na(Regions) %>%
+  dplyr::filter(Dataset != "HDBR") %>%
+  mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", 
+                                              "Oligodendrocytes", 
+                                              "Astrocytes", 
+                                              "Neurons")),
+        Regions = factor(Regions, 
+                         levels = c("Brain", "Forebrain","Hindbrain",
+                                    "Midbrain", "Chroid plexus", 
+                                    "Cortex", "Subcortex",
+                                    "Cerebellum", "Spinal Cord") )) %>% 
+  ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 10, family = "serif", color = "black"),
+        axis.text.y = element_text(size = 12, family = "serif", color = "black"), 
+        legend.position = "none", 
+        strip.text = element_text(size = 12,family = "serif")) + coord_flip() + 
+  facet_grid(Dataset~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("") +
+  scale_fill_manual(values = c("Neurons" = "#D94A70", 
+                               "Astrocytes" = "#5590CC", 
+                               "Oligodendrocytes" = "#AF9DCB", 
+                               "Microglia" = "#69C9CF", 
+                               "Endothelia" = "#FAE47B")) #+
+cibersort_all
+#facet_wrap(Dataset~Regions)
+
+
+cibersort_hdbr = rbind(pe.cbs,
+      bspan.csb,
+      bseq.cbs, 
+      hdbr.cbs, 
+      gtex.cbs) %>% 
+  as.data.frame %>%
+  melt() %>%
+  drop_na(Regions) %>%
+  dplyr::filter(Dataset == "HDBR") %>%
+  mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", 
+                                              "Oligodendrocytes", 
+                                              "Astrocytes", 
+                                              "Neurons")),
+        Regions = factor(Regions, 
+                         levels = c("Brain", "Forebrain","Hindbrain",
+                                    "Midbrain", "Chroid plexus", 
+                                    "Cortex", "Subcortex",
+                                    "Cerebellum", "Spinal Cord") )) %>% 
+  ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() +
+  theme_bw() +
+   theme(axis.text.x = element_text(size = 10, family = "serif", color = "black"),
+        axis.text.y = element_text(size = 12, family = "serif", color = "black"), 
+        legend.position = "none", 
+        strip.text = element_text(size = 12,family = "serif"))  + coord_flip() + 
+  facet_grid(Dataset~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("") +
+  scale_fill_manual(values = c("Neurons" = "#D94A70", 
+                               "Astrocytes" = "#5590CC", 
+                               "Oligodendrocytes" = "#AF9DCB", 
+                               "Microglia" = "#69C9CF", 
+                               "Endothelia" = "#FAE47B"))
+
+# cibersort_hdbr 
+# ggsave(plot = cibersort_all, 
+#        filename = here::here("output/Thesis_plots/Deconvolution/cibersort-estimates-all.svg"), 
+#        height = 9.30, 
+#        width = 10.55, 
+#        units = "in")
+# 
+# ggsave(plot = cibersort_hdbr, 
+#        filename = here::here("output/Thesis_plots/Deconvolution/cibersort-estimates-hdbr.svg"), 
+#        height = 3.07, 
+#        width = 10.55, 
+#        units = "in")
+# 
+# pdf(file = here::here("output/Thesis_plots/Deconvolution/cbs-estimates-all.pdf"), height =12, 
+#     width = 11)
+plot_grid(cibersort_all, cibersort_hdbr, align = "v", nrow = 2, rel_heights = c(1/2, 1/4))
+# dev.off()
+#grid.arrange(cibersort_all, cibersort_hdbr, nrow=2)
+```
+
+### Across age intervals and regions 
+
+```{r fig.height=12, fig.width=20}
+# pdf(file = here::here("output/Thesis_plots/Deconvolution/cbs-estimates-BSeq.pdf"), height =12, 
+#     width = 11)
+ rbind(pe.cbs,
+      bspan.csb,
+      bseq.cbs, 
+      gtex.cbs, 
+      hdbr.cbs) %>% 
+  as.data.frame %>%
+  melt() %>%
+  drop_na(Regions) %>%
+ # dplyr::filter(Dataset != "HDBR") %>%
+  mutate(variable= factor(variable, levels = c("Neurons","Astrocytes", 
+                                               "Endothelia", "Oligodendrocytes",
+                                               "Microglia"
+                                              
+                                              )),
+        Regions = factor(Regions, 
+                         levels = c("Brain", "Forebrain","Hindbrain",
+                                    "Midbrain", "Forebrain and midbrain", 
+                                    "Cortex", "Subcortex",
+                                    "Cerebellum", "Spinal Cord")),
+        AgeInterval = factor(AgeInterval, levels = c("4-7pcw", "8-9pcw",
+                                                        "10-12pcw", "13-15pcw", "16-18pcw",
+                                                        "19-24pcw", "25-38pcw", "0-5mos",
+                                                        "6-18mos", "19mos-5yrs", "6-11yrs",
+                                                        "12-19yrs", "20-29yrs", "30-39yrs",
+                                                      "40-49yrs", "50-59yrs", "60-69yrs",
+                                                      "70-79yrs", "80-89yrs", "90-99yrs"))) %>% 
+  dplyr::filter(Dataset == "BrainSeq") %>%
+  ggplot(aes(x = AgeInterval, y = value, fill = Regions)) + geom_boxplot() +
+  theme_bw() +
+    theme(axis.text.x = element_text(size = 12, family = "serif", color = "black", angle = 90),
+        axis.text.y = element_text(size = 12, family = "serif", color = "black"), 
+        legend.position = "none", 
+        strip.text = element_text(size = 12,family = "serif")) + 
+  facet_grid(variable~Dataset, scales = "free") +ylab("Estimated Proportion") + xlab("") +
+  scale_fill_manual(values = c("Cortex" = "#E85571", 
+                                 "Subcortex" = "#838DE0", 
+                                 "Cerebellum" = "#FFD256",
+                                 "Spinal Cord" = "#C6D14A", 
+                                 "Forebrain" = "#F6B19D", #
+                                 "Midbrain" = "#AC93AD",
+                                 "Hindbrain" = "#6E8B8E",
+                                 "Brain" = "#FFA6B7", 
+                                 "Forebrain and midbrain" = "#9D696C"
+                                ))
+ 
+ # dev.off()
+
+```
+
+```{r fig.height=12, fig.width=20}
+# pdf(file = here::here("output/Thesis_plots/Deconvolution/cbs-estimates-BSpan.pdf"), height =12, 
+#     width = 11)
+ rbind(pe.cbs,
+      bspan.csb,
+      bseq.cbs, 
+      gtex.cbs, 
+      hdbr.cbs) %>% 
+  as.data.frame %>%
+  melt() %>%
+  drop_na(Regions) %>%
+ # dplyr::filter(Dataset != "HDBR") %>%
+  mutate(variable= factor(variable, levels = c("Neurons","Astrocytes", 
+                                               "Endothelia", "Oligodendrocytes",
+                                               "Microglia"
+                                              
+                                              )),
+        Regions = factor(Regions, 
+                         levels = c("Brain", "Forebrain","Hindbrain",
+                                    "Midbrain", "Forebrain and midbrain", 
+                                    "Cortex", "Subcortex",
+                                    "Cerebellum", "Spinal Cord")),
+        AgeInterval = factor(AgeInterval, levels = c("4-7pcw", "8-9pcw",
+                                                        "10-12pcw", "13-15pcw", "16-18pcw",
+                                                        "19-24pcw", "25-38pcw", "0-5mos",
+                                                        "6-18mos", "19mos-5yrs", "6-11yrs",
+                                                        "12-19yrs", "20-29yrs", "30-39yrs",
+                                                      "40-49yrs", "50-59yrs", "60-69yrs",
+                                                      "70-79yrs", "80-89yrs", "90-99yrs"))) %>% 
+  dplyr::filter(Dataset == "BrainSpan") %>%
+  ggplot(aes(x = AgeInterval, y = value, fill = Regions)) + geom_boxplot() +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 12, family = "serif", color = "black", angle = 90),
+        axis.text.y = element_text(size = 12, family = "serif", color = "black"), 
+        legend.position = "none", 
+        strip.text = element_text(size = 12,family = "serif"))+ 
+  facet_grid(variable~Dataset, scales = "free") +ylab("Estimated Proportion") + xlab("") +
+  scale_fill_manual(values = c("Cortex" = "#E85571", 
+                                 "Subcortex" = "#838DE0", 
+                                 "Cerebellum" = "#FFD256",
+                                 "Spinal Cord" = "#C6D14A", 
+                                 "Forebrain" = "#F6B19D", #
+                                 "Midbrain" = "#AC93AD",
+                                 "Hindbrain" = "#6E8B8E",
+                                 "Brain" = "#FFA6B7", 
+                                 "Forebrain and midbrain" = "#9D696C"
+                                ))
+ 
+ #dev.off()
+
+```
+
+```{r fig.height=12, fig.width=20}
+# 
+# pdf(file = here::here("output/Thesis_plots/Deconvolution/cbs-estimates-PE.pdf"), height =12, 
+#     width = 11)
+ rbind(pe.cbs,
+      bspan.csb,
+      bseq.cbs, 
+      gtex.cbs, 
+      hdbr.cbs) %>% 
+  as.data.frame %>%
+  melt() %>%
+  drop_na(Regions) %>%
+ # dplyr::filter(Dataset != "HDBR") %>%
+  mutate(variable= factor(variable, levels = c("Neurons","Astrocytes", 
+                                               "Endothelia", "Oligodendrocytes",
+                                               "Microglia"
+                                              
+                                              )),
+        Regions = factor(Regions, 
+                         levels = c("Brain", "Forebrain","Hindbrain",
+                                    "Midbrain", "Forebrain and midbrain", 
+                                    "Cortex", "Subcortex",
+                                    "Cerebellum", "Spinal Cord")),
+        AgeInterval = factor(AgeInterval, levels = c("4-7pcw", "8-9pcw",
+                                                        "10-12pcw", "13-15pcw", "16-18pcw",
+                                                        "19-24pcw", "25-38pcw", "0-5mos",
+                                                        "6-18mos", "19mos-5yrs", "6-11yrs",
+                                                        "12-19yrs", "20-29yrs", "30-39yrs",
+                                                      "40-49yrs", "50-59yrs", "60-69yrs",
+                                                      "70-79yrs", "80-89yrs", "90-99yrs"))) %>% 
+  dplyr::filter(Dataset == "PsychEncode") %>%
+  ggplot(aes(x = AgeInterval, y = value, fill = Regions)) + geom_boxplot() +
+  theme_bw() +
+   theme(axis.text.x = element_text(size = 12, family = "serif", color = "black", angle = 90),
+        axis.text.y = element_text(size = 12, family = "serif", color = "black"), 
+        legend.position = "none", 
+        strip.text = element_text(size = 12,family = "serif")) + 
+  facet_grid(variable~Dataset, scales = "free") +ylab("Estimated Proportion") + xlab("") +
+  scale_fill_manual(values = c("Cortex" = "#E85571", 
+                                 "Subcortex" = "#838DE0", 
+                                 "Cerebellum" = "#FFD256",
+                                 "Spinal Cord" = "#C6D14A", 
+                                 "Forebrain" = "#F6B19D", #
+                                 "Midbrain" = "#AC93AD",
+                                 "Hindbrain" = "#6E8B8E",
+                                 "Brain" = "#FFA6B7", 
+                                 "Forebrain and midbrain" = "#9D696C"
+                                ))
+#dev.off()
+```
+
+
+```{r fig.height=12, fig.width=20}
+
+# pdf(file = here::here("output/Thesis_plots/Deconvolution/cbs-estimates-HDBR.pdf"), height =12, 
+#     width = 11)
+ rbind(pe.cbs,
+      bspan.csb,
+      bseq.cbs, 
+      gtex.cbs, 
+      hdbr.cbs) %>% 
+  as.data.frame %>%
+  melt() %>%
+  drop_na(Regions) %>%
+ # dplyr::filter(Dataset != "HDBR") %>%
+  mutate(variable= factor(variable, levels = c("Neurons","Astrocytes", 
+                                               "Endothelia", "Oligodendrocytes",
+                                               "Microglia"
+                                              
+                                              )),
+        Regions = factor(Regions, 
+                         levels = c("Brain", "Forebrain","Hindbrain",
+                                    "Midbrain", "Chroid plexus", 
+                                    "Cortex", "Subcortex",
+                                    "Cerebellum", "Spinal Cord")),
+        AgeInterval = factor(AgeInterval, levels = c("4-7pcw", "8-9pcw",
+                                                        "10-12pcw", "13-15pcw", "16-18pcw",
+                                                        "19-24pcw", "25-38pcw", "0-5mos",
+                                                        "6-18mos", "19mos-5yrs", "6-11yrs",
+                                                        "12-19yrs", "20-29yrs", "30-39yrs",
+                                                      "40-49yrs", "50-59yrs", "60-69yrs",
+                                                      "70-79yrs", "80-89yrs", "90-99yrs"))) %>% 
+  dplyr::filter(Dataset == "HDBR") %>%
+  ggplot(aes(x = AgeInterval, y = value, fill = Regions)) + geom_boxplot() +
+  theme_bw() +
+   theme(axis.text.x = element_text(size = 12, family = "serif", color = "black", angle = 90),
+        axis.text.y = element_text(size = 12, family = "serif", color = "black"), 
+        legend.position = "none", 
+        strip.text = element_text(size = 12,family = "serif")) + 
+  facet_grid(variable~Dataset, scales = "free") +ylab("Estimated Proportion") + xlab("") +
+  scale_fill_manual(values = c("Cortex" = "#E85571", 
+                                 "Subcortex" = "#838DE0", 
+                                 "Cerebellum" = "#FFD256",
+                                 "Spinal Cord" = "#C6D14A", 
+                                 "Forebrain" = "#F6B19D", #
+                                 "Midbrain" = "#AC93AD",
+                                 "Hindbrain" = "#6E8B8E",
+                                 "Brain" = "#FFA6B7", 
+                                 "Chroid plexus" = "#9D696C"
+                                ))
+#dev.off()
+```
+
+
+```{r fig.height=12, fig.width=20}
+
+# pdf(file = here::here("output/Thesis_plots/Deconvolution/cbs-estimates-GTEx.pdf"), height =12, 
+#     width = 11)
+ rbind(pe.cbs,
+      bspan.csb,
+      bseq.cbs, 
+      gtex.cbs, 
+      hdbr.cbs) %>% 
+  as.data.frame %>%
+  melt() %>%
+  drop_na(Regions) %>%
+ # dplyr::filter(Dataset != "HDBR") %>%
+  mutate(variable= factor(variable, levels = c("Neurons","Astrocytes", 
+                                               "Endothelia", "Oligodendrocytes",
+                                               "Microglia"
+                                              
+                                              )),
+        Regions = factor(Regions, 
+                         levels = c("Brain", "Forebrain","Hindbrain",
+                                    "Midbrain", "Chroid plexus", 
+                                    "Cortex", "Subcortex",
+                                    "Cerebellum", "Spinal Cord")),
+        AgeInterval = factor(AgeInterval, levels = c("4-7pcw", "8-9pcw",
+                                                        "10-12pcw", "13-15pcw", "16-18pcw",
+                                                        "19-24pcw", "25-38pcw", "0-5mos",
+                                                        "6-18mos", "19mos-5yrs", "6-11yrs",
+                                                        "12-19yrs", "20-29yrs", "30-39yrs",
+                                                      "40-49yrs", "50-59yrs", "60-69yrs",
+                                                      "70-79yrs", "80-89yrs", "90-99yrs"))) %>% 
+  dplyr::filter(Dataset == "GTEx") %>%
+  ggplot(aes(x = AgeInterval, y = value, fill = Regions)) + geom_boxplot() +
+  theme_bw() +
+   theme(axis.text.x = element_text(size = 12, family = "serif", color = "black", angle = 90),
+        axis.text.y = element_text(size = 12, family = "serif", color = "black"), 
+        legend.position = "none", 
+        strip.text = element_text(size = 12,family = "serif")) + 
+  facet_grid(variable~Dataset, scales = "free") +ylab("Estimated Proportion") + xlab("") +
+  scale_fill_manual(values = c("Cortex" = "#E85571", 
+                                 "Subcortex" = "#838DE0", 
+                                 "Cerebellum" = "#FFD256",
+                                 "Spinal Cord" = "#C6D14A", 
+                                 "Forebrain" = "#F6B19D", #
+                                 "Midbrain" = "#AC93AD",
+                                 "Hindbrain" = "#6E8B8E",
+                                 "Brain" = "#FFA6B7", 
+                                 "Chroid plexus" = "#9D696C"
+                                ))
+#dev.off()
+```
+
+<!-- - Across age intervals and regions  -->
+
+<!-- ```{r} -->
+<!-- bseq.cbs %>%  -->
+<!--   melt() %>% -->
+<!--   mutate(AgeInterval = factor(AgeInterval, levels = c("4-7pcw", "8-9pcw", -->
+<!--                                                         "10-12pcw", "13-15pcw", "16-18pcw", -->
+<!--                                                         "19-24pcw", "25-38pcw", "0-5mos", -->
+<!--                                                         "6-18mos", "19mos-5yrs", "6-11yrs", -->
+<!--                                                         "12-19yrs", "20-29yrs", "30-39yrs", -->
+<!--                                                       "40-49yrs", "50-59yrs", "60-69yrs", -->
+<!--                                                       "70-79yrs", "80-89yrs", "90-99yrs"))) %>% -->
+<!--   ggplot(aes(x = AgeInterval,y = value, fill = Regions)) + geom_boxplot() + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10, angle = 90), -->
+<!--         axis.text.y = element_text(size = 12),  -->
+<!--         legend.position = "none") + facet_grid(~variable)  -->
+
+<!-- ``` -->
+
+```{r}
+bspan.csb %>% 
+  melt() %>%
+  mutate(AgeInterval = factor(AgeInterval, levels = c("4-7pcw", "8-9pcw",
+                                                        "10-12pcw", "13-15pcw", "16-18pcw",
+                                                        "19-24pcw", "25-38pcw", "0-5mos",
+                                                        "6-18mos", "19mos-5yrs", "6-11yrs",
+                                                        "12-19yrs", "20-29yrs", "30-39yrs",
+                                                      "40-49yrs", "50-59yrs", "60-69yrs",
+                                                      "70-79yrs", "80-89yrs", "90-99yrs"))) %>%
+  ggplot(aes(x = AgeInterval,y = value, fill = Regions)) + geom_boxplot() +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 10, angle = 90),
+        axis.text.y = element_text(size = 12), 
+        legend.position = "none") + facet_grid(~variable) 
+
+```
+
+
+<!-- ```{r fig.height=12, fig.width=20} -->
+<!--  rbind(pe.cbs, -->
+<!--       bspan.csb, -->
+<!--       bseq.cbs,  -->
+<!--       gtex.cbs,  -->
+<!--       hdbr.cbs) %>%  -->
+<!--   as.data.frame %>% -->
+<!--   melt() %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--  # dplyr::filter(Dataset != "HDBR") %>% -->
+<!--   mutate(variable= factor(variable, levels = c("Neurons","Astrocytes",  -->
+<!--                                                "Endothelia", "Oligodendrocytes", -->
+<!--                                                "Microglia" -->
+
+<!--                                               )), -->
+<!--         Regions = factor(Regions,  -->
+<!--                          levels = c("Brain", "Forebrain","Hindbrain", -->
+<!--                                     "Midbrain", "Forebrain and midbrain",  -->
+<!--                                     "Cortex", "Subcortex", -->
+<!--                                     "Cerebellum", "Spinal Cord")), -->
+<!--         AgeInterval = factor(AgeInterval, levels = c("4-7pcw", "8-9pcw", -->
+<!--                                                         "10-12pcw", "13-15pcw", "16-18pcw", -->
+<!--                                                         "19-24pcw", "25-38pcw", "0-5mos", -->
+<!--                                                         "6-18mos", "19mos-5yrs", "6-11yrs", -->
+<!--                                                         "12-19yrs", "20-29yrs", "30-39yrs", -->
+<!--                                                       "40-49yrs", "50-59yrs", "60-69yrs", -->
+<!--                                                       "70-79yrs", "80-89yrs", "90-99yrs"))) %>%  -->
+<!--   dplyr::filter(variable == "Neurons") %>% -->
+<!--   ggplot(aes(x = AgeInterval, y = value, fill = Regions)) + geom_boxplot() + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10), -->
+<!--         axis.text.y = element_text(size = 12),  -->
+<!--         legend.position = "none") +  -->
+<!--   facet_grid(Dataset~variable, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!--   scale_fill_manual(values = c("Cortex" = "#E85571",  -->
+<!--                                  "Subcortex" = "#838DE0",  -->
+<!--                                  "Cerebellum" = "#FFD256", -->
+<!--                                  "Spinal Cord" = "#C6D14A",  -->
+<!--                                  "Forebrain" = "#F6B19D", # -->
+<!--                                  "Midbrain" = "#AC93AD", -->
+<!--                                  "Hindbrain" = "#6E8B8E", -->
+<!--                                  "Brain" = "#FFA6B7",  -->
+<!--                                  "Forebrain and midbrain" = "#9D696C" -->
+<!--                                 )) -->
+
+
+<!-- ``` -->
+
+<!-- # ```{r fig.height=12, fig.width=20} -->
+<!-- #  rbind(pe.cbs, -->
+<!-- #       bspan.csb, -->
+<!-- #       bseq.cbs,  -->
+<!-- #       gtex.cbs,  -->
+<!-- #       hdbr.cbs) %>%  -->
+<!-- #   as.data.frame %>% -->
+<!-- #   melt() %>% -->
+<!-- #   drop_na(Regions) %>% -->
+<!-- #  # dplyr::filter(Dataset != "HDBR") %>% -->
+<!-- #   mutate(variable= factor(variable, levels = c("Neurons","Astrocytes",  -->
+<!-- #                                                "Endothelia", "Oligodendrocytes", -->
+<!-- #                                                "Microglia" -->
+<!-- #                                                -->
+<!-- #                                               )), -->
+<!-- #         Regions = factor(Regions,  -->
+<!-- #                          levels = c("Brain", "Forebrain","Hindbrain", -->
+<!-- #                                     "Midbrain", "Forebrain and midbrain",  -->
+<!-- #                                     "Cortex", "Subcortex", -->
+<!-- #                                     "Cerebellum", "Spinal Cord")), -->
+<!-- #         AgeInterval = factor(AgeInterval, levels = c("4-7pcw", "8-9pcw", -->
+<!-- #                                                         "10-12pcw", "13-15pcw", "16-18pcw", -->
+<!-- #                                                         "19-24pcw", "25-38pcw", "0-5mos", -->
+<!-- #                                                         "6-18mos", "19mos-5yrs", "6-11yrs", -->
+<!-- #                                                         "12-19yrs", "20-29yrs", "30-39yrs", -->
+<!-- #                                                       "40-49yrs", "50-59yrs", "60-69yrs", -->
+<!-- #                                                       "70-79yrs", "80-89yrs", "90-99yrs"))) %>%  -->
+<!-- #   dplyr::filter(variable == "Astrocytes") %>% -->
+<!-- #   ggplot(aes(x = AgeInterval, y = value, fill = Regions)) + geom_boxplot() + -->
+<!-- #   theme_bw() + -->
+<!-- #   theme(axis.text.x = element_text(size = 10), -->
+<!-- #         axis.text.y = element_text(size = 12),  -->
+<!-- #         legend.position = "none") +  -->
+<!-- #   facet_grid(Dataset~variable, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!-- #   scale_fill_manual(values = c("Cortex" = "#E85571",  -->
+<!-- #                                  "Subcortex" = "#838DE0",  -->
+<!-- #                                  "Cerebellum" = "#FFD256", -->
+<!-- #                                  "Spinal Cord" = "#C6D14A",  -->
+<!-- #                                  "Forebrain" = "#F6B19D", # -->
+<!-- #                                  "Midbrain" = "#AC93AD", -->
+<!-- #                                  "Hindbrain" = "#6E8B8E", -->
+<!-- #                                  "Brain" = "#FFA6B7",  -->
+<!-- #                                  "Forebrain and midbrain" = "#9D696C" -->
+<!-- #                                 )) -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ```{r fig.height=12, fig.width=20} -->
+<!-- #  rbind(pe.cbs, -->
+<!-- #       bspan.csb, -->
+<!-- #       bseq.cbs,  -->
+<!-- #       gtex.cbs,  -->
+<!-- #       hdbr.cbs) %>%  -->
+<!-- #   as.data.frame %>% -->
+<!-- #   melt() %>% -->
+<!-- #   drop_na(Regions) %>% -->
+<!-- #  # dplyr::filter(Dataset != "HDBR") %>% -->
+<!-- #   mutate(variable= factor(variable, levels = c("Neurons","Astrocytes",  -->
+<!-- #                                                "Endothelia", "Oligodendrocytes", -->
+<!-- #                                                "Microglia" -->
+<!-- #                                                -->
+<!-- #                                               )), -->
+<!-- #         Regions = factor(Regions,  -->
+<!-- #                          levels = c("Brain", "Forebrain","Hindbrain", -->
+<!-- #                                     "Midbrain", "Forebrain and midbrain",  -->
+<!-- #                                     "Cortex", "Subcortex", -->
+<!-- #                                     "Cerebellum", "Spinal Cord")), -->
+<!-- #         AgeInterval = factor(AgeInterval, levels = c("4-7pcw", "8-9pcw", -->
+<!-- #                                                         "10-12pcw", "13-15pcw", "16-18pcw", -->
+<!-- #                                                         "19-24pcw", "25-38pcw", "0-5mos", -->
+<!-- #                                                         "6-18mos", "19mos-5yrs", "6-11yrs", -->
+<!-- #                                                         "12-19yrs", "20-29yrs", "30-39yrs", -->
+<!-- #                                                       "40-49yrs", "50-59yrs", "60-69yrs", -->
+<!-- #                                                       "70-79yrs", "80-89yrs", "90-99yrs"))) %>%  -->
+<!-- #   dplyr::filter(variable == "Microglia") %>% -->
+<!-- #   ggplot(aes(x = AgeInterval, y = value, fill = Regions)) + geom_boxplot() + -->
+<!-- #   theme_bw() + -->
+<!-- #   theme(axis.text.x = element_text(size = 10), -->
+<!-- #         axis.text.y = element_text(size = 12),  -->
+<!-- #         legend.position = "none") +  -->
+<!-- #   facet_grid(Dataset~variable, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!-- #   scale_fill_manual(values = c("Cortex" = "#E85571",  -->
+<!-- #                                  "Subcortex" = "#838DE0",  -->
+<!-- #                                  "Cerebellum" = "#FFD256", -->
+<!-- #                                  "Spinal Cord" = "#C6D14A",  -->
+<!-- #                                  "Forebrain" = "#F6B19D", # -->
+<!-- #                                  "Midbrain" = "#AC93AD", -->
+<!-- #                                  "Hindbrain" = "#6E8B8E", -->
+<!-- #                                  "Brain" = "#FFA6B7",  -->
+<!-- #                                  "Forebrain and midbrain" = "#9D696C" -->
+<!-- #                                 )) -->
+<!-- #  -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ```{r fig.height=12, fig.width=20} -->
+<!-- #  rbind(pe.cbs, -->
+<!-- #       bspan.csb, -->
+<!-- #       bseq.cbs,  -->
+<!-- #       gtex.cbs,  -->
+<!-- #       hdbr.cbs) %>%  -->
+<!-- #   as.data.frame %>% -->
+<!-- #   melt() %>% -->
+<!-- #   drop_na(Regions) %>% -->
+<!-- #  # dplyr::filter(Dataset != "HDBR") %>% -->
+<!-- #   mutate(variable= factor(variable, levels = c("Neurons","Astrocytes",  -->
+<!-- #                                                "Endothelia", "Oligodendrocytes", -->
+<!-- #                                                "Microglia" -->
+<!-- #                                                -->
+<!-- #                                               )), -->
+<!-- #         Regions = factor(Regions,  -->
+<!-- #                          levels = c("Brain", "Forebrain","Hindbrain", -->
+<!-- #                                     "Midbrain", "Forebrain and midbrain",  -->
+<!-- #                                     "Cortex", "Subcortex", -->
+<!-- #                                     "Cerebellum", "Spinal Cord")), -->
+<!-- #         AgeInterval = factor(AgeInterval, levels = c("4-7pcw", "8-9pcw", -->
+<!-- #                                                         "10-12pcw", "13-15pcw", "16-18pcw", -->
+<!-- #                                                         "19-24pcw", "25-38pcw", "0-5mos", -->
+<!-- #                                                         "6-18mos", "19mos-5yrs", "6-11yrs", -->
+<!-- #                                                         "12-19yrs", "20-29yrs", "30-39yrs", -->
+<!-- #                                                       "40-49yrs", "50-59yrs", "60-69yrs", -->
+<!-- #                                                       "70-79yrs", "80-89yrs", "90-99yrs"))) %>%  -->
+<!-- #   dplyr::filter(variable == "Endothelia") %>% -->
+<!-- #   ggplot(aes(x = AgeInterval, y = value, fill = Regions)) + geom_boxplot() + -->
+<!-- #   theme_bw() + -->
+<!-- #   theme(axis.text.x = element_text(size = 10), -->
+<!-- #         axis.text.y = element_text(size = 12),  -->
+<!-- #         legend.position = "none") +  -->
+<!-- #   facet_grid(Dataset~variable, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!-- #   scale_fill_manual(values = c("Cortex" = "#E85571",  -->
+<!-- #                                  "Subcortex" = "#838DE0",  -->
+<!-- #                                  "Cerebellum" = "#FFD256", -->
+<!-- #                                  "Spinal Cord" = "#C6D14A",  -->
+<!-- #                                  "Forebrain" = "#F6B19D", # -->
+<!-- #                                  "Midbrain" = "#AC93AD", -->
+<!-- #                                  "Hindbrain" = "#6E8B8E", -->
+<!-- #                                  "Brain" = "#FFA6B7",  -->
+<!-- #                                  "Forebrain and midbrain" = "#9D696C" -->
+<!-- #                                 )) -->
+<!-- #  -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ```{r fig.height=12, fig.width=20} -->
+<!-- #  rbind(pe.cbs, -->
+<!-- #       bspan.csb, -->
+<!-- #       bseq.cbs,  -->
+<!-- #       gtex.cbs,  -->
+<!-- #       hdbr.cbs) %>%  -->
+<!-- #   as.data.frame %>% -->
+<!-- #   melt() %>% -->
+<!-- #   drop_na(Regions) %>% -->
+<!-- #  # dplyr::filter(Dataset != "HDBR") %>% -->
+<!-- #   mutate(variable= factor(variable, levels = c("Neurons","Astrocytes",  -->
+<!-- #                                                "Endothelia", "Oligodendrocytes", -->
+<!-- #                                                "Microglia" -->
+<!-- #                                                -->
+<!-- #                                               )), -->
+<!-- #         Regions = factor(Regions,  -->
+<!-- #                          levels = c("Brain", "Forebrain","Hindbrain", -->
+<!-- #                                     "Midbrain", "Forebrain and midbrain",  -->
+<!-- #                                     "Cortex", "Subcortex", -->
+<!-- #                                     "Cerebellum", "Spinal Cord")), -->
+<!-- #         AgeInterval = factor(AgeInterval, levels = c("4-7pcw", "8-9pcw", -->
+<!-- #                                                         "10-12pcw", "13-15pcw", "16-18pcw", -->
+<!-- #                                                         "19-24pcw", "25-38pcw", "0-5mos", -->
+<!-- #                                                         "6-18mos", "19mos-5yrs", "6-11yrs", -->
+<!-- #                                                         "12-19yrs", "20-29yrs", "30-39yrs", -->
+<!-- #                                                       "40-49yrs", "50-59yrs", "60-69yrs", -->
+<!-- #                                                       "70-79yrs", "80-89yrs", "90-99yrs"))) %>%  -->
+<!-- #   dplyr::filter(variable == "Oligodendrocytes") %>% -->
+<!-- #   ggplot(aes(x = AgeInterval, y = value, fill = Regions)) + geom_boxplot() + -->
+<!-- #   theme_bw() + -->
+<!-- #   theme(axis.text.x = element_text(size = 10), -->
+<!-- #         axis.text.y = element_text(size = 12),  -->
+<!-- #         legend.position = "none") +  -->
+<!-- #   facet_grid(Dataset~variable, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!-- #   scale_fill_manual(values = c("Cortex" = "#E85571",  -->
+<!-- #                                  "Subcortex" = "#838DE0",  -->
+<!-- #                                  "Cerebellum" = "#FFD256", -->
+<!-- #                                  "Spinal Cord" = "#C6D14A",  -->
+<!-- #                                  "Forebrain" = "#F6B19D", # -->
+<!-- #                                  "Midbrain" = "#AC93AD", -->
+<!-- #                                  "Hindbrain" = "#6E8B8E", -->
+<!-- #                                  "Brain" = "#FFA6B7",  -->
+<!-- #                                  "Forebrain and midbrain" = "#9D696C" -->
+<!-- #                                 )) -->
+<!-- #  -->
+<!-- # ``` -->
+
+
+<!-- # ```{r} -->
+<!-- # bseq.cbs %>%  -->
+<!-- #   dplyr::select(Regions, Neurons, Astrocytes, Oligodendrocytes,Microglia, Endothelia ) %>% -->
+<!-- #   group_by(Regions) %>% dplyr::summarise(across(everything(), list(mean)) * 100) -->
+<!-- #  -->
+<!-- #  -->
+<!-- # gtex.cbs %>%  -->
+<!-- #   dplyr::select(Regions, Neurons, Astrocytes, Oligodendrocytes,Microglia, Endothelia ) %>% -->
+<!-- #   group_by(Regions) %>% dplyr::summarise(across(everything(), list(mean)) * 100) -->
+<!-- # ``` -->
+
+
+
+
+
+
+<!-- ## Impact of cell fractions on gene expression  -->
+
+<!-- ```{r} -->
+<!-- thresh <- function(x) { -->
+<!--       y <- x > 1 -->
+<!--       keep <- rowSums(y) > (ncol(y) / 10) -->
+<!--       return(x[keep,]) -->
+<!--     } -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- gtex <- thresh(e$GTEx) -->
+<!-- span <- thresh(e$BSpan) -->
+<!-- seq <- thresh(e$BSeq) -->
+<!-- pe <- thresh(e$PE) -->
+<!-- hdbr <- thresh(e$HDBR) -->
+
+<!-- ``` -->
+
+<!-- - BrainSeq -->
+
+<!-- ```{r} -->
+<!-- pc = log(seq + 0.05) %>%  -->
+<!--   t() %>%  -->
+<!--    prcomp(scale = TRUE) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!--  pc$x  %>% -->
+<!--     as.data.frame() %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   left_join(bseq.cbs) %>% -->
+<!--   left_join(md$BSeq %>%  -->
+<!--               dplyr::select(SampleID, DonorID,  -->
+<!--                             Sex, Ethnicity,  -->
+<!--                             Diagnosis, Period)) %>% -->
+<!--     dplyr::select( -->
+<!--         PC1, PC2, PC3, -->
+<!--         Neurons, -->
+<!--         Astrocytes, -->
+<!--         Oligodendrocytes, -->
+<!--          Microglia, -->
+<!--         Endothelia, -->
+<!--         Period,  -->
+<!--         Regions, -->
+<!--         DonorID,  -->
+<!--         Diagnosis -->
+
+<!--     ) %>%  -->
+<!--   drop_na(Regions) %>% -->
+<!--    mutate(Period = as.numeric(as.factor(Period)),  -->
+<!--           Regions = as.numeric(as.factor(Regions)), -->
+<!--             DonorID = as.numeric(as.factor(DonorID)),  -->
+<!--           Diagnosis = as.numeric(as.factor(Diagnosis))) %>% -->
+<!--     cor() %>%  -->
+<!--     corrplot( -->
+<!--         type = "lower",  -->
+<!--         diag = FALSE,  -->
+<!--         addCoef.col = 1,  -->
+<!--         number.cex = 0.75) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- bseq.cbs %>%  -->
+<!--   dplyr::select(SampleID, Neurons, -->
+<!--         Astrocytes, -->
+<!--         Oligodendrocytes, -->
+<!--          Microglia, -->
+<!--         Endothelia) %>% -->
+<!--   left_join(md$BSeq %>%  -->
+<!--               dplyr::select(SampleID,"Dev.Replicating", "Dev.Quiescent","Adult.Neurons", -->
+<!--                             "Adult.Astrocytes", "Adult.Oligo", -->
+<!--                             "Adult.Microglia")) %>% -->
+<!--   dplyr::select(-SampleID) %>% -->
+<!--    cor() %>%  -->
+<!--     corrplot( -->
+<!--         type = "lower",  -->
+<!--         diag = FALSE,  -->
+<!--         addCoef.col = 1,  -->
+<!--         number.cex = 0.75) -->
+
+
+<!-- ``` -->
+
+<!-- - BrainSpan -->
+
+<!-- ```{r} -->
+<!-- pc = log(span + 0.05) %>%  -->
+<!--   t() %>%  -->
+<!--    prcomp(scale = TRUE) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!--  cor.bspan =pc$x  %>% -->
+<!--     as.data.frame() %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   left_join(bspan.csb) %>% -->
+<!--   left_join(md$BSpan %>%  -->
+<!--               dplyr::select(SampleID, DonorID,  -->
+<!--                             Sex, Ethnicity,  -->
+<!--                             StructureAcronym, Period)) %>% -->
+<!--     dplyr::select( -->
+<!--         PC1, PC2, PC3, -->
+<!--         Neurons, -->
+<!--         Astrocytes, -->
+<!--         Oligodendrocytes, -->
+<!--          Microglia, -->
+<!--         Endothelia, -->
+<!--         Period,  -->
+<!--         Regions, -->
+<!--         DonorID,  -->
+<!--         StructureAcronym -->
+
+<!--     ) %>%  -->
+<!--   drop_na(Regions) %>% -->
+<!--    mutate(Period = as.numeric(as.factor(Period)),  -->
+<!--           Regions = as.numeric(as.factor(Regions)), -->
+<!--             DonorID = as.numeric(as.factor(DonorID)),  -->
+<!--           StructureAcronym = as.numeric(as.factor(StructureAcronym))) %>% -->
+<!--     cor()  -->
+<!-- cor.bspan = cor.bspan[-c(1:3),] -->
+<!-- cor.bspan = cor.bspan[,c(1:3)] -->
+<!-- cor.bspan %>% corrplot( -->
+<!--         addCoef.col = 1,  -->
+<!--         number.cex = 0.75,  -->
+<!--         method = 'color') -->
+<!-- ``` -->
+
+<!-- - GTEx -->
+
+<!-- ```{r} -->
+<!-- pc = log(gtex + 0.05) %>%  -->
+<!--   t() %>%  -->
+<!--    prcomp(scale = TRUE) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!--  cor.gtex =pc$x  %>% -->
+<!--     as.data.frame() %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   left_join(gtex.cbs) %>% -->
+<!--   left_join(md$GTEx %>%  -->
+<!--               dplyr::select(SampleID, DonorID,  -->
+<!--                             Sex, -->
+<!--                             StructureAcronym, Period, rRNA_ratio, PMI)) %>% -->
+<!--     dplyr::select( -->
+<!--         PC1, PC2, PC3, -->
+<!--         Neurons, -->
+<!--         Astrocytes, -->
+<!--         Oligodendrocytes, -->
+<!--          Microglia, -->
+<!--         Endothelia, -->
+<!--         Regions, -->
+<!--         DonorID,  -->
+<!--         StructureAcronym,  -->
+<!--         rRNA_ratio,  -->
+<!--         PMI -->
+
+<!--     ) %>%  -->
+<!--   drop_na(Regions) %>% -->
+<!--    mutate( -->
+<!--           Regions = as.numeric(as.factor(Regions)), -->
+<!--             DonorID = as.numeric(as.factor(DonorID)),  -->
+<!--           StructureAcronym = as.numeric(as.factor(StructureAcronym))) %>% -->
+<!--     cor()  -->
+
+<!-- cor.gtex = cor.gtex[-c(1:3),] -->
+<!-- cor.gtex = cor.gtex[,c(1:3)] -->
+<!-- cor.gtex %>% corrplot( -->
+<!--         addCoef.col = 1,  -->
+<!--         number.cex = 0.75,  -->
+<!--         method = 'color') -->
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+<!-- pc = log(pe + 0.05) %>%  -->
+<!--   t() %>%  -->
+<!--    prcomp(scale = TRUE) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!--  pc$x  %>% -->
+<!--     as.data.frame() %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   left_join(pe.cbs) %>% -->
+<!--   left_join(md$PE %>%  -->
+<!--               dplyr::select(SampleID, Diagnosis, AgeNumeric)) %>% -->
+<!--     dplyr::select( -->
+<!--         PC1, PC2, PC3, -->
+<!--         Neurons, -->
+<!--         Astrocytes, -->
+<!--         Oligodendrocytes, -->
+<!--          Microglia, -->
+<!--         Endothelia, -->
+<!--         Period, -->
+<!--         Diagnosis -->
+
+<!--     ) %>% -->
+<!--    mutate(Period = as.numeric(as.factor(Period)), -->
+<!--             Diagnosis = as.numeric(as.factor(Diagnosis))) %>% -->
+<!--     cor() %>%  -->
+<!--     corrplot( -->
+<!--         type = "lower",  -->
+<!--         diag = FALSE,  -->
+<!--         addCoef.col = 1,  -->
+<!--         number.cex = 0.75) -->
+<!-- ``` -->
+
+
+
+<!-- ## Export the datasets  -->
+
+
+<!-- ## GOF poster  -->
+
+<!-- ```{r} -->
+<!-- library(ggstatsplot) -->
+<!-- brainSeq_region = do.call(rbind, gof_results) %>% -->
+<!--   as.data.frame() %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   dplyr::filter(Deconvolution == "Cibersort" & Dataset == "BrainSeq") %>%  -->
+<!--   ggbetweenstats( -->
+<!--   x     = Regions, -->
+<!--   y     = r,  -->
+<!--   package = "RColorBrewer", -->
+<!--   palette = "Pastel1" -->
+<!-- ) + theme_bw() + geom_hline(yintercept = c(0.5,0.7), color = "black",linetype='dotted') + -->
+<!--    ylab("Goodness of fit (r)") + theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"), -->
+<!--         axis.text.y = element_text(size = 12, family = "serif", color = "black"),  -->
+<!--         legend.position = "none",  -->
+<!--         strip.text = element_text(size = 12,family = "serif"),  -->
+<!--         rect = element_rect(fill = "transparent")) +  -->
+<!--   scale_color_manual(values = c("Cortex" = "#E85571",  -->
+<!--                                  "Subcortex" = "#838DE0",  -->
+<!--                                  "Cerebellum" = "#FFD256", -->
+<!--                                  "Spinal Cord" = "#C6D14A",  -->
+<!--                                  "Forebrain" = "#F6B19D", # -->
+<!--                                  "Midbrain" = "#AC93AD", -->
+<!--                                  "Hindbrain" = "#6E8B8E", -->
+<!--                                  "Brain" = "#FFA6B7",  -->
+<!--                                  "Forebrain and midbrain" = "#9D696C" -->
+<!--                                 )) +  -->
+<!--   ggtitle("BrainSeq") -->
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- brainSpan_region = do.call(rbind, gof_results) %>% -->
+<!--   as.data.frame() %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   dplyr::filter(Deconvolution == "Cibersort" & Dataset == "BrainSpan") %>%  -->
+<!--   ggbetweenstats( -->
+<!--   x     = Regions, -->
+<!--   y     = r,  -->
+<!--   package = "RColorBrewer", -->
+<!--   palette = "Pastel1" -->
+<!-- ) + theme_bw() + geom_hline(yintercept = c(0.5,0.7), color = "black",linetype='dotted') + -->
+<!--    ylab("Goodness of fit (r)") + theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"), -->
+<!--         axis.text.y = element_text(size = 12, family = "serif", color = "black"),  -->
+<!--         legend.position = "none",  -->
+<!--         strip.text = element_text(size = 12,family = "serif"),  -->
+<!--         rect = element_rect(fill = "transparent")) +  -->
+<!--   scale_color_manual(values = c("Cortex" = "#E85571",  -->
+<!--                                  "Subcortex" = "#838DE0",  -->
+<!--                                  "Cerebellum" = "#FFD256", -->
+<!--                                  "Spinal Cord" = "#C6D14A",  -->
+<!--                                  "Forebrain" = "#F6B19D", # -->
+<!--                                  "Midbrain" = "#AC93AD", -->
+<!--                                  "Hindbrain" = "#6E8B8E", -->
+<!--                                  "Brain" = "#FFA6B7",  -->
+<!--                                  "Forebrain and midbrain" = "#9D696C" -->
+<!--                                 )) +  -->
+<!--   ggtitle("BrainSpan") -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- gtex_region = do.call(rbind, gof_results) %>% -->
+<!--   as.data.frame() %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   dplyr::filter(Deconvolution == "Cibersort" & Dataset == "GTEx") %>%  -->
+<!--   ggbetweenstats( -->
+<!--   x     = Regions, -->
+<!--   y     = r,  -->
+<!--   package = "RColorBrewer", -->
+<!--   palette = "Pastel1" -->
+<!-- ) + theme_bw() + geom_hline(yintercept = c(0.5,0.7), color = "black",linetype='dotted') + -->
+<!--    ylab("Goodness of fit (r)") + theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"), -->
+<!--         axis.text.y = element_text(size = 12, family = "serif", color = "black"),  -->
+<!--         legend.position = "none",  -->
+<!--         strip.text = element_text(size = 12,family = "serif"),  -->
+<!--         rect = element_rect(fill = "transparent")) +  -->
+<!--   scale_color_manual(values = c("Cortex" = "#E85571",  -->
+<!--                                  "Subcortex" = "#838DE0",  -->
+<!--                                  "Cerebellum" = "#FFD256", -->
+<!--                                  "Spinal Cord" = "#C6D14A",  -->
+<!--                                  "Forebrain" = "#F6B19D", # -->
+<!--                                  "Midbrain" = "#AC93AD", -->
+<!--                                  "Hindbrain" = "#6E8B8E", -->
+<!--                                  "Brain" = "#FFA6B7",  -->
+<!--                                  "Forebrain and midbrain" = "#9D696C" -->
+<!--                                 )) +  -->
+<!--   ggtitle("GTEx") -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- hdbr_region = do.call(rbind, gof_results) %>% -->
+<!--   as.data.frame() %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   dplyr::filter(Deconvolution == "Cibersort" & Dataset == "HDBR") %>%  -->
+<!--   ggbetweenstats( -->
+<!--   x     = Regions, -->
+<!--   y     = r,  -->
+<!--   package = "RColorBrewer", -->
+<!--   palette = "Pastel1" -->
+<!-- ) + theme_bw() + geom_hline(yintercept = c(0.5,0.7), color = "black",linetype='dotted') + -->
+<!--    ylab("Goodness of fit (r)") + theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"), -->
+<!--         axis.text.y = element_text(size = 12, family = "serif", color = "black"),  -->
+<!--         legend.position = "none",  -->
+<!--         strip.text = element_text(size = 12,family = "serif"),  -->
+<!--         rect = element_rect(fill = "transparent")) +  -->
+<!--   scale_color_manual(values = c("Cortex" = "#E85571",  -->
+<!--                                  "Subcortex" = "#838DE0",  -->
+<!--                                  "Cerebellum" = "#FFD256", -->
+<!--                                  "Spinal Cord" = "#C6D14A",  -->
+<!--                                  "Forebrain" = "#F6B19D", # -->
+<!--                                  "Midbrain" = "#AC93AD", -->
+<!--                                  "Hindbrain" = "#6E8B8E", -->
+<!--                                  "Brain" = "#FFA6B7",  -->
+<!--                                  "Chroid plexus" = "#9D696C" -->
+<!--                                 )) +  -->
+<!--   ggtitle("HDBR") -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- pe_region = do.call(rbind, gof_results) %>% -->
+<!--   as.data.frame() %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   dplyr::filter(Deconvolution == "Cibersort" & Dataset == "PsychEncode") %>%  -->
+<!--   ggbetweenstats( -->
+<!--   x     = Regions, -->
+<!--   y     = r,  -->
+<!--   package = "RColorBrewer", -->
+<!--   palette = "Pastel1" -->
+<!-- ) + theme_bw() + geom_hline(yintercept = c(0.5,0.7), color = "black",linetype='dotted') + -->
+<!--    ylab("Goodness of fit (r)") + theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"), -->
+<!--         axis.text.y = element_text(size = 12, family = "serif", color = "black"),  -->
+<!--         legend.position = "none",  -->
+<!--         strip.text = element_text(size = 12,family = "serif"),  -->
+<!--         rect = element_rect(fill = "transparent")) +  -->
+<!--   scale_color_manual(values = c("Cortex" = "#E85571",  -->
+<!--                                  "Subcortex" = "#838DE0",  -->
+<!--                                  "Cerebellum" = "#FFD256", -->
+<!--                                  "Spinal Cord" = "#C6D14A",  -->
+<!--                                  "Forebrain" = "#F6B19D", # -->
+<!--                                  "Midbrain" = "#AC93AD", -->
+<!--                                  "Hindbrain" = "#6E8B8E", -->
+<!--                                  "Brain" = "#FFA6B7",  -->
+<!--                                  "Chroid plexus" = "#9D696C" -->
+<!--                                 )) +  -->
+<!--   ggtitle("PE") -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- ggsave(brainSpan_region, filename = "/home/neuro/Documents/Brain_integrative_transcriptome/BITHub-preprocessing/output/Poster_plots/Brainspan-deconvolution-region.svg", height = 7, width = 8, units = "in") -->
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- ggsave(brainSeq_region, filename = "/home/neuro/Documents/Brain_integrative_transcriptome/BITHub-preprocessing/output/Poster_plots/Brainseq-deconvolution-region.svg", height = 7, width = 8, units = "in") -->
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- ggsave(gtex_region, filename = "/home/neuro/Documents/Brain_integrative_transcriptome/BITHub-preprocessing/output/Poster_plots/GTEx-deconvolution-region.svg", height = 7, width = 8, units = "in") -->
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- ggsave(hdbr_region, filename = "/home/neuro/Documents/Brain_integrative_transcriptome/BITHub-preprocessing/output/Poster_plots/HDBR-deconvolution-region.svg", height = 7, width = 8, units = "in") -->
+
+<!-- ``` -->
+<!-- ```{r} -->
+<!-- ggsave(pe_region, filename = "/home/neuro/Documents/Brain_integrative_transcriptome/BITHub-preprocessing/output/Poster_plots/PE-deconvolution-region.svg", height = 7, width = 8, units = "in") -->
+
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- library(ggstatsplot) -->
+<!-- brainSeq_period = do.call(rbind, gof_results) %>% -->
+<!--   as.data.frame() %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   dplyr::filter(Deconvolution == "Cibersort" & Dataset == "BrainSeq") %>%  -->
+<!--   mutate(Period = factor(Period, levels = c("Prenatal", "Postnatal"))) %>% -->
+<!--   ggbetweenstats( -->
+<!--   x     = Period, -->
+<!--   y     = r,  -->
+<!--   package = "RColorBrewer", -->
+<!--   palette = "Pastel1" -->
+<!-- ) + theme_bw() + geom_hline(yintercept = c(0.5,0.7), color = "black",linetype='dotted') + -->
+<!--    ylab("Goodness of fit (r)") + theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"), -->
+<!--         axis.text.y = element_text(size = 12, family = "serif", color = "black"),  -->
+<!--         legend.position = "none",  -->
+<!--         strip.text = element_text(size = 12,family = "serif"),  -->
+<!--         rect = element_rect(fill = "transparent")) +  -->
+<!-- scale_color_manual(values = c("Prenatal" = "#FD84B8",  -->
+<!--                                                 "Postnatal" = "#3A53A4")) +  -->
+<!--   ggtitle("BrainSeq") -->
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- brainSpan_period = do.call(rbind, gof_results) %>% -->
+<!--   as.data.frame() %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   dplyr::filter(Deconvolution == "Cibersort" & Dataset == "BrainSpan") %>%  -->
+<!--     mutate(Period = factor(Period, levels = c("Prenatal", "Postnatal"))) %>% -->
+<!--   ggbetweenstats( -->
+<!--   x     = Period, -->
+<!--   y     = r,  -->
+<!--   package = "RColorBrewer", -->
+<!--   palette = "Pastel1" -->
+<!-- ) + theme_bw() + geom_hline(yintercept = c(0.5,0.7), color = "black",linetype='dotted') + -->
+<!--    ylab("Goodness of fit (r)") + theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"), -->
+<!--         axis.text.y = element_text(size = 12, family = "serif", color = "black"),  -->
+<!--         legend.position = "none",  -->
+<!--         strip.text = element_text(size = 12,family = "serif"),  -->
+<!--         rect = element_rect(fill = "transparent")) +  -->
+<!-- scale_color_manual(values = c("Prenatal" = "#FD84B8",  -->
+<!--                                                 "Postnatal" = "#3A53A4")) +  -->
+<!--   ggtitle("BrainSpan") -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- gtex_period = do.call(rbind, gof_results) %>% -->
+<!--   as.data.frame() %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   dplyr::filter(Deconvolution == "Cibersort" & Dataset == "GTEx") %>%  -->
+<!--   ggbetweenstats( -->
+<!--   x     = Period, -->
+<!--   y     = r,  -->
+<!--   package = "RColorBrewer", -->
+<!--   palette = "Pastel1" -->
+<!-- ) + theme_bw() + geom_hline(yintercept = c(0.5,0.7), color = "black",linetype='dotted') + -->
+<!--    ylab("Goodness of fit (r)") + theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"), -->
+<!--         axis.text.y = element_text(size = 12, family = "serif", color = "black"),  -->
+<!--         legend.position = "none",  -->
+<!--         strip.text = element_text(size = 12,family = "serif"),  -->
+<!--         rect = element_rect(fill = "transparent")) +  -->
+<!-- scale_color_manual(values = c("Prenatal" = "#FD84B8",  -->
+<!--                                                 "Postnatal" = "#3A53A4")) +  -->
+<!--   ggtitle("GTEx") -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- hdbr_period = do.call(rbind, gof_results) %>% -->
+<!--   as.data.frame() %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   dplyr::filter(Deconvolution == "Cibersort" & Dataset == "HDBR") %>%  -->
+<!--   ggbetweenstats( -->
+<!--   x     = Period, -->
+<!--   y     = r,  -->
+<!--   package = "RColorBrewer", -->
+<!--   palette = "Pastel1" -->
+<!-- ) + theme_bw() + geom_hline(yintercept = c(0.5,0.7), color = "black",linetype='dotted') + -->
+<!--    ylab("Goodness of fit (r)") + theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"), -->
+<!--         axis.text.y = element_text(size = 12, family = "serif", color = "black"),  -->
+<!--         legend.position = "none",  -->
+<!--         strip.text = element_text(size = 12,family = "serif"),  -->
+<!--         rect = element_rect(fill = "transparent")) +  -->
+<!--   scale_color_manual(values = c("Prenatal" = "#FD84B8",  -->
+<!--                                                 "Postnatal" = "#3A53A4")) +  -->
+<!--   ggtitle("HDBR") -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- pe_period = do.call(rbind, gof_results) %>% -->
+<!--   as.data.frame() %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   dplyr::filter(Deconvolution == "Cibersort" & Dataset == "PsychEncode") %>%  -->
+<!--     mutate(Period = factor(Period, levels = c("Prenatal", "Postnatal"))) %>% -->
+<!--   ggbetweenstats( -->
+<!--   x     = Period, -->
+<!--   y     = r,  -->
+<!--   package = "RColorBrewer", -->
+<!--   palette = "Pastel1" -->
+<!-- ) + theme_bw() + geom_hline(yintercept = c(0.5,0.7), color = "black",linetype='dotted') + -->
+<!--    ylab("Goodness of fit (r)") + theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"), -->
+<!--         axis.text.y = element_text(size = 12, family = "serif", color = "black"),  -->
+<!--         legend.position = "none",  -->
+<!--         strip.text = element_text(size = 12,family = "serif"),  -->
+<!--         rect = element_rect(fill = "transparent")) +  -->
+<!--   scale_color_manual(values = c("Prenatal" = "#FD84B8",  -->
+<!--                                                 "Postnatal" = "#3A53A4"))  +  -->
+<!--   ggtitle("PE") -->
+<!-- ``` -->
+
+
+
+## Export 
+
+### Datasets 
+
+```{r}
+#write.csv(as.data.frame(decon_results$BSpan_CIBERSORT), file = "/home/neuro/Documents/BrainData/Bulk/BrainSpan/Formatted/BrainSpan-decon.csv" )
+#write.csv(as.data.frame(decon_results$BSeq_CIBERSORT), file = "/home/neuro/Documents/BrainData/Bulk/Brainseq/Formatted/BrainSeq-decon.csv" )
+#write.csv(as.data.frame(decon_results$GTEx_CIBERSORT), file = "/home/neuro/Documents/BrainData/Bulk/GTEx/Formatted/GTEx-decon.csv")
+#write.csv(as.data.frame(decon_results$HDBR_CIBERSORT), file = "/home/neuro/Documents/BrainData/Bulk/HDBR/Formatted/HDBR-decon.csv")
+#write.csv(as.data.frame(decon_results$PE_CIBERSORT), file = "/home/neuro/Documents/BrainData/Bulk/PsychEncode/Formatted/PsychEncode-decon.csv")
+```
+
+### Figures 
+```{r}
+# ggsave(plot = cbs_period, 
+#       filename = here::here("output/Thesis_plots/Deconvolution/GoF-period.svg"), 
+#       units = "in", 
+#       width = 6.48, 
+#       height = 12)
+# 
+# ggsave(plot = cbs_regions, 
+#       filename = here::here("output/Thesis_plots/Deconvolution/GoF-region.svg"), 
+#       units = "in", 
+#       width = 6.48, 
+#       height = 12)
+```
+
+<!-- # ```{r} -->
+<!-- # ggsave(brainSpan_period, filename = "/home/neuro/Documents/Brain_integrative_transcriptome/BITHub-preprocessing/output/Poster_plots/Brainspan-deconvolution-period.svg", height = 7, width = 8, units = "in") -->
+<!-- #  -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ```{r} -->
+<!-- # ggsave(brainSeq_period, filename = "/home/neuro/Documents/Brain_integrative_transcriptome/BITHub-preprocessing/output/Poster_plots/Brainseq-deconvolution-period.svg", height = 7, width = 8, units = "in") -->
+<!-- #  -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ```{r} -->
+<!-- # ggsave(gtex_period, filename = "/home/neuro/Documents/Brain_integrative_transcriptome/BITHub-preprocessing/output/Poster_plots/GTEx-deconvolution-period.svg", height = 7, width = 8, units = "in") -->
+<!-- #  -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ```{r} -->
+<!-- # ggsave(hdbr_period, filename = "/home/neuro/Documents/Brain_integrative_transcriptome/BITHub-preprocessing/output/Poster_plots/HDBR-deconvolution-period.svg", height = 7, width = 8, units = "in") -->
+<!-- #  -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ```{r} -->
+<!-- # ggsave(pe_period, filename = "/home/neuro/Documents/Brain_integrative_transcriptome/BITHub-preprocessing/output/Poster_plots/PE-deconvolution-period.svg", height = 7, width = 8, units = "in") -->
+<!-- #  -->
+<!-- # ``` -->
+
+
+<!-- ## Goodness-of-fit -->
+
+
+```{r}
+
+
+
+## BrainSpan
+# gof_results$BSpan_DRS = write.gof(e$BSpan, decon_results$BSpan_DRS, sigsBrain$MB) %>%
+#   as.data.frame() %>%
+#   mutate(Dataset= "BrainSpan",
+#          Deconvolution = "DeconRNASeq") %>%
+#   rownames_to_column("SampleID") %>%
+#   mutate(SampleID = gsub("X", "", SampleID)) %>%
+#   mutate(SampleID = gsub("\\.", "-", SampleID)) %>%
+#   left_join(md$BSpan %>%
+#               dplyr::select(SampleID, Regions, Period), by = "SampleID")
+
+# gof_results$BSpan_DTG = write.gof(e$BSpan, decon_results$BSpan_DTG, sigsBrain$MB) %>%
+#   as.data.frame() %>% mutate(Dataset= "BrainSpan",
+#                              Deconvolution = "Dtangle")  %>%
+#   rownames_to_column("SampleID") %>%
+#    mutate(SampleID = gsub("X", "", SampleID)) %>%
+#   mutate(SampleID = gsub("\\.", "-", SampleID)) %>%
+#   left_join(md$BSpan %>%
+#               dplyr::select(SampleID, Regions, Period), by = "SampleID")
+
+
+
+
+```
+
+
+<!-- # ```{r} -->
+<!-- # ## BrainSeq -->
+<!-- # gof_results$BSeq_DRS = write.gof(e$BSeq, decon_results$BSeq_DRS, sigsBrain$MB) %>% -->
+<!-- #   as.data.frame() %>% mutate(Dataset= "BrainSeq", -->
+<!-- #                              Deconvolution = "DeconRNASeq") %>% -->
+<!-- #   rownames_to_column("SampleID") %>% -->
+<!-- #   left_join(md$BSeq %>% -->
+<!-- #               dplyr::select(SampleID, Regions, Period), by = "SampleID") -->
+<!-- #  -->
+<!-- # gof_results$BSeq_DTG = write.gof(e$BSeq, decon_results$BSeq_DTG, sigsBrain$MB) %>% -->
+<!-- #   as.data.frame() %>% mutate(Dataset= "BrainSeq", -->
+<!-- #                              Deconvolution = "Dtangle") %>% -->
+<!-- #   rownames_to_column("SampleID")  %>% -->
+<!-- #   left_join(md$BSeq %>% -->
+<!-- #               dplyr::select(SampleID, Regions, Period), by = "SampleID") -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ## GTEx -->
+<!-- # gof_results$GTEx_DRS = write.gof(e$GTEx, decon_results$GTEx_DRS, sigsBrain$MB) %>% -->
+<!-- #   as.data.frame() %>% mutate(Dataset= "GTEx", -->
+<!-- #                              Deconvolution = "DeconRNASeq")%>% -->
+<!-- #   rownames_to_column("SampleID") %>% -->
+<!-- #   mutate(SampleID = gsub("\\.", "-", SampleID))  %>% -->
+<!-- #   left_join(md$GTEx %>% -->
+<!-- #               dplyr::select(SampleID, Regions, Period), by = "SampleID") -->
+<!-- #  -->
+<!-- # gof_results$GTEx_DTG = write.gof(e$GTEx, decon_results$GTEx_DTG, sigsBrain$MB) %>% -->
+<!-- #   as.data.frame() %>% mutate(Dataset= "GTEx", -->
+<!-- #                              Deconvolution = "Dtangle")%>% -->
+<!-- #   rownames_to_column("SampleID") %>% -->
+<!-- #   mutate(SampleID = gsub("\\.", "-", SampleID)) %>% -->
+<!-- #   left_join(md$GTEx %>% -->
+<!-- #               dplyr::select(SampleID, Regions, Period), by = "SampleID") -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ## PsychEncode -->
+<!-- # gof_results$PE_DRS = write.gof(e$PE, decon_results$PE_DRS, sigsBrain$MB) %>% -->
+<!-- #   as.data.frame() %>% mutate(Dataset= "PsychEncode", -->
+<!-- #                              Deconvolution = "DeconRNASeq") %>% -->
+<!-- #   rownames_to_column("SampleID") %>% -->
+<!-- #   mutate(SampleID = gsub("X", "", SampleID), -->
+<!-- #          SampleID = gsub("\\.", "-", SampleID)) %>% -->
+<!-- #   left_join(md$PE %>% -->
+<!-- #               dplyr::select(SampleID, Regions, Period), by = "SampleID") -->
+<!-- #  -->
+<!-- # gof_results$PE_DTG = write.gof(e$PE, decon_results$PE_DTG, sigsBrain$MB) %>% -->
+<!-- #   as.data.frame() %>% mutate(Dataset= "PsychEncode", -->
+<!-- #                              Deconvolution = "Dtangle") %>% -->
+<!-- #   rownames_to_column("SampleID") %>% -->
+<!-- #   mutate(SampleID = gsub("X", "", SampleID), -->
+<!-- #          SampleID = gsub("\\.", "-", SampleID)) %>% -->
+<!-- #   left_join(md$PE %>% -->
+<!-- #               dplyr::select(SampleID, Regions, Period), by = "SampleID") -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ## HDBR -->
+<!-- # gof_results$HDBR_DRS = write.gof(e$HDBR, decon_results$HDBR_DRS, sigsBrain$MB) %>% -->
+<!-- #   as.data.frame() %>% mutate(Dataset= "HDBR", -->
+<!-- #                              Deconvolution = "DeconRNASeq") %>% -->
+<!-- #   rownames_to_column("SampleID")  %>% -->
+<!-- #   left_join(md$HDBR %>% -->
+<!-- #               dplyr::select(SampleID, Regions, Period), by = "SampleID") -->
+<!-- #  -->
+<!-- # gof_results$HDBR_DTG = write.gof(e$HDBR, decon_results$HDBR_DTG, sigsBrain$MB) %>% -->
+<!-- #   as.data.frame() %>% mutate(Dataset= "HDBR", -->
+<!-- #                              Deconvolution = "Dtangle") %>% -->
+<!-- #   rownames_to_column("SampleID")  %>% -->
+<!-- #   left_join(md$HDBR %>% -->
+<!-- #               dplyr::select(SampleID, Regions, Period), by = "SampleID") -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ``` -->
+
+
+<!-- # ```{r} -->
+<!-- # cbs_regions = do.call(rbind, gof_results) %>% -->
+<!-- #   as.data.frame() %>% -->
+<!-- #   drop_na(Regions) %>% -->
+<!-- #   dplyr::filter(Deconvolution == "Cibersort") %>%  -->
+<!-- #     ggplot(aes(Regions, r, fill = Regions)) + geom_violin(width=1, alpha = 0.85) + -->
+<!-- #       geom_boxplot(width=0.1, color="white") + -->
+<!-- #       theme_bw() +   scale_fill_manual(values = c("Cortex" = "#E85571",  -->
+<!-- #                                  "Subcortex" = "#838DE0",  -->
+<!-- #                                  "Cerebellum" = "#FFD256", -->
+<!-- #                                  "Spinal Cord" = "#C6D14A",  -->
+<!-- #                                  "Forebrain" = "#F6B19D", # -->
+<!-- #                                  "Midbrain" = "#AC93AD", -->
+<!-- #                                  "Hindbrain" = "#6E8B8E", -->
+<!-- #                                  "Brain" = "#FFA6B7",  -->
+<!-- #                                  "Forebrain and midbrain" = "#9D696C" -->
+<!-- #                                 )) +  -->
+<!-- #   geom_hline(yintercept = c(0.5,0.7), color = "grey",linetype='dotted') +  -->
+<!-- #   ylab("Goodness of fit (r)") + facet_wrap(~Dataset, scales = "free",  nrow = 6) +  -->
+<!-- #   theme(legend.position = "none",  -->
+<!-- #         axis.text = element_text(size =10), -->
+<!-- #         axis.title  = element_text(size =12)) -->
+<!-- #  -->
+<!-- #  -->
+<!-- # cbs_period =do.call(rbind, gof_results) %>% -->
+<!-- #   as.data.frame() %>% -->
+<!-- #   drop_na(Regions) %>% -->
+<!-- #   mutate(Period = factor(Period, levels=c("Prenatal", "Postnatal"))) %>%  -->
+<!-- #   dplyr::filter(Deconvolution == "Cibersort") %>%  -->
+<!-- #     ggplot(aes(Period, r, fill = Period)) + geom_violin(width=1, alpha = 0.85) + -->
+<!-- #       geom_boxplot(width=0.1, color="white") + -->
+<!-- #       theme_bw() +  scale_fill_manual(values = c("Prenatal" = "#FD84B8",  -->
+<!-- #                                                 "Postnatal" = "#54B4E6")) +  -->
+<!-- #   geom_hline(yintercept = c(0.5,0.7), color = "black",linetype='dotted') +  -->
+<!-- #   ylab("Goodness of fit (r)") + facet_wrap(~Dataset, scales = "free",  nrow = 6) + -->
+<!-- #   theme(legend.position = "none",  -->
+<!-- #         axis.text = element_text(size =10), -->
+<!-- #         axis.title  = element_text(size =12))  -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- # grid.arrange(cbs_regions, cbs_period, ncol=2) -->
+<!-- # ``` -->
+
+
+
+
+
+
+
+<!-- - Overall -->
+
+<!-- ```{r} -->
+<!-- overall = do.call(rbind, gof_results) %>% -->
+<!--   ggplot(aes(y = r, x = Deconvolution, fill = Deconvolution)) + -->
+<!--   geom_violin( alpha = 0.75) + -->
+<!--       geom_boxplot(width=0.1)+ facet_grid(~Dataset) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_blank(), -->
+<!--         legend.position = "top", -->
+<!--         axis.title.x = element_blank(), -->
+<!--         axis.text.y = element_text(size = 12), -->
+<!--         axis.title.y = element_text(size = 15), -->
+<!--         panel.grid.major = element_blank(), -->
+<!--         panel.grid.minor = element_blank()) + -->
+<!--   geom_hline(yintercept = c(0.5,0.7), color = "black",linetype='dotted') + -->
+<!--   ylab("Goodness of fit (r)") + -->
+<!--   scale_fill_manual(values = -->
+<!--                       c("Cibersort" = "#fdaf91", -->
+<!--                         "DeconRNASeq" = "#ad002b", -->
+<!--                         "Dtangle" = "#925e9f")) -->
+
+<!-- overall -->
+<!-- ggsave(plot = overall, -->
+<!--        filename = here::here("output/Thesis_plots/Deconvolution/GoF-overall.svg"), -->
+<!--        height = 4, -->
+<!--        width = 7.31, -->
+<!--        units = "in") -->
+<!-- ``` -->
+
+
+
+<!-- - Across developmental periods -->
+<!-- ```{r} -->
+<!-- period_gof = do.call(rbind, gof_results) %>% -->
+<!--   drop_na(Period) %>% -->
+<!--   mutate(Period = factor(Period, levels = c("Prenatal", "Postnatal"))) %>% -->
+<!--   ggplot(aes(y = r, x = Deconvolution, fill = Deconvolution)) + -->
+<!--   geom_violin( alpha = 0.75) + -->
+<!--       geom_boxplot(width=0.1)+ facet_grid(Dataset~Period) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_blank(), -->
+<!--         legend.position = "top", -->
+<!--         axis.title.x = element_blank(), -->
+<!--         axis.text.y = element_text(size = 12), -->
+<!--         axis.title.y = element_text(size = 15), -->
+<!--         panel.grid.major = element_blank(), -->
+<!--         panel.grid.minor = element_blank()) + -->
+<!--   geom_hline(yintercept = c(0.5,0.7), color = "black",linetype='dotted') + -->
+<!--   ylab("Goodness of fit (r)") + -->
+<!--   scale_fill_manual(values = -->
+<!--                       c("Cibersort" = "#fdaf91", -->
+<!--                         "DeconRNASeq" = "#ad002b", -->
+<!--                         "Dtangle" = "#925e9f")) -->
+
+<!-- period_gof -->
+
+<!-- ggsave(plot = period_gof, -->
+<!--        filename = here::here("output/Thesis_plots/Deconvolution/GoF-period.svg"), -->
+<!--        height = 9.30, -->
+<!--        width = 8.15, -->
+<!--        units = "in") -->
+<!-- ``` -->
+
+<!-- - Across regions -->
+
+<!-- ```{r} -->
+
+<!-- dodge <- position_dodge(width = 0.8) -->
+<!-- regions = do.call(rbind, gof_results) %>% -->
+<!--   drop_na(Period) %>% -->
+<!--   ggplot(aes(y = r, x = Deconvolution, fill = Regions)) + -->
+<!--   geom_boxplot() + -->
+<!--  # -->
+<!--   facet_grid(Dataset~Deconvolution, scales = "free_x") + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_blank(), -->
+<!--         legend.position = "top", -->
+<!--         axis.title.x = element_blank(), -->
+<!--         axis.text.y = element_text(size = 12), -->
+<!--         axis.title.y = element_text(size = 15), -->
+<!--         panel.grid.major = element_blank(), -->
+<!--         panel.grid.minor = element_blank()) + -->
+<!--   geom_hline(yintercept = c(0.5,0.7), color = "black",linetype='dotted') + -->
+<!--   ylab("Goodness of fit (r)") + -->
+<!--     scale_fill_manual(values = c("Cortex" = "#E85571", -->
+<!--                                  "Subcortex" = "#838DE0", -->
+<!--                                  "Cerebellum" = "#FFD256", -->
+<!--                                  "Spinal Cord" = "#C6D14A", -->
+<!--                                  "Forebrain" = "#F6B19D", # -->
+<!--                                  "Midbrain" = "#AC93AD", -->
+<!--                                  "Hindbrain" = "#6E8B8E", -->
+<!--                                  "Brain" = "#FFA6B7", -->
+<!--                                  "Forebrain and midbrain" = "#9D696C" -->
+<!--                                 )) -->
+
+
+<!-- ggsave(plot = regions, -->
+<!--        filename = here::here("output/Thesis_plots/Deconvolution/GoF-regions.svg"), -->
+<!--        height = 9.30, -->
+<!--        width = 7.31, -->
+<!--        units = "in") -->
+<!-- ``` -->
+
+
+<!-- ## Proportion estimation -->
+
+<!-- - BrainSeq -->
+
+<!-- ```{r} -->
+<!-- decon_bseq =decon_results$BSeq_CIBERSORT %>% -->
+<!--   as.data.frame %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   dplyr::select(SampleID, Neurons, Astrocytes, -->
+<!--                 Oligodendrocytes, Microglia, Endothelia) %>% -->
+<!--   melt() %>% -->
+<!--   left_join(md$BSeq) %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", -->
+<!--                                               "Oligodendrocytes", -->
+<!--                                               "Astrocytes", -->
+<!--                                               "Neurons")), -->
+<!--          Regions = factor(Regions, levels = c("Cortex", "Subcortex", -->
+<!--                                               "Cerebellum", "Spinal Cord") )) %>% -->
+<!--   ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() + -->
+<!--   #scale_fill_manual(values = c("Cortex" = "#E85772", -->
+<!--    #                                          "Subcortex" = "#878DC5", -->
+<!--     #                                        "Cerebellum" = "#FFD357", -->
+<!--      #                                        "Spinal Cord" = "#C6D14A")) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10), -->
+<!--         axis.text.y = element_text(size = 10), -->
+<!--         legend.position = "none") + coord_flip() + -->
+<!--   facet_grid(~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!--   scale_fill_manual(values = c("Neurons" = "#D94A70", -->
+<!--                                "Astrocytes" = "#5590CC", -->
+<!--                                "Oligodendrocytes" = "#AF9DCB", -->
+<!--                                "Microglia" = "#69C9CF", -->
+<!--                                "Endothelia" = "#FAE47B")) -->
+
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- decon_results$BSeq_DRS %>% -->
+<!--   as.data.frame %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   dplyr::select(SampleID, Neurons, Astrocytes, -->
+<!--                 Oligodendrocytes, Microglia, Endothelia) %>% -->
+<!--   melt() %>% -->
+<!--   left_join(md$BSeq) %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", -->
+<!--                                               "Oligodendrocytes", -->
+<!--                                               "Astrocytes", -->
+<!--                                               "Neurons")), -->
+<!--          Regions = factor(Regions, levels = c("Cortex", "Subcortex", -->
+<!--                                               "Cerebellum", "Spinal Cord") )) %>% -->
+<!--   ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() + -->
+<!--   #scale_fill_manual(values = c("Cortex" = "#E85772", -->
+<!--    #                                          "Subcortex" = "#878DC5", -->
+<!--     #                                        "Cerebellum" = "#FFD357", -->
+<!--      #                                        "Spinal Cord" = "#C6D14A")) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10), -->
+<!--         axis.text.y = element_text(size = 10), -->
+<!--         legend.position = "none") + coord_flip() + -->
+<!--   facet_grid(~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!--   scale_fill_manual(values = c("Neurons" = "#D94A70", -->
+<!--                                "Astrocytes" = "#5590CC", -->
+<!--                                "Oligodendrocytes" = "#AF9DCB", -->
+<!--                                "Microglia" = "#69C9CF", -->
+<!--                                "Endothelia" = "#FAE47B")) -->
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- decon_results$BSeq_DTG %>% -->
+<!--   as.data.frame %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   dplyr::select(SampleID, Neurons, Astrocytes, -->
+<!--                 Oligodendrocytes, Microglia, Endothelia) %>% -->
+<!--   melt() %>% -->
+<!--   left_join(md$BSeq) %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", -->
+<!--                                               "Oligodendrocytes", -->
+<!--                                               "Astrocytes", -->
+<!--                                               "Neurons")), -->
+<!--          Regions = factor(Regions, levels = c("Cortex", "Subcortex", -->
+<!--                                               "Cerebellum", "Spinal Cord") )) %>% -->
+<!--   ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() + -->
+<!--   #scale_fill_manual(values = c("Cortex" = "#E85772", -->
+<!--    #                                          "Subcortex" = "#878DC5", -->
+<!--     #                                        "Cerebellum" = "#FFD357", -->
+<!--      #                                        "Spinal Cord" = "#C6D14A")) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10), -->
+<!--         axis.text.y = element_text(size = 10), -->
+<!--         legend.position = "none") + coord_flip() + -->
+<!--   facet_grid(~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!--   scale_fill_manual(values = c("Neurons" = "#D94A70", -->
+<!--                                "Astrocytes" = "#5590CC", -->
+<!--                                "Oligodendrocytes" = "#AF9DCB", -->
+<!--                                "Microglia" = "#69C9CF", -->
+<!--                                "Endothelia" = "#FAE47B")) -->
+
+<!-- ``` -->
+
+<!-- - BrainSpan -->
+
+<!-- ```{r} -->
+<!-- decon_bspan = decon_results$BSpan_CIBERSORT %>% -->
+<!--   as.data.frame %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   dplyr::select(SampleID, Neurons, Astrocytes, -->
+<!--                 Oligodendrocytes, Microglia, Endothelia) %>% -->
+<!--   melt() %>% -->
+<!--   left_join(md$BSpan) %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", -->
+<!--                                               "Oligodendrocytes", -->
+<!--                                               "Astrocytes", -->
+<!--                                               "Neurons")), -->
+<!--          Regions = factor(Regions, levels = c("Cortex", "Subcortex", -->
+<!--                                               "Cerebellum", "Spinal Cord") )) %>% -->
+<!--   ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() + -->
+<!--   #scale_fill_manual(values = c("Cortex" = "#E85772", -->
+<!--    #                                          "Subcortex" = "#878DC5", -->
+<!--     #                                        "Cerebellum" = "#FFD357", -->
+<!--      #                                        "Spinal Cord" = "#C6D14A")) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10), -->
+<!--         axis.text.y = element_text(size = 10), -->
+<!--         legend.position = "none") + coord_flip() + -->
+<!--   facet_grid(~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!--   scale_fill_manual(values = c("Neurons" = "#D94A70", -->
+<!--                                "Astrocytes" = "#5590CC", -->
+<!--                                "Oligodendrocytes" = "#AF9DCB", -->
+<!--                                "Microglia" = "#69C9CF", -->
+<!--                                "Endothelia" = "#FAE47B")) -->
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- decon_results$BSpan_DRS %>% -->
+<!--   as.data.frame %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   dplyr::select(SampleID, Neurons, Astrocytes, -->
+<!--                 Oligodendrocytes, Microglia, Endothelia) %>% -->
+<!--   melt() %>% -->
+<!--   left_join(md$BSpan) %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", -->
+<!--                                               "Oligodendrocytes", -->
+<!--                                               "Astrocytes", -->
+<!--                                               "Neurons")), -->
+<!--          Regions = factor(Regions, levels = c("Cortex", "Subcortex", -->
+<!--                                               "Cerebellum", "Spinal Cord") )) %>% -->
+<!--   ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() + -->
+<!--   #scale_fill_manual(values = c("Cortex" = "#E85772", -->
+<!--    #                                          "Subcortex" = "#878DC5", -->
+<!--     #                                        "Cerebellum" = "#FFD357", -->
+<!--      #                                        "Spinal Cord" = "#C6D14A")) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10), -->
+<!--         axis.text.y = element_text(size = 10), -->
+<!--         legend.position = "none") + coord_flip() + -->
+<!--   facet_grid(~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!--   scale_fill_manual(values = c("Neurons" = "#D94A70", -->
+<!--                                "Astrocytes" = "#5590CC", -->
+<!--                                "Oligodendrocytes" = "#AF9DCB", -->
+<!--                                "Microglia" = "#69C9CF", -->
+<!--                                "Endothelia" = "#FAE47B")) -->
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- decon_results$BSpan_DTG %>% -->
+<!--   as.data.frame %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   dplyr::select(SampleID, Neurons, Astrocytes, -->
+<!--                 Oligodendrocytes, Microglia, Endothelia) %>% -->
+<!--   melt() %>% -->
+<!--   left_join(md$BSpan) %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", -->
+<!--                                               "Oligodendrocytes", -->
+<!--                                               "Astrocytes", -->
+<!--                                               "Neurons")), -->
+<!--          Regions = factor(Regions, levels = c("Cortex", "Subcortex", -->
+<!--                                               "Cerebellum", "Spinal Cord") )) %>% -->
+<!--   ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() + -->
+<!--   #scale_fill_manual(values = c("Cortex" = "#E85772", -->
+<!--    #                                          "Subcortex" = "#878DC5", -->
+<!--     #                                        "Cerebellum" = "#FFD357", -->
+<!--      #                                        "Spinal Cord" = "#C6D14A")) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10), -->
+<!--         axis.text.y = element_text(size = 10), -->
+<!--         legend.position = "none") + coord_flip() + -->
+<!--   facet_grid(~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!--   scale_fill_manual(values = c("Neurons" = "#D94A70", -->
+<!--                                "Astrocytes" = "#5590CC", -->
+<!--                                "Oligodendrocytes" = "#AF9DCB", -->
+<!--                                "Microglia" = "#69C9CF", -->
+<!--                                "Endothelia" = "#FAE47B")) -->
+
+<!-- ``` -->
+
+
+<!-- - GTEx -->
+
+<!-- ```{r} -->
+<!-- decon_results$GTEx_CIBERSORT %>% -->
+<!--   as.data.frame %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   dplyr::select(SampleID, Neurons, Astrocytes, -->
+<!--                 Oligodendrocytes, Microglia, Endothelia) %>% -->
+<!--   melt() %>% -->
+<!--   left_join(md$GTEx) %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", -->
+<!--                                               "Oligodendrocytes", -->
+<!--                                               "Astrocytes", -->
+<!--                                               "Neurons")), -->
+<!--          Regions = factor(Regions, levels = c("Cortex", "Subcortex", -->
+<!--                                               "Cerebellum", "Spinal Cord") )) %>% -->
+<!--   ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() + -->
+<!--   #scale_fill_manual(values = c("Cortex" = "#E85772", -->
+<!--    #                                          "Subcortex" = "#878DC5", -->
+<!--     #                                        "Cerebellum" = "#FFD357", -->
+<!--      #                                        "Spinal Cord" = "#C6D14A")) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10), -->
+<!--         axis.text.y = element_text(size = 10), -->
+<!--         legend.position = "none") + coord_flip() + -->
+<!--   facet_grid(~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!--   scale_fill_manual(values = c("Neurons" = "#D94A70", -->
+<!--                                "Astrocytes" = "#5590CC", -->
+<!--                                "Oligodendrocytes" = "#AF9DCB", -->
+<!--                                "Microglia" = "#69C9CF", -->
+<!--                                "Endothelia" = "#FAE47B")) -->
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- decon_results$GTEx_DRS %>% -->
+<!--   as.data.frame %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   dplyr::select(SampleID, Neurons, Astrocytes, -->
+<!--                 Oligodendrocytes, Microglia, Endothelia) %>% -->
+<!--   melt() %>% -->
+<!--   left_join(md$GTEx) %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", -->
+<!--                                               "Oligodendrocytes", -->
+<!--                                               "Astrocytes", -->
+<!--                                               "Neurons")), -->
+<!--          Regions = factor(Regions, levels = c("Cortex", "Subcortex", -->
+<!--                                               "Cerebellum", "Spinal Cord") )) %>% -->
+<!--   ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() + -->
+<!--   #scale_fill_manual(values = c("Cortex" = "#E85772", -->
+<!--    #                                          "Subcortex" = "#878DC5", -->
+<!--     #                                        "Cerebellum" = "#FFD357", -->
+<!--      #                                        "Spinal Cord" = "#C6D14A")) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10), -->
+<!--         axis.text.y = element_text(size = 10), -->
+<!--         legend.position = "none") + coord_flip() + -->
+<!--   facet_grid(~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!--   scale_fill_manual(values = c("Neurons" = "#D94A70", -->
+<!--                                "Astrocytes" = "#5590CC", -->
+<!--                                "Oligodendrocytes" = "#AF9DCB", -->
+<!--                                "Microglia" = "#69C9CF", -->
+<!--                                "Endothelia" = "#FAE47B")) -->
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- decon_results$GTEx_DTG %>% -->
+<!--   as.data.frame %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   dplyr::select(SampleID, Neurons, Astrocytes, -->
+<!--                 Oligodendrocytes, Microglia, Endothelia) %>% -->
+<!--   melt() %>% -->
+<!--   left_join(md$GTEx) %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", -->
+<!--                                               "Oligodendrocytes", -->
+<!--                                               "Astrocytes", -->
+<!--                                               "Neurons")), -->
+<!--          Regions = factor(Regions, levels = c("Cortex", "Subcortex", -->
+<!--                                               "Cerebellum", "Spinal Cord") )) %>% -->
+<!--   ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() + -->
+<!--   #scale_fill_manual(values = c("Cortex" = "#E85772", -->
+<!--    #                                          "Subcortex" = "#878DC5", -->
+<!--     #                                        "Cerebellum" = "#FFD357", -->
+<!--      #                                        "Spinal Cord" = "#C6D14A")) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10), -->
+<!--         axis.text.y = element_text(size = 10), -->
+<!--         legend.position = "none") + coord_flip() + -->
+<!--   facet_grid(~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!--   scale_fill_manual(values = c("Neurons" = "#D94A70", -->
+<!--                                "Astrocytes" = "#5590CC", -->
+<!--                                "Oligodendrocytes" = "#AF9DCB", -->
+<!--                                "Microglia" = "#69C9CF", -->
+<!--                                "Endothelia" = "#FAE47B")) -->
+
+<!-- ``` -->
+
+<!-- - HDBR -->
+
+<!-- ```{r} -->
+<!-- decon_results$HDBR_CIBERSORT %>% -->
+<!--   as.data.frame %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   dplyr::select(SampleID, Neurons, Astrocytes, -->
+<!--                 Oligodendrocytes, Microglia, Endothelia) %>% -->
+<!--   melt() %>% -->
+<!--   left_join(md$HDBR) %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", -->
+<!--                                               "Oligodendrocytes", -->
+<!--                                               "Astrocytes", -->
+<!--                                               "Neurons")), -->
+<!--          Regions = factor(Regions, levels = c("Cortex", "Subcortex", -->
+<!--                                               "Cerebellum", "Spinal Cord") )) %>% -->
+<!--   ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() + -->
+<!--   #scale_fill_manual(values = c("Cortex" = "#E85772", -->
+<!--    #                                          "Subcortex" = "#878DC5", -->
+<!--     #                                        "Cerebellum" = "#FFD357", -->
+<!--      #                                        "Spinal Cord" = "#C6D14A")) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10), -->
+<!--         axis.text.y = element_text(size = 10), -->
+<!--         legend.position = "none") + coord_flip() + -->
+<!--   facet_grid(~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("")+ -->
+<!--   scale_fill_manual(values = c("Neurons" = "#D94A70", -->
+<!--                                "Astrocytes" = "#5590CC", -->
+<!--                                "Oligodendrocytes" = "#AF9DCB", -->
+<!--                                "Microglia" = "#69C9CF", -->
+<!--                                "Endothelia" = "#FAE47B")) -->
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- decon_results$HDBR_DRS %>% -->
+<!--   as.data.frame %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   dplyr::select(SampleID, Neurons, Astrocytes, -->
+<!--                 Oligodendrocytes, Microglia, Endothelia) %>% -->
+<!--   melt() %>% -->
+<!--   left_join(md$HDBR) %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", -->
+<!--                                               "Oligodendrocytes", -->
+<!--                                               "Astrocytes", -->
+<!--                                               "Neurons")), -->
+<!--          Regions = factor(Regions, levels = c("Cortex", "Subcortex", -->
+<!--                                               "Cerebellum", "Spinal Cord") )) %>% -->
+<!--   ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() + -->
+<!--   #scale_fill_manual(values = c("Cortex" = "#E85772", -->
+<!--    #                                          "Subcortex" = "#878DC5", -->
+<!--     #                                        "Cerebellum" = "#FFD357", -->
+<!--      #                                        "Spinal Cord" = "#C6D14A")) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10), -->
+<!--         axis.text.y = element_text(size = 10), -->
+<!--         legend.position = "none") + coord_flip() + -->
+<!--   facet_grid(~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("")+ -->
+<!--   scale_fill_manual(values = c("Neurons" = "#D94A70", -->
+<!--                                "Astrocytes" = "#5590CC", -->
+<!--                                "Oligodendrocytes" = "#AF9DCB", -->
+<!--                                "Microglia" = "#69C9CF", -->
+<!--                                "Endothelia" = "#FAE47B")) -->
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- decon_results$HDBR_DTG %>% -->
+<!--   as.data.frame %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   dplyr::select(SampleID, Neurons, Astrocytes, -->
+<!--                 Oligodendrocytes, Microglia, Endothelia) %>% -->
+<!--   melt() %>% -->
+<!--   left_join(md$HDBR) %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", -->
+<!--                                               "Oligodendrocytes", -->
+<!--                                               "Astrocytes", -->
+<!--                                               "Neurons")), -->
+<!--          Regions = factor(Regions, levels = c("Cortex", "Subcortex", -->
+<!--                                               "Cerebellum", "Spinal Cord") )) %>% -->
+<!--   ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() + -->
+<!--   #scale_fill_manual(values = c("Cortex" = "#E85772", -->
+<!--    #                                          "Subcortex" = "#878DC5", -->
+<!--     #                                        "Cerebellum" = "#FFD357", -->
+<!--      #                                        "Spinal Cord" = "#C6D14A")) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10), -->
+<!--         axis.text.y = element_text(size = 10), -->
+<!--         legend.position = "none") + coord_flip() + -->
+<!--   facet_grid(~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!--   scale_fill_manual(values = c("Neurons" = "#D94A70", -->
+<!--                                "Astrocytes" = "#5590CC", -->
+<!--                                "Oligodendrocytes" = "#AF9DCB", -->
+<!--                                "Microglia" = "#69C9CF", -->
+<!--                                "Endothelia" = "#FAE47B")) -->
+
+<!-- ``` -->
+
+<!-- - PsychEncode -->
+
+<!-- ```{r} -->
+<!-- decon_results$PE_CIBERSORT %>% -->
+<!--   as.data.frame %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   dplyr::select(SampleID, Neurons, Astrocytes, -->
+<!--                 Oligodendrocytes, Microglia, Endothelia) %>% -->
+<!--   melt() %>% -->
+<!--   left_join(md$PE) %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", -->
+<!--                                               "Oligodendrocytes", -->
+<!--                                               "Astrocytes", -->
+<!--                                               "Neurons")), -->
+<!--          Regions = factor(Regions, levels = c("Cortex", "Subcortex", -->
+<!--                                               "Cerebellum", "Spinal Cord") )) %>% -->
+<!--   ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() + -->
+<!--   #scale_fill_manual(values = c("Cortex" = "#E85772", -->
+<!--    #                                          "Subcortex" = "#878DC5", -->
+<!--     #                                        "Cerebellum" = "#FFD357", -->
+<!--      #                                        "Spinal Cord" = "#C6D14A")) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10), -->
+<!--         axis.text.y = element_text(size = 10), -->
+<!--         legend.position = "none") + coord_flip() + -->
+<!--   facet_grid(~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!--   scale_fill_manual(values = c("Neurons" = "#D94A70", -->
+<!--                                "Astrocytes" = "#5590CC", -->
+<!--                                "Oligodendrocytes" = "#AF9DCB", -->
+<!--                                "Microglia" = "#69C9CF", -->
+<!--                                "Endothelia" = "#FAE47B")) -->
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- decon_results$PE_DRS %>% -->
+<!--   as.data.frame %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   dplyr::select(SampleID, Neurons, Astrocytes, -->
+<!--                 Oligodendrocytes, Microglia, Endothelia) %>% -->
+<!--   melt() %>% -->
+<!--   left_join(md$PE) %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", -->
+<!--                                               "Oligodendrocytes", -->
+<!--                                               "Astrocytes", -->
+<!--                                               "Neurons")), -->
+<!--          Regions = factor(Regions, levels = c("Cortex", "Subcortex", -->
+<!--                                               "Cerebellum", "Spinal Cord") )) %>% -->
+<!--   ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() + -->
+<!--   #scale_fill_manual(values = c("Cortex" = "#E85772", -->
+<!--    #                                          "Subcortex" = "#878DC5", -->
+<!--     #                                        "Cerebellum" = "#FFD357", -->
+<!--      #                                        "Spinal Cord" = "#C6D14A")) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10), -->
+<!--         axis.text.y = element_text(size = 10), -->
+<!--         legend.position = "none") + coord_flip() + -->
+<!--   facet_grid(~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!--   scale_fill_manual(values = c("Neurons" = "#D94A70", -->
+<!--                                "Astrocytes" = "#5590CC", -->
+<!--                                "Oligodendrocytes" = "#AF9DCB", -->
+<!--                                "Microglia" = "#69C9CF", -->
+<!--                                "Endothelia" = "#FAE47B")) -->
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- decon_results$PE_DTG %>% -->
+<!--   as.data.frame %>% -->
+<!--   rownames_to_column("SampleID") %>% -->
+<!--   dplyr::select(SampleID, Neurons, Astrocytes, -->
+<!--                 Oligodendrocytes, Microglia, Endothelia) %>% -->
+<!--   melt() %>% -->
+<!--   left_join(md$PE) %>% -->
+<!--   drop_na(Regions) %>% -->
+<!--   mutate(variable= factor(variable, levels = c("Endothelia", "Microglia", -->
+<!--                                               "Oligodendrocytes", -->
+<!--                                               "Astrocytes", -->
+<!--                                               "Neurons")), -->
+<!--          Regions = factor(Regions, levels = c("Cortex", "Subcortex", -->
+<!--                                               "Cerebellum", "Spinal Cord") )) %>% -->
+<!--   ggplot(aes(x = variable, y = value, fill = variable)) + geom_boxplot() + -->
+<!--   #scale_fill_manual(values = c("Cortex" = "#E85772", -->
+<!--    #                                          "Subcortex" = "#878DC5", -->
+<!--     #                                        "Cerebellum" = "#FFD357", -->
+<!--      #                                        "Spinal Cord" = "#C6D14A")) + -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(size = 10), -->
+<!--         axis.text.y = element_text(size = 10), -->
+<!--         legend.position = "none") + coord_flip() + -->
+<!--   facet_grid(~Regions, scales = "free") +ylab("Estimated Proportion") + xlab("") + -->
+<!--   scale_fill_manual(values = c("Neurons" = "#D94A70", -->
+<!--                                "Astrocytes" = "#5590CC", -->
+<!--                                "Oligodendrocytes" = "#AF9DCB", -->
+<!--                                "Microglia" = "#69C9CF", -->
+<!--                                "Endothelia" = "#FAE47B")) -->
+
+<!-- ``` -->
+

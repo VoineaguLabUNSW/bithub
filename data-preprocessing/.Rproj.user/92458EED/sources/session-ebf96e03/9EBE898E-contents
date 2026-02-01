@@ -1,0 +1,720 @@
+---
+title: "Metadata-attributes"
+author: "unawaz1996"
+date: "2023-09-19"
+output:
+  html_notebook: default
+  workflowr::wflow_html:
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    autodep = TRUE,
+    eval = TRUE,
+	echo = TRUE,
+	warning = FALSE,
+	message = FALSE
+)
+```
+
+# Set-up 
+```{r libraries}
+library(recount3)
+library(magrittr)
+library(tibble)
+library(reshape2)
+library(SummarizedExperiment)
+library(corrplot)
+library(dplyr)
+library(ggvenn)
+library(pander)
+library(gridExtra)
+library(variancePartition)
+library(DT)
+library(EnsDb.Hsapiens.v86)
+library(singscore)
+library(AnnotationHub)
+library(stargazer)
+library(ggfortify)
+library(glue)
+library(cowplot)
+library(broom)
+library(glmpca)
+library(DT)
+library(naniar)
+source("code/preprocess/functions.R")
+source("code/preprocess/def_stages.R")
+source("code/preprocess/raw_file_locations.R")
+library(UpSetR)
+library(patchwork)
+library(pheatmap)
+library(ggpubr)
+
+```
+
+
+# Introduction 
+
+To allow comparison of gene expression with a metadata variable of interest, BITHub contains comprehensive metadata annotations of the curated datasets. There are three main categories of annotation are present in BITHub: 
+
+* Phenotype annotations: 
+Relating to the phenotype and origin of sample, including sex, donorIDs, age of donor, diagnosis and ethnicity
+
+* Sequencing metrics 
+These annotations relate to the quality of the RNA-seq samples and how they were experimentally prepared (if available).
+
+* Sample characteristics 
+These include the charateristics of the samples. 
+
+In addition to the above, Cell Types category contains deconvolution estimates for each of the bulk RNA-seq datasets.
+
+In order to ensure the metadata information is displayed in a user-friendly manner, highly correlated metadata annotations will be removed and a subset will be used for the site.
+
+# Filtering of redudant metadata labels via correlation analysis 
+
+Several datasets on BITHub  contain redundant metadata variables related to sequencing metrics. These datasets include the BrainSeq, GTEx, HDBR and the snRNA-seq datasets including HCA and Aldinger et al.  To remove these, a correlation analysis of all sequencing metrics was performed. Correlation of metadata was prepared after processing the raw metadata and expression files. If you are interested in that part of the pipeline, please refer to the README.md in the Github repo. 
+
+
+
+```{r load-data}
+dir = file.path("/home/neuro/Documents/BrainData/Bulk")
+sn_dir = file.path("/home/neuro/Documents/BrainData/single-cell")
+md = list()
+
+md$BrainSeq = read.csv(file.path(bseq.out,"BrainSeq-metadata.csv"), header=TRUE, check.names = FALSE, row.names = 1)
+md$BrainSpan = read.csv(file.path(bspan.out,"BrainSpan-metadata.csv"), header=TRUE, check.names = FALSE, row.names = 1)
+md$GTEx =  read.csv(file.path(gtex.out,"GTEx-metadata.csv"), header=TRUE, check.names = FALSE, row.names =1)
+md$HDBR = read.csv(file.path(hdbr.out, "HDBR-metadata.csv"), header=TRUE, check.names = FALSE, row.names =1)
+#md$FANTOM5 = read.csv(file.path(dir, "Fantom5/Formatted/FANTOM5-metadata.csv"), header=TRUE, check.names = FALSE)
+md$PsychEncode = read.csv(file.path(pe.out, "PsychEncode-metadata.csv"), header=TRUE, check.names = FALSE)
+#md$Velmeshev = read.csv(file.path(dir, "HDBR/Formatted/HDBR-metadata.csv"), header=TRUE, check.names = FALSE)
+md$Aldringer = read.csv(file.path(sn_dir, "aldinger/Aldringer-metadata.csv"), header=TRUE, check.names = FALSE)
+```
+
+
+```{r md-annot}
+annot = list()
+
+annot$BrainSpan = read.csv(here::here("data/annotations/BrainSpan-metadata-annot.csv"), header=TRUE) %>%
+  mutate(Dataset = c("BrainSpan"))
+annot$BrainSeq = read.csv(here::here("data/annotations/BrainSeq-metadata-annot.csv"), header=TRUE) %>%
+  mutate(Dataset = c("BrainSeq"))
+
+annot$GTEx = read.csv(here::here("data/annotations/GTEx-metadata-annot.csv"), header=TRUE) %>%
+  mutate(Dataset = c("GTEx"))
+
+annot$PsychEncode =  read.csv(here::here("data/annotations/PsychEncode-metadata-annot.csv"), header=TRUE) %>%
+  mutate(Dataset = c("PsychEncode"))
+
+annot$FANTOM5 = read.csv(here::here("data/annotations/Fantom5-metadata-annot.csv"), header=TRUE) %>%
+  mutate(Dataset = c("FANTOM5"))
+
+annot$HDBR = read.csv(here::here("data/annotations/HDBR-metadata-annot.csv"), header=TRUE) %>%
+  mutate(Dataset = c("HDBR"))
+
+annot$Velmeshev = read.csv(here::here("data/annotations/Velmeshev-annot.csv"), header=TRUE) %>%
+  mutate(Dataset = c("Velmeshev"))
+
+annot$Aldringer = read.csv(here::here("data/annotations/Aldringer-metadata-annot.csv"), header=TRUE) %>%
+  mutate(Dataset = c("Aldringer"))
+
+annot$HCA =  read.csv(here::here("data/annotations/HCA-annot.csv"), header=TRUE) %>%
+  mutate(Dataset = c("HCA"))
+
+annot$Cameron =  read.csv(here::here("data/annotations/Cameron-metadata-annot.csv"), header=TRUE) %>%
+  mutate(Dataset = c("Cameron"))
+```
+
+
+##  BrainSeq 
+
+```{r}
+annot_seq = annot$BrainSeq %>%
+  dplyr::filter(Type == "Sequencing metrics")
+md.clean = md$BrainSeq %>% 
+  dplyr::select(contains(annot_seq$BITColumnName))
+md.clean = md.clean %>% select_if(~ !any(is.na(.)))
+md.clean = md.clean[vapply(md.clean, function(x) length(unique(x)) > 1, logical(1L))]
+```
+
+
+
+```{r fig.cap="Correlation plot showing highly correlating metadata variables in BrainSeq"}
+M = cor(data.matrix(md.clean), use = "complete.obs")
+#pdf(here::here("output/Thesis_plots/Metadata/BrainSeq-cor-seq-metadata.pdf"), height = 10, width=10)
+corrplot(M, order='hclust',
+         method = "circle", 
+         number.cex = .50, 
+         tl.cex=0.75)
+#dev.off()
+
+```
+
+The final BrainSeq sequencing metrics contain the following columns: 
+
+```{r}
+annot$BrainSeq %>% 
+  dplyr::filter(Include..Yes.No....Interest == "Yes") %>% 
+  DT::datatable()
+
+```
+
+## GTEx
+
+```{r}
+annot_seq = annot$GTEx %>%
+  dplyr::filter(Type == "Sequencing metrics")
+md.clean = md$GTEx %>%
+  dplyr::select(contains(annot_seq$BITColumnName))
+md.clean = md.clean %>% select_if(~ !any(is.na(.)))
+md.clean = md.clean[vapply(md.clean, function(x) length(unique(x)) > 1, logical(1L))]
+```
+
+
+```{r fig.cap="Correlation plot showing highly correlating metadata variables in GTEx"}
+#pdf(here::here("output/Thesis_plots/Metadata/GTEx-cor-seq-metadata.pdf"), height = 10, width=10)
+M = cor(data.matrix(md.clean), use = "complete.obs")
+corrplot(M, order='hclust',
+         method = "circle",
+         number.cex = .50,
+         tl.cex=0.75)
+
+#dev.off()
+```
+
+```{r}
+annot$GTEx %>% 
+  dplyr::filter(Include..Yes.No....Interest == "Yes") %>% 
+  DT::datatable()
+
+```
+
+<!-- <!-- - FANTOM5 --> -->
+
+<!-- <!-- ```{r f5-cor} --> -->
+<!-- <!-- annot_seq = annot$FANTOM5 %>% --> -->
+<!-- <!--   dplyr::filter(Type == "Sequencing") --> -->
+<!-- <!-- md.clean = md$FANTOM5 %>%  --> -->
+<!-- <!--   dplyr::select(contains(annot_seq$BITHubName)) --> -->
+<!-- <!-- md.clean = md.clean %>% select_if(~ !any(is.na(.))) --> -->
+<!-- <!-- md.clean = md.clean[vapply(md.clean, function(x) length(unique(x)) > 1, logical(1L))] --> -->
+<!-- <!-- ``` --> -->
+
+
+<!-- <!-- ```{r} --> -->
+<!-- <!-- M = cor(data.matrix(md.clean), use = "complete.obs") --> -->
+<!-- <!-- corrplot(M, order='hclust', --> -->
+<!-- <!--          method = "circle",  --> -->
+<!-- <!--          number.cex = .50,  --> -->
+<!-- <!--          tl.cex=0.75, type="upper") --> -->
+<!-- <!-- ``` --> -->
+
+
+## HDBR
+
+```{r}
+hdbr_annot_seq = annot$HDBR %>%
+  dplyr::filter(Type == "Sequencing metrics")
+
+md.seq = md$HDBR %>%
+  dplyr::select(contains(hdbr_annot_seq$BITColumnName)) %>%
+  dplyr::select(-c("Percentage_fragment_mapped_unique_exon_fc",
+                   "Total_fragments_assigned_exon_fc",
+                   "Total_fragments_count_unique_exon_fc",
+                   "Total_fragments_count_unique_assigned_exon_fc",
+                   "AUC_all_annotated_exons", "AUC_all_annotated_exons_unique",
+                   "BigWigFile", "CellLinePrediction","PredictionType",
+                   "CuratedTypePrediction", "PredictionType",
+                   "Metadata_source", "Metadata_source", "LibraryName",
+                   "LibraryStrategy", "LibrarySource", "LibraryLayout",
+                   "LibrarySelection", "CellTypePrediction", "PatternPredictionType",
+                   "SampleAccPrediction", "CuratedTissuePrediction",
+                   "Mapping_speed_per_hour_STAR", "ReadInfo", "RunAlias",
+                   "Run_Center_Name", "Run_Broker_name", "Run_Center", "Processed_Recount",
+                   "FileSource_Recount", "Organism_recount", "PlatformModel",
+                   "SampleAttributes", "ExperimentAttributes", "SampleName",
+                   "SampleTitle", "RunPublished", "Size",
+                   "MeanFragmentLength_BAM", "Total_fragments_input_fc_exon_fc"))
+
+md.seq.clean = md.seq  %>% select_if(~ !any(is.na(.)))
+md.seq.clean = md.seq.clean[vapply(md.seq.clean, function(x) length(unique(x)) > 1, logical(1L))]
+```
+
+```{r fig.height=25, fig.width=25, fig.cap="Correlation plot showing highly correlating metadata variables in HDBR"}
+#M = cor(data.matrix(md.seq.clean), use = "complete.obs")
+#pdf(here::here("output/Thesis_plots/Metadata/HDBR-corplot.pdf"), height = 25, width=25)
+corrplot(M, order='hclust',
+         method = "circle",
+         number.cex = .50,
+         cl.cex = 3,
+         tl.cex=1.2)
+#dev.off()
+```
+
+```{r}
+annot$HDBR %>% 
+  dplyr::filter(Include..Yes.No....Interest == "Yes") %>% 
+  DT::datatable()
+```
+
+
+## Single-nucleus RNA-seq dataset
+
+The redundant metadata columns have been removed for BITHub, however, the metadata have not been fully explored in the BITHub thesis chapter. 
+
+### Aldinger et al (2022)
+
+```{r}
+aldringer_annot_seq = annot$Aldringer %>%
+  dplyr::filter(Type == "Sequencing metrics")
+
+md.seq = md$Aldringer %>%
+  dplyr::select(contains(aldringer_annot_seq$BITColumnName))
+
+md.seq.clean = md.seq  %>% select_if(~ !any(is.na(.)))
+md.seq.clean = md.seq.clean[vapply(md.seq.clean, function(x) length(unique(x)) > 1, logical(1L))]
+
+M = cor(data.matrix(md.seq.clean ), use = "complete.obs")
+corrplot(M, order='hclust',
+         method = "circle",
+         number.cex = .50,
+         tl.cex=0.75, type="upper")
+```
+
+
+
+# Exploratory analysis of  metadata 
+
+The removal of these redundant metadata attributes resulted in 91 unique metadata across all bulk RNA-seq datasets. These metadata can be identified in `data/Tables/Supplementary_Table_2.xlsx'. 
+
+
+## Overlap of metadata across bulk RNA-seq datasets 
+
+As metadata were categorized into a concept that they represented (i.e Sequencing Metrics, Phenotype attributes, Sample characteristics), I overlapped metadata belonging to each of these categories were then overlapped to determine the set of common metadata attributes across all datasets. 
+
+```{r}
+annot = lapply(annot, function(x){
+  x %<>%
+    dplyr::filter(Include..Yes.No....Interest == "Yes")
+  return(x)
+  })
+
+
+md$BrainSeq %<>% dplyr::select(contains(annot$BrainSeq$BITColumnName))
+md$BrainSpan %<>% dplyr::select(contains(annot$BrainSpan$BITColumnName))
+md$GTEx %<>% dplyr::select(contains(annot$GTEx$BITColumnName))
+md$HDBR %<>% dplyr::select(contains(annot$HDBR$BITColumnName))
+md$PsychEncode %<>% dplyr::select(contains(annot$PsychEncode$BITColumnName))
+```
+
+```{r}
+seq.metrics = lapply(annot, function(x){
+  x = x %>%
+     dplyr::filter(Type == "Sequencing metrics")
+  return(x)
+})
+
+
+pheno.metrics = lapply(annot, function(x){
+  x = x %>%
+     dplyr::filter(Type == "Phenotype")
+  return(x)
+})
+
+
+annot = lapply(annot, function(x){
+  x = x %>%
+    mutate(Type = gsub("Sample charactertics", "Sample characteristics", Type))
+  return(x)
+})
+sample.metrics = lapply(annot, function(x){
+  x = x %>%
+     dplyr::filter(Type == "Sample characteristics")
+  return(x)
+})
+```
+
+
+### Sequencing metrics
+
+```{r}
+
+library(VennDiagram)
+v= list( "BrainSeq" = seq.metrics$BrainSeq$BITColumnName,
+          "BrainSpan" = seq.metrics$BrainSpan$BITColumnName,
+          "GTEx" = seq.metrics$GTEx$BITColumnName,
+          "HDBR" = seq.metrics$HDBR$BITColumnName,
+          "PsychEncode" = seq.metrics$PsychEncode$BITColumnName
+       #  "HCA" = hca.tech$BITHubColumnName,
+        # "Cameron et al" = cam.tech$BITHubColumnName,
+         #"Velmeshev et al" = vel.tech$BITColumnName,
+         #"Aldringer et al" = adl.tech$BITHubColumnName
+         #,
+        #  "Ramaker" = ram.tech$BITColumnName
+         )
+
+
+a=calculate.overlap(v)
+
+plot =UpSetR::upset(fromList(v), sets.bar.color = c("#7DA1D4","#E11F28","#F1605F","#49215F"),
+              main.bar.color = c("#7DA1D4","#E11F28","#F1605F","#49215F",
+                                 "#808080","#808080","#808080","#808080",
+                                 "#808080","#808080"),
+              mainbar.y.label = "Overlap of Sequencing Metrics",
+              sets.x.label = "Total Sequencing Metrics",
+                text.scale = c(1.2, 2, 1.2),
+              point.size = 4)
+```
+
+```{r}
+plot
+combos <- Reduce(c,lapply(2:length(v),
+                          function(x) combn(1:length(v),x,simplify=FALSE) ))
+intersect <- lapply(combos, function(x) Reduce(intersect,v[x]) )
+```
+
+### Phenotype attributes 
+
+```{r}
+v= list( "BrainSeq" = pheno.metrics$BrainSeq$BITColumnName,
+          "BrainSpan" = pheno.metrics$BrainSpan$BITColumnName,
+          "GTEx" = pheno.metrics$GTEx$BITColumnName,
+          "HDBR" = pheno.metrics$HDBR$BITColumnName,
+          "PsychEncode" = pheno.metrics$PsychEncode$BITColumnName
+       #  "HCA" = hca.tech$BITHubColumnName,
+        # "Cameron et al" = cam.tech$BITHubColumnName,
+         #"Velmeshev et al" = vel.tech$BITColumnName,
+         #"Aldringer et al" = adl.tech$BITHubColumnName
+         #,
+        #  "Ramaker" = ram.tech$BITColumnName
+         )
+
+
+
+UpSetR::upset(fromList(v), sets.bar.color = c("#FAAD79","#F1605F","#E11F28","#7DA1D4","#49215F"),
+              main.bar.color = c("#FAAD79","#7DA1D4",
+                                "#808080","#808080","#808080"),
+              mainbar.y.label = "Overlap of Phenotype Attributes",
+              sets.x.label = "Total Phenotype Attributes",
+                text.scale = c(1.2, 2, 1.2),
+              point.size = 4)
+
+combos <- Reduce(c,lapply(2:length(v),
+                          function(x) combn(1:length(v),x,simplify=FALSE) ))
+intersect <- lapply(combos, function(x) Reduce(intersect,v[x]) )
+```
+
+
+```{r}
+v= list( "BrainSeq" = pheno.metrics$BrainSeq$BITColumnName,
+          "BrainSpan" = pheno.metrics$BrainSpan$BITColumnName,
+          "GTEx" = pheno.metrics$GTEx$BITColumnName,
+          "HDBR" = pheno.metrics$HDBR$BITColumnName,
+          "PsychEncode" = pheno.metrics$PsychEncode$BITColumnName
+       #  "HCA" = hca.tech$BITHubColumnName,
+        # "Cameron et al" = cam.tech$BITHubColumnName,
+         #"Velmeshev et al" = vel.tech$BITColumnName,
+         #"Aldringer et al" = adl.tech$BITHubColumnName
+         #,
+        #  "Ramaker" = ram.tech$BITColumnName
+         )
+
+
+
+UpSetR::upset(fromList(v), sets.bar.color = c("#FAAD79","#F1605F","#E11F28","#7DA1D4","#49215F"),
+              main.bar.color = c("#FAAD79","#7DA1D4",
+                                "#808080","#808080","#808080"),
+              mainbar.y.label = "Overlap of Phenotype Attributes",
+              sets.x.label = "Total Phenotype Attributes",
+                text.scale = c(1.2, 2, 1.2),
+              point.size = 4)
+
+combos <- Reduce(c,lapply(2:length(v),
+                          function(x) combn(1:length(v),x,simplify=FALSE) ))
+intersect <- lapply(combos, function(x) Reduce(intersect,v[x]) )
+```
+
+
+### Sample characteristics 
+
+```{r}
+v= list( "BrainSeq" = sample.metrics$BrainSeq$BITColumnName,
+          "BrainSpan" = sample.metrics$BrainSpan$BITColumnName,
+          "GTEx" = sample.metrics$GTEx$BITColumnName,
+          "HDBR" = sample.metrics$HDBR$BITColumnName,
+          "PsychEncode" = sample.metrics$PsychEncode$BITColumnName
+       #  "HCA" = hca.tech$BITHubColumnName,
+        # "Cameron et al" = cam.tech$BITHubColumnName,
+         #"Velmeshev et al" = vel.tech$BITColumnName,
+         #"Aldringer et al" = adl.tech$BITHubColumnName
+         #,
+        #  "Ramaker" = ram.tech$BITColumnName
+         )
+
+
+UpSetR::upset(fromList(v), sets.bar.color = c("#7DA1D4","#FAAD79","#E11F28","#F1605F","#49215F"),
+              main.bar.color = c("#7DA1D4","#FAAD79",
+             "#808080","#808080"),
+              mainbar.y.label = "Overlap of Sample Characteristics",
+              sets.x.label = "Total Sample Characteristics",
+                text.scale = c(1.2, 2, 1.2),
+              point.size = 4)
+
+combos <- Reduce(c,lapply(2:length(v),
+                          function(x) combn(1:length(v),x,simplify=FALSE) ))
+intersect <- lapply(combos, function(x) Reduce(intersect,v[x]) )
+```
+
+## Determining number of missing metadata from each bulk RNA-seq analysis 
+
+I assessed the quality of the metadata by determining the extent of missing information across the available and retained metadata columns in all datasets. 
+
+```{r}
+count_na <- function(x) sum(is.na(x))
+# md$ %>%
+#   mutate(count_na = apply(., 1, count_na)) %>%
+#   ggplot(aes(count_na)) + geom_density()
+
+na_calc = lapply(md[1:5], function(x){
+  x %<>%
+    mutate(count_na = apply(., 1, count_na)) %>%
+    dplyr::select(count_na)
+  return(x)
+})
+
+
+total_nb = do.call(rbind, na_calc) %>%
+  rownames_to_column("Dataset") %>%
+  dplyr::filter(count_na != 0)
+```
+
+
+
+```{r}
+#ggsave(filename = here::here("output/Thesis_plots/Metadata/missing_md.svg"), height=6, width = 7, units = "in")
+md_missing = do.call(rbind, na_calc) %>%
+  rownames_to_column("Dataset") %>%
+  mutate(Dataset = gsub("\\..*", "", Dataset)) %>%
+   ggplot(aes(count_na, fill= Dataset)) +
+  geom_density(alpha = 0.75) +
+  theme_bw()  +
+     scale_fill_manual(values =c("BrainSeq" ="#F1605F",
+                               "BrainSpan" = "#49215F",
+                               "GTEx" = "#7DA1D4",
+                               "HDBR" = "#E11F28",
+                               "PsychEncode" = "#FAAD79"))+
+  xlab("Number of missing metadata") +
+  ylab("Density of samples") +
+  theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
+        axis.text.y = element_text(size = 15, family = "serif", color = "black"),
+        axis.title = element_text(size=15, family = "serif"),
+         legend.box.background = element_rect(color = "black"),
+          legend.text = element_text(family = "serif"),
+          legend.title = element_text( family = "serif"),
+           plot.title = element_text(family = "serif", size =20),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "top")
+
+ggsave(filename = here::here("output/Thesis_plots/Metadata/missing_md.png"), 
+       height=5, width = 6, units = "in", plot=md_missing)
+#dev.off()
+
+```
+
+<!-- # ```{r} -->
+<!-- # md$GTEx %>% apply(., 2, count_na)  -->
+<!-- # md$HDBR %>% apply(.,2, count_na)  -->
+<!-- # md$PsychEncode%>% apply(.,2, count_na) -->
+<!-- # md$BrainSpan %>% apply(.,2, count_na)  -->
+<!-- #  -->
+<!-- # ``` -->
+<!-- ## Heatmap showing metadata variables in at least 2 datasets -->
+
+<!-- ```{r} -->
+<!-- metadata_summary = lapply(annot, function(x) { x %>% -->
+<!--     dplyr::filter(`Include..Yes.No....Interest` == "Yes") %>% -->
+<!--     dplyr::select("BITColumnName",`Include..Yes.No....Interest`, "Dataset")}) -->
+
+
+
+<!-- metadata_heatmap = metadata_summary  %>% do.call(rbind,.) %>% -->
+<!--   pivot_wider(id_cols = "Dataset", names_from = "BITColumnName", values_from = "Include..Yes.No....Interest") %>% -->
+<!--   as.data.frame() -->
+
+<!-- metadata_heatmap$SampleID[6] <- "Yes" -->
+<!-- metadata_heatmap[metadata_heatmap == "Yes"] <- 1 -->
+<!-- metadata_heatmap[is.na(metadata_heatmap)] <- 0 -->
+<!--   #mutate(comparison=gsub("\\.[0-9]*$","", comparison)) %>% -->
+<!--   #xtabs(fgsea.NES ~ comparison + fgsea.Geneset,.) -->
+
+<!-- metadata_heatmap <- apply(metadata_heatmap,2,as.character) -->
+<!-- #write.csv(metadata_heatmap,here::here("output/metadata_heatmap.csv")) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+
+<!-- heatmap_file = read.csv("output/metadata_heatmap.csv", header=TRUE) -->
+<!-- md.summary = heatmap_file %>% -->
+<!--   column_to_rownames("Dataset") %>% -->
+<!--   pheatmap(cellheight = 15, -->
+<!--              cellwidth = 15, -->
+<!--              cluster_rows = FALSE, -->
+<!--              cluster_cols = FALSE, -->
+<!--              border_color = "#FFF8F9", -->
+<!--              color = c("#FFF8F9", "black")) -->
+
+<!-- ggsave(file = here::here("output/Thesis_plots/Metadata/summary-heatmap.svg"),  md.summary, -->
+<!--        height = 15, width = 19.9329, units = "cm") -->
+<!-- ``` -->
+
+<!-- ## Shared sequencing metrics -->
+
+
+
+
+
+
+
+
+<!-- ```{r} -->
+
+<!-- x= list("HCA" = hca.tech$BITHubColumnName, -->
+<!--          "Cameron et al" = cam.tech$BITHubColumnName, -->
+<!--          "Velmeshev et al" = vel.tech$BITColumnName, -->
+<!--          "Aldringer et al" = adl.tech$BITHubColumnName -->
+<!--          #, -->
+<!--         #  "Ramaker" = ram.tech$BITColumnName -->
+<!--          ) -->
+
+
+<!-- UpSetR::upset(fromList(x), sets.bar.color = c ("#E85571","#838DE0","#FFD256","#75C7A0")) -->
+<!-- ``` -->
+
+<!-- ### -->
+
+
+
+
+
+
+
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- brainspan = read.csv("/home/neuro/Documents/BrainData/Bulk/BrainSpan/Formatted/BrainSpan-metadata-subset.csv", header=TRUE, check.names = FALSE, row.names =1) -->
+
+<!-- brainspan_decon = read.csv("/home/neuro/Documents/BrainData/Bulk/BrainSpan/Formatted/BrainSpan-decon.csv", header=TRUE, check.names = FALSE, row.names =1) %>% -->
+<!--   as.data.frame() %>% -->
+<!--   rownames_to_column("SampleID") -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- brainspan_full = brainspan %>% -->
+<!--   left_join(brainspan_decon %>% -->
+<!--               dplyr::select("SampleID", "Neurons", -->
+<!--                             "Astrocytes", "Oligodendrocytes", -->
+<!--                             "Microglia", "Endothelia"), by = "SampleID") -->
+
+<!-- write.csv(brainspan_full ,"/home/neuro/Documents/BrainData/Bulk/BrainSpan/Formatted/BrainSpan-metadata-all.csv" ) -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- brainseq = read.csv("/home/neuro/Documents/BrainData/Bulk/Brainseq/Formatted/BrainSeq-metadata-subset.csv", header=TRUE, check.names = FALSE, row.names =1) -->
+
+
+<!-- brainseq_decon = read.csv("/home/neuro/Documents/BrainData/Bulk/Brainseq/Formatted/BrainSeq-decon.csv", header=TRUE, check.names = FALSE, row.names =1) %>% -->
+<!--   as.data.frame() %>% -->
+<!--   rownames_to_column("SampleID") -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- brainseq_full = brainseq %>% -->
+<!--   dplyr::select(-c("Dev.Replicating", "Dev.Quiescent", "Adult.OPC", "Adult.Neurons", "Adult.Astrocytes", "Adult.Oligo", "Adult.Microglia", "Adult.Endothelial")) %>% -->
+<!--   left_join(brainseq_decon %>% -->
+<!--               dplyr::select("SampleID", "Neurons", -->
+<!--                             "Astrocytes", "Oligodendrocytes", -->
+<!--                             "Microglia", "Endothelia"), by = "SampleID") -->
+
+<!-- write.csv(brainseq_full ,"/home/neuro/Documents/BrainData/Bulk/Brainseq/Formatted/BrainSeq-metadata-all.csv" ) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- gtex = read.csv("/home/neuro/Documents/BrainData/Bulk/GTEx/Formatted/GTEx-metadata-subset.csv", header=TRUE, check.names = FALSE, row.names =1) -->
+
+<!-- gtex_decon = read.csv("/home/neuro/Documents/BrainData/Bulk/GTEx/Formatted/GTEx-decon.csv", header=TRUE, check.names = FALSE, row.names =1) %>% -->
+<!--   as.data.frame() %>% -->
+<!--   rownames_to_column("SampleID") -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- gtex_full = gtex %>% -->
+<!--   left_join(gtex_decon %>% -->
+<!--               dplyr::select("SampleID", "Neurons", -->
+<!--                             "Astrocytes", "Oligodendrocytes", -->
+<!--                             "Microglia", "Endothelia"), by = "SampleID") -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- write.csv(gtex_full ,"/home/neuro/Documents/BrainData/Bulk/GTEx/Formatted/GTEx-metadata-all.csv" ) -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- hdbr = read.csv("/home/neuro/Documents/BrainData/Bulk/HDBR/Formatted/HDBR-metadata-subset.csv", header=TRUE, check.names = FALSE, row.names =1) -->
+
+<!-- hdbr_decon = read.csv("/home/neuro/Documents/BrainData/Bulk/HDBR/Formatted/HDBR-decon.csv", header=TRUE, check.names = FALSE, row.names =1) %>% -->
+<!--   as.data.frame() %>% -->
+<!--   rownames_to_column("SampleID") -->
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- hdbr_full = hdbr %>% -->
+<!--   left_join(hdbr_decon  %>% -->
+<!--               dplyr::select("SampleID", "Neurons", -->
+<!--                             "Astrocytes", "Oligodendrocytes", -->
+<!--                             "Microglia", "Endothelia"), by = "SampleID") -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- write.csv(hdbr_full ,"/home/neuro/Documents/BrainData/Bulk/HDBR/Formatted/HDBR-metadata-all.csv" ) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- pe = read.csv("/home/neuro/Documents/BrainData/Bulk/PsychEncode/Formatted/PsychEncode-metadata-subset.csv", header=TRUE, check.names = FALSE, row.names =1) -->
+
+<!-- pe_decon = read.csv("/home/neuro/Documents/BrainData/Bulk/PsychEncode/Formatted/PsychEncode-decon.csv", header=TRUE, check.names = FALSE, row.names =1) %>% -->
+<!--   as.data.frame() %>% -->
+<!--   rownames_to_column("SampleID") -->
+
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- pe_full = pe %>% -->
+<!--   left_join(pe_decon %>% -->
+<!--               dplyr::select("SampleID", "Neurons", -->
+<!--                             "Astrocytes", "Oligodendrocytes", -->
+<!--                             "Microglia", "Endothelia"), by = "SampleID") -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- #write.csv(pe_full ,"/home/neuro/Documents/BrainData/Bulk/PsychEncode/Formatted/PsychEncode-metadata-all.csv" ) -->
+<!-- ``` -->
+
+# Export data 
+
+```{r}
+write.csv(file = file.path(bseq.out,"BrainSeq-metadata-subset.csv"), md$BrainSeq)
+write.csv(file= file.path(bspan.out,"BrainSpan/Formatted/BrainSpan-metadata-subset.csv"), md$BrainSpan)
+write.csv(file = file.path(gtex.out,"GTEx/Formatted/GTEx-metadata-subset.csv"), md$GTEx)
+write.csv(file= file.path(pe.out, "PsychEncode/Formatted/PsychEncode-metadata-subset.csv"), md$PsychEncode)
+write.csv(file = file.path(hdbr.out, "HDBR/Formatted/HDBR-metadata-subset.csv"), md$HDBR)
+```

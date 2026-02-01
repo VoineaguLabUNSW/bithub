@@ -1,0 +1,383 @@
+library(magrittr)
+library(tibble)
+library(reshape2)
+library(corrplot)
+library(dplyr)
+library(ggvenn)
+library(glue)
+library(pander)
+library(gridExtra)
+library(variancePartition)
+library(DT)
+library(ggplot2)
+library(UpSetR)
+library(patchwork)
+library(ggpubr)
+library(variancePartition)
+library(yaml)
+library(EnsDb.Hsapiens.v86)
+source("code/preprocess/functions.R")
+
+paths <- yaml::read_yaml("config/paths-example.yaml")
+
+expr_specs <- list(
+  GTEx = list(dir = paths$bulk$formatted$gtex,        file = "GTEx-exp.csv"),
+  PsychENCODE= list(dir = paths$bulk$formatted$psychencode, file = "PsychEncode-exp.csv"),
+  BrainSpan= list(dir = paths$bulk$formatted$brainspan,   file = "BrainSpan-exp.csv"),
+  BrainSeq = list(dir = paths$bulk$formatted$brainseq,    file = "BrainSeq-exp.csv"),
+  HDBR = list(dir = paths$bulk$formatted$hdbr,        file = "HDBR-exp.csv")
+)
+
+
+e <- list()
+e$Raw <- lapply(names(expr_specs), \(ds) {
+  f <- file.path(expr_specs[[ds]]$dir, expr_specs[[ds]]$file)
+  read_expr(f, ds)
+})
+names(e$Raw) <- names(expr_specs)
+
+
+
+raw_list <- e$Raw
+
+thresh_list <- lapply(raw_list, thresh)
+
+
+
+## BrainSeq
+
+md = list()
+md$BSeq <- read.csv(file.path(paths$bulk$formatted$brainseq,"BrainSeq-metadata.csv"),
+                    check.names = FALSE)
+
+form.bseq <- ~ `Age (Numeric)` + (1|Regions) + (1|Sex) + RIN +  (1|Diagnosis) + `Mito Ratio` +
+  `rRNA ratio` + `Total N Reads`  +  (1|Period) + `Proportion of Neurons (MultiBrain)` +
+  `Proportion of Astrocytes (MultiBrain)` + `Proportion of Microglia (MultiBrain)` +
+  `Proportion of Endothelia (MultiBrain)`+ `Total Assigned Gene`
+
+md$BSeq %<>%
+  column_to_rownames("SampleID")
+varPar.bseq <- fitExtractVarPartModel(thresh_list$BrainSeq, form.bseq, md$BSeq)
+varPar.bseq = sortCols(varPar.bseq)
+plot_varPart = plotVarPart(varPar.bseq)
+
+ggsave(plot_varPart,
+       filename = here::here("output/Thesis_plots/Variance/PCA/BrainSeq/BrainSeq_varPart_full.svg"),
+       height = 6,
+       width = 8,
+       units = "in")
+
+
+write.csv(varPar.bseq, file = "/home/neuro/Documents/BrainData/Bulk/Brainseq/Formatted/BrainSeq-varPart-decon.csv")
+
+## BrainSpan
+
+form.bspan <- ~ AgeNumeric  + (1|Sex) + (1|Period) + (1|Regions) + RIN +  pH + PMI + DonorID + Dissectionscore +Neurons +
+  Astrocytes
+varPar.bspan <- fitExtractVarPartModel(span,form.bspan ,md$BSpan)
+varPar.bspan = sortCols(varPar.bspan)
+plot_varPart = plotVarPart(varPar.bspan)
+
+ggsave(plot_varPart,
+       filename = here::here("output/Thesis_plots/Variance/PCA/BrainSpan/BrainSpan_varPart_full.svg"),
+       height = 6,
+       width = 8,
+       units = "in")
+
+
+write.csv(varPar.bspan, file="/home/neuro/Documents/BrainData/Bulk/BrainSpan/Formatted/BrainSpan-varPart.csv")
+
+## GTEx
+
+gtex.form <- ~ TotalNReads + rRNA_ratio + (1|TypeofBatch)  + (1|AgeInterval) + (1|Sex) + (1|Regions) + RIN + HardyScale + PMI + MappingRate + PMI + ExonicRate
+
+varPar.gtex <- fitExtractVarPartModel(gtex,gtex.form ,md$GTEx)
+varPar.gtex = sortCols(varPar.gtex)
+# varPar.gtex = read.csv("/home/neuro/Documents/BrainData/Bulk/GTEx/Formatted/GTEx-varPart.csv",
+#                        header=TRUE,
+#                        row.names = 1)
+plot_varPart = plotVarPart(varPar.gtex)
+
+
+ggsave(plot_varPart,
+       filename = here::here("output/Thesis_plots/Variance/PCA/GTEx/GTEx_varPart_full.svg"),
+       height = 6,
+       width = 8,
+       units = "in")
+
+write.csv(varPar.gtex,"/home/neuro/Documents/BrainData/Bulk/GTEx/Formatted/GTEx-varPart.csv")
+
+##HDBR
+form.hdbr <- ~ (1|AgeInterval) + (1|Sex) + (1|Hemisphere) + (1|SequencingBatch)+  TotalNReads + MappingRate + (1|Regions) + PMI + DonorID + IntronicRate
+varPar.hdbr <- fitExtractVarPartModel(hdbr,form.hdbr ,md$HDBR)
+varPar.hdbr = sortCols(varPar.hdbr)
+
+plot_varPart = plotVarPart(varPar.hdbr)
+
+ggsave(plot_varPart,
+       filename = here::here("output/Thesis_plots/Variance/PCA/HDBR/HDBR_varPart_full.svg"),
+       height = 6,
+       width = 8,
+       units = "in")
+
+write.csv(varPar.hdbr , file = "/home/neuro/Documents/BrainData/Bulk/HDBR/Formatted/HDBR-varPart.csv")
+
+## PsychEncode
+
+
+md$PE= md$PE[!duplicated(md$PE[,c('SampleID')]),]
+varPar.pe <- fitExtractVarPartModel(pe, pe.form, md$PE)
+
+varPar.pe = sortCols(varPar.pe)
+plot_varPart = plotVarPart(varPar.pe)
+plot_varPart
+
+ggsave(plot_varPart,
+       filename = here::here("output/Thesis_plots/Variance/PCA/PsychEncode/PE_varPart_full.svg"),
+       height = 6,
+       width = 8,
+       units = "in")
+
+write.csv(varPar.pe,"/home/neuro/Documents/BrainData/Bulk/PsychEncode/Formatted/PsychEncode-varPart.csv")
+
+
+## Plots
+
+bspan <- read.csv("/home/neuro/Documents/BrainData/Bulk/BrainSpan/Formatted/BrainSpan-varPart.csv", header=TRUE, check.names = FALSE, row.name =1) %>%
+   rownames_to_column("Gene")
+
+long_df <- bspan %>%
+  pivot_longer(
+    cols = -Gene,
+    names_to = "Category",
+    values_to = "Variance_Explained"
+  )
+
+bspan %<>%
+  dplyr::select(-Gene)
+
+ordered_levels <- long_df %>%
+  dplyr::filter(Category != "Residuals") %>%
+  group_by(Category) %>%
+  summarise(median_var = median(Variance_Explained, na.rm = TRUE)) %>%
+  arrange(desc(median_var)) %>%
+  pull(Category)
+
+# Add "Residuals" at the end
+final_levels <- c(ordered_levels, "Residuals")
+
+# Set factor levels for plotting
+long_df <- long_df %>%
+  mutate(Category = factor(Category, levels = final_levels))
+
+# Plot violin + boxplot
+bspan_varPar = ggplot(long_df, aes(x = Category, y = Variance_Explained * 100)) +
+ # geom_violin() +
+  geom_boxplot(fill = "#A27BB1") +
+ # geom_jitter(width = 0.1, size = 0.5, alpha = 0.3) +
+  labs(
+    y = "Percentage (%) Variance Explained",
+    x = " ",
+    title = "BrainSpan"
+  ) +
+  theme_bw() + theme(axis.text.x = element_text(size = 12, family = "serif", color = "black", angle = 75, hjust =1),
+              axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+              axis.title = element_text(size=15, family = "serif"),
+              legend.box.background = element_rect(color = "black"),
+              legend.text = element_text(family = "serif"),
+              legend.title = element_text( family = "serif"),
+              plot.title = element_text(family = "serif", size =20),
+              panel.grid.major.x = element_blank(),
+              panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "none")
+
+
+bseq <- read.csv("/home/neuro/Documents/BrainData/Bulk/Brainseq//Formatted/BrainSeq-varPart.csv", header=TRUE, check.names = FALSE, row.name =1) %>%
+  rownames_to_column("Gene")
+
+
+long_df <- bseq %>%
+  pivot_longer(
+    cols = -Gene,
+    names_to = "Category",
+    values_to = "Variance_Explained"
+  )
+
+ordered_levels <- long_df %>%
+  dplyr::filter(Category != "Residuals") %>%
+  group_by(Category) %>%
+  summarise(median_var = median(Variance_Explained, na.rm = TRUE)) %>%
+  arrange(desc(median_var)) %>%
+  pull(Category)
+
+# Add "Residuals" at the end
+final_levels <- c(ordered_levels, "Residuals")
+
+# Set factor levels for plotting
+long_df <- long_df %>%
+  mutate(Category = factor(Category, levels = final_levels))
+
+# Plot violin + boxplot
+bseq_varPar = ggplot(long_df, aes(x = Category, y = Variance_Explained * 100)) +
+  # geom_violin() +
+  geom_boxplot(fill = "#FFC6BD") +
+  # geom_jitter(width = 0.1, size = 0.5, alpha = 0.3) +
+  labs(
+    y = "Percentage (%) Variance Explained",
+    x = " ",
+    title = "BrainSeq"
+  ) +
+  theme_bw() + theme(axis.text.x = element_text(size = 12, family = "serif", color = "black", angle = 75, hjust =1),
+                     axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+                     axis.title = element_text(size=15, family = "serif"),
+                     legend.box.background = element_rect(color = "black"),
+                     legend.text = element_text(family = "serif"),
+                     legend.title = element_text( family = "serif"),
+                     plot.title = element_text(family = "serif", size =20),
+                     panel.grid.major.x = element_blank(),
+                     panel.grid.major.y = element_line( size=.1 ),
+                     legend.position = "none")
+
+gtex <- read.csv("/home/neuro/Documents/BrainData/Bulk/GTEx/Formatted/GTEx-varPart.csv", header=TRUE, check.names = FALSE, row.name =1) %>%
+  rownames_to_column("Gene")
+
+long_df <- gtex %>%
+  pivot_longer(
+    cols = -Gene,
+    names_to = "Category",
+    values_to = "Variance_Explained"
+  )
+
+ordered_levels <- long_df %>%
+  dplyr::filter(Category != "Residuals") %>%
+  group_by(Category) %>%
+  summarise(median_var = median(Variance_Explained, na.rm = TRUE)) %>%
+  arrange(desc(median_var)) %>%
+  pull(Category)
+
+# Add "Residuals" at the end
+final_levels <- c(ordered_levels, "Residuals")
+
+# Set factor levels for plotting
+long_df <- long_df %>%
+  mutate(Category = factor(Category, levels = final_levels))
+
+gtex_varPar = ggplot(long_df, aes(x = Category, y = Variance_Explained * 100)) +
+  # geom_violin() +
+  geom_boxplot(fill = "#6f9ceb") +
+  # geom_jitter(width = 0.1, size = 0.5, alpha = 0.3) +
+  labs(
+    y = "Percentage (%) Variance Explained",
+    x = " ",
+    title = "GTEx"
+  ) +
+  theme_bw() + theme(axis.text.x = element_text(size = 12, family = "serif", color = "black", angle = 75, hjust =1),
+                     axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+                     axis.title = element_text(size=15, family = "serif"),
+                     legend.box.background = element_rect(color = "black"),
+                     legend.text = element_text(family = "serif"),
+                     legend.title = element_text( family = "serif"),
+                     plot.title = element_text(family = "serif", size =20),
+                     panel.grid.major.x = element_blank(),
+                     panel.grid.major.y = element_line( size=.1 ),
+                     legend.position = "none")
+
+hdbr <- read.csv("/home/neuro/Documents/BrainData/Bulk/HDBR/Formatted/HDBR-varPart.csv", header=TRUE, check.names = FALSE, row.name =1) %>%
+  rownames_to_column("Gene")
+
+long_df <- hdbr %>%
+  pivot_longer(
+    cols = -Gene,
+    names_to = "Category",
+    values_to = "Variance_Explained"
+  )
+
+ordered_levels <- long_df %>%
+  dplyr::filter(Category != "Residuals") %>%
+  group_by(Category) %>%
+  summarise(median_var = median(Variance_Explained, na.rm = TRUE)) %>%
+  arrange(desc(median_var)) %>%
+  pull(Category)
+
+# Add "Residuals" at the end
+final_levels <- c(ordered_levels, "Residuals")
+
+# Set factor levels for plotting
+long_df <- long_df %>%
+  mutate(Category = factor(Category, levels = final_levels))
+
+hdbr_varPar = ggplot(long_df, aes(x = Category, y = Variance_Explained * 100)) +
+  # geom_violin() +
+  geom_boxplot(fill = "#F08383") +
+  # geom_jitter(width = 0.1, size = 0.5, alpha = 0.3) +
+  labs(
+    y = "Percentage (%) Variance Explained",
+    x = " ",
+    title = "HDBR"
+  ) +
+  theme_bw() + theme(axis.text.x = element_text(size = 12, family = "serif", color = "black", angle = 75, hjust =1),
+                     axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+                     axis.title = element_text(size=15, family = "serif"),
+                     legend.box.background = element_rect(color = "black"),
+                     legend.text = element_text(family = "serif"),
+                     legend.title = element_text( family = "serif"),
+                     plot.title = element_text(family = "serif", size =20),
+                     panel.grid.major.x = element_blank(),
+                     panel.grid.major.y = element_line( size=.1 ),
+                     legend.position = "none")
+
+
+pe <- read.csv("/home/neuro/Documents/BrainData/Bulk/PsychEncode/Formatted/PsychEncode-varPart.csv", header=TRUE, check.names = FALSE, row.name =1) %>%
+  rownames_to_column("Gene")
+
+long_df <- pe  %>%
+  pivot_longer(
+    cols = -Gene,
+    names_to = "Category",
+    values_to = "Variance_Explained"
+  )
+
+ordered_levels <- long_df %>%
+  dplyr::filter(Category != "Residuals") %>%
+  group_by(Category) %>%
+  summarise(median_var = median(Variance_Explained, na.rm = TRUE)) %>%
+  arrange(desc(median_var)) %>%
+  pull(Category)
+
+# Add "Residuals" at the end
+final_levels <- c(ordered_levels, "Residuals")
+
+# Set factor levels for plotting
+long_df <- long_df %>%
+  mutate(Category = factor(Category, levels = final_levels))
+
+pe_varPar = ggplot(long_df, aes(x = Category, y = Variance_Explained * 100)) +
+  # geom_violin() +
+  geom_boxplot(fill = "#F9AD79") +
+  # geom_jitter(width = 0.1, size = 0.5, alpha = 0.3) +
+  labs(
+    y = "Percentage (%) Variance Explained",
+    x = " ",
+    title = "PsychENCODE"
+  ) +
+  theme_bw() + theme(axis.text.x = element_text(size = 12, family = "serif", color = "black", angle = 75, hjust =1),
+                     axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+                     axis.title = element_text(size=15, family = "serif"),
+                     legend.box.background = element_rect(color = "black"),
+                     legend.text = element_text(family = "serif"),
+                     legend.title = element_text( family = "serif"),
+                     plot.title = element_text(family = "serif", size =20),
+                     panel.grid.major.x = element_blank(),
+                     panel.grid.major.y = element_line( size=.1 ),
+                     legend.position = "none")
+
+
+ggarrange(bseq_varPar, bspan_varPar,
+          gtex_varPar, hdbr_varPar,
+          pe_varPar, ncol = 2, nrow = 3)
+
+ggsave(plot = bseq_varPar, filename = "output/Publication_plots/variancePartition/BrainSeq-MVE.png", height =6, width = 7, dpi=1200)
+ggsave(plot = bspan_varPar, filename = "output/Publication_plots/variancePartition/BrainSpan-MVE.png", height =6, width = 7, dpi=1200)
+ggsave(plot = gtex_varPar, filename = "output/Publication_plots/variancePartition/GTEx-MVE.png", height =6, width = 7, dpi=1200)
+ggsave(plot = hdbr_varPar, filename = "output/Publication_plots/variancePartition/HDBR-MVE.png", height =6, width = 7, dpi=1200)
+ggsave(plot = pe_varPar, filename = "output/Publication_plots/variancePartition/PE-MVE.png", height =6, width = 7, dpi=1200)

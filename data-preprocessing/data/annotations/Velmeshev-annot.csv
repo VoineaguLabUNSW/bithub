@@ -1,0 +1,19 @@
+OriginalMetadataColumnName,BITColumnName,Include (Yes/No) - Interest,Type
+cell,CellID,Yes,Cell Type
+cluster,Cell Type,Yes,Cell Type
+individual,DonorID,Yes,Phenotype
+region,Structure Acronym,Yes,Sample charactertics
+age,Age (Numeric),Yes,Phenotype
+sex,Sex,Yes,Phenotype
+diagnosis,Diagnosis,Yes,Phenotype
+Capbatch,Capture Batch,Yes,Sample charactertics
+Seqbatch,Sequencing Batch,Yes,Sequencing metrics
+post.mortem.interval..hours.,PMI (hours),Yes,Sample charactertics
+RNA.Integrity.Number,RIN,Yes,Sample charactertics
+genes,Total Genes Detected,Yes,Sequencing metrics
+UMIs,Total UMIs,Yes,Cell Type
+RNA.mitochondr..percent,mito rate,Yes,Sequencing metrics
+RNA.ribosomal.percent,rRNA rate,Yes,Sequencing metrics
+MajorCelltype,Major Cell Type,Yes,Cell Type
+NA,Age Interval,Yes,Phenotype
+NA,Regions,Yes,Sample charactertics

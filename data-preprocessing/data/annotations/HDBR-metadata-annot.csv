@@ -1,0 +1,176 @@
+OriginalMetadataColumnName,BITColumnName,Include (Yes/No) - Interest,Type
+Run,SampleID,Yes,Sample characteristics
+Sample.Characteristic.block.,Sequencing Batch,Yes,Sequencing metrics
+Sample.Characteristic.Ontology.Term.block.,Block,Yes,Sequencing metrics
+Sample.Characteristic.developmental.stage.,Age,No,Phenotype
+Sample.Characteristic.individual.,DonorID,Yes,Phenotype
+Sample.Characteristic.karyotype.,Sex,Yes,Phenotype
+Sample.Characteristic.organism.part.,Structure Acronym,Yes,Sample characteristics
+Sample.Characteristic.sampling.site.,Hemisphere,Yes,Sample characteristics
+external_id,SampleID,Yes,Sample characteristics
+recount_qc.aligned_reads..chrm,Chimeric Pairs,Yes,Sequencing metrics
+recount_qc.aligned_reads..chrx,Percent aligned ChrX,Yes,Sequencing metrics
+recount_qc.aligned_reads..chry,Percent aligned ChrY,Yes,Sequencing metrics
+recount_qc.bc_auc.all_.,AUC all percentage,Yes,Sequencing metrics
+recount_qc.bc_auc.unique_.,AUC unique percentage,Yes,Sequencing metrics
+recount_qc.bc_frag.mode_length_count,Mode Fragment Length Count,Yes,Sequencing metrics
+recount_qc.exon_fc.all_.,Exonic Rate,Yes,Sequencing metrics
+recount_qc.exon_fc.unique_.,Percentage fragment mapped unique exon fc,No,Sequencing metrics
+recount_qc.exon_fc_count_all.total,Total fragments input fc exon fc,No,Sequencing metrics
+recount_qc.exon_fc_count_all.assigned,Total fragments assigned exon fc,Yes,Sequencing metrics
+recount_qc.exon_fc_count_unique.total,Total fragments count unique exon fc,Yes,Sequencing metrics
+recount_qc.exon_fc_count_unique.assigned,Total fragments count unique assigned exon fc,Yes,Sequencing metrics
+recount_qc.gene_fc_count_all.assigned,Total Assigned Gene,Yes,Sequencing metrics
+recount_qc.intron_sum,Intron Total,No,Sequencing metrics
+recount_qc.intron_sum_.,Intronic Rate,Yes,Sequencing metrics
+recount_qc.star.._of_reads_mapped_to_multiple_loci,Percentage mapped multi loci STAR,Yes,Sequencing metrics
+recount_qc.star.._of_reads_mapped_to_too_many_loci,Percentage mapped too many loci STAR,Yes,Sequencing metrics
+recount_qc.star.._of_reads_unmapped._other,Percentage unmapped other STAR,Yes,Sequencing metrics
+recount_qc.star.._of_reads_unmapped._too_many_mismatches,Percentage unmapped too many mismatches STAR,No,Sequencing metrics
+recount_qc.star.all_mapped_reads,Reads Mapped,Yes,Sequencing metrics
+recount_qc.star.number_of_input_reads,Total N Reads,Yes,Sequencing metrics
+recount_qc.star.uniquely_mapped_reads_.,Mapping Rate,Yes,Sequencing metrics
+recount_qc.star.uniquely_mapped_reads_number,Mapping Rate unique,Yes,Sequencing metrics
+recount_qc.junction_count,Junction count,Yes,Sequencing metrics
+recount_qc.junction_coverage,Junction coverage,No,Sequencing metrics
+recount_qc.junction_avg_coverage,Junction average coverage,No,Sequencing metrics
+recount_qc.star.all_mapped_reads_both,Mapped Pairs,Yes,Sequencing metrics
+recount_qc.star.._mapped_reads_both,Mapping Rate both,Yes,Sequencing metrics
+recount_qc.star.._reads_mapped_to_multiple_loci_both,Percentage mapped multi loci both STAR,Yes,Sequencing metrics
+recount_qc.star.._reads_mapped_to_too_many_loci_both,Percentage mapped too many loci both STAR,Yes,Sequencing metrics
+NA,Age Interval,Yes,Phenotype
+NA,Period,Yes,Phenotype
+time sample in transit (minutes),PMI (hours),Yes,Sequencing metrics
+NA,Regions,Yes,Sample characteristics
+NA,Age (Numeric),Yes,Phenotype
+sra.run_total_spots,RunTotalSpots,No,Sequencing metrics
+recount_qc.bc_auc.all_reads_all_bases,AUC_all_alignments,No,Sequencing metrics
+recount_qc.bc_auc.unique_reads_all_bases,AUC_uniquely_aligned,No,Sequencing metrics
+recount_qc.bc_frag.count,TotalNFragments,No,Sequencing metrics
+recount_qc.gene_fc.all_.,Percentage_fragment_mapped_gene_fc,No,Sequencing metrics
+recount_qc.gene_fc.unique_.,Percentage_fragment_mapped_unique_gene_fc,No,Sequencing metrics
+recount_qc.gene_fc_count_all.total,Total_fragments_input_fc_gene_fc,No,Sequencing metrics
+recount_qc.gene_fc_count_unique.total,Total_fragments_count_unique_gene_fc,No,Sequencing metrics
+recount_qc.gene_fc_count_unique.assigned,Total_fragments_count_unique_assigned_gene_fc,No,Sequencing metrics
+recount_qc.star.._of_reads_unmapped._too_short,Percentage_unmapped_too_short_STAR,No,Sequencing metrics
+recount_qc.star.number_of_input_reads_both,Number_input_reads_both_STAR,No,Sequencing metrics
+recount_qc.star.._reads_unmapped._other_both,Percentage_unmapped_other_both_STAR,No,Sequencing metrics
+recount_qc.star.._reads_unmapped._too_many_mismatches_both,Percentage_unmapped_too_many_mismatches_both_STAR,No,Sequencing metrics
+recount_qc.star.._reads_unmapped._too_short_both,Percentage_unmapped_too_short_both_STAR,No,Sequencing metrics
+recount_qc.star.uniquely_mapped_reads_._both,Percentage_uniquely_mapped_both_STAR,No,Sequencing metrics
+Sample.Characteristic.Ontology.Term.developmental.stage.,OntologyAge,No,Phenotype
+Sample.Characteristic.Ontology.Term.individual.,OntologyIndividual,No,Phenotype
+Sample.Characteristic.Ontology.Term.karyotype.,KaryotypeOntology,No,Phenotype
+Sample.Characteristic.organism.,Organism,No,Phenotype
+Sample.Characteristic.Ontology.Term.organism.,OrganismOntology,No,Phenotype
+Sample.Characteristic.Ontology.Term.organism.part.,StructureOntology,No,Sample characteristics
+Sample.Characteristic.Ontology.Term.sampling.site.,HemisphereOntology,No,Sample characteristics
+Factor.Value.developmental.stage.,NA,No,Sample characteristics
+Factor.Value.Ontology.Term.developmental.stage.,NA,No,Sample characteristics
+Factor.Value.organism.part.,NA,No,Sample characteristics
+Factor.Value.Ontology.Term.organism.part.,NA,No,Sample characteristics
+Analysed,NA,No,Sample characteristics
+rail_id,RunID,No,Sample characteristics
+study,StudyID,No,Sample characteristics
+sra.sample_acc.x,SampleACC,No,Sample characteristics
+sra.experiment_acc,ExperimentACC,No,Sample characteristics
+sra.submission_acc,SubmissionACC,No,Sample characteristics
+sra.submission_center,SubmissionCentre,No,Sample characteristics
+sra.submission_lab,SubmissionLab,No,Sample characteristics
+sra.study_title,StudyTitle,No,Sample characteristics
+sra.study_abstract,StudyAbstract,No,Sample characteristics
+sra.study_description,StudyDescription,No,Sample characteristics
+sra.experiment_title,ExperimentTitle,No,Sample characteristics
+sra.design_description,DesignDescription,No,Sample characteristics
+sra.sample_description,SampleDescription,No,Sample characteristics
+sra.library_name,LibraryName,No,Sequencing metrics
+sra.library_strategy,LibraryStrategy,No,Sequencing metrics
+sra.library_source,LibrarySource,No,Sequencing metrics
+sra.library_selection,LibrarySelection,No,Sequencing metrics
+sra.library_layout,LibraryLayout,No,Sequencing metrics
+sra.paired_nominal_length,PairedNominalLength,No,Sequencing metrics
+sra.paired_nominal_stdev,PairedNominalStdev,No,Sequencing metrics
+sra.library_construction_protocol,LibraryConstructionProtocol,No,Sequencing metrics
+sra.platform_model,PlatformModel,No,Sequencing metrics
+sra.sample_attributes,SampleAttributes,No,Sequencing metrics
+sra.experiment_attributes,ExperimentAttributes,No,Sequencing metrics
+sra.spot_length,SpotLength,No,Sequencing metrics
+sra.sample_name,SampleName,No,Sequencing metrics
+sra.sample_title,SampleTitle,No,Sequencing metrics
+sra.sample_bases,SampleBases,No,Sequencing metrics
+sra.sample_spots,SampleSpots,No,Sequencing metrics
+sra.run_published,RunPublished,No,Sequencing metrics
+sra.size,Size,No,Sequencing metrics
+sra.run_total_bases,RunTotalBases,No,Sequencing metrics
+sra.num_reads,NumReads,No,Sequencing metrics
+sra.num_spots,NumSpots,No,Sequencing metrics
+sra.read_info,ReadInfo,No,Sequencing metrics
+sra.run_alias,RunAlias,No,Sequencing metrics
+sra.run_center_name,Run_Center_Name,No,Sequencing metrics
+sra.run_broker_name,Run_Broker_name,No,Sequencing metrics
+sra.run_center,Run_Center,No,Sequencing metrics
+recount_project.project,RecountProject,No,Sequencing metrics
+recount_project.organism,Organism_recount,No,Sequencing metrics
+recount_project.file_source,FileSource_Recount,No,Sequencing metrics
+recount_project.metadata_source,Metadata_source,No,Sequencing metrics
+recount_project.date_processed,Processed_Recount,No,Sequencing metrics
+recount_qc.bc_auc.all_reads_annotated_bases,AUC_all_annotated_exons,No,Sequencing metrics
+recount_qc.bc_auc.unique_reads_annotated_bases,AUC_all_annotated_exons_unique,No,Sequencing metrics
+recount_qc.bc_frag.kallisto_count,ReadFragmentLength,No,Sequencing metrics
+recount_qc.bc_frag.kallisto_mean_length,MeanFragmentLength,No,Sequencing metrics
+recount_qc.bc_frag.mean_length,MeanFragmentLength_BAM,No,Sequencing metrics
+recount_qc.bc_frag.mode_length,ModeFragmentLength,No,Sequencing metrics
+recount_qc.star.._of_chimeric_reads,Percentage_chimeric_reads_STAR,No,Sequencing metrics
+recount_qc.star.average_input_read_length,Average_input_read_length_STAR,No,Sequencing metrics
+recount_qc.star.average_mapped_length,Average_mapped_length_STAR,No,Sequencing metrics
+recount_qc.star.deletion_average_length,Deletion_average_length_STAR,No,Sequencing metrics
+recount_qc.star.deletion_rate_per_base,Delelion_rate_per_base_STAR,No,Sequencing metrics
+recount_qc.star.insertion_average_length,Insertion_average_length_STAR,No,Sequencing metrics
+recount_qc.star.insertion_rate_per_base,Insertion_rate_per_base_STAR,No,Sequencing metrics
+recount_qc.star.mapping_speed._million_of_reads_per_hour,Mapping_speed_per_hour_STAR,No,Sequencing metrics
+recount_qc.star.mismatch_rate_per_base._.,Percentage_mismatch_per_base_STAR,No,Sequencing metrics
+recount_qc.star.number_of_chimeric_reads,Number_of_chimeric_reads_STAR,No,Sequencing metrics
+recount_qc.star.number_of_reads_mapped_to_multiple_loci,Number_reads_mapped_to_multiple_loci_STAR,No,Sequencing metrics
+recount_qc.star.number_of_reads_mapped_to_too_many_loci,Number_reads_mapped_to_too_many_loci_STAR,No,Sequencing metrics
+recount_qc.star.number_of_reads_unmapped._other,Number_reads_unmapped_other_STAR,No,Sequencing metrics
+recount_qc.star.number_of_reads_unmapped._too_many_mismatches,Number_reads_unmapped_mismatches_STAR,No,Sequencing metrics
+recount_qc.star.number_of_reads_unmapped._too_short,Number_reads_unmapped_too_short_STAR,No,Sequencing metrics
+recount_qc.star.number_of_splices._at.ac,Number_canonical_splices_AT_AC_STAR,No,Sequencing metrics
+recount_qc.star.number_of_splices._annotated_.sjdb.,Number_splices_found_annotation_DB_STAR,No,Sequencing metrics
+recount_qc.star.number_of_splices._gc.ag,Number_canonical_splices_GC_AG_STAR,No,Sequencing metrics
+recount_qc.star.number_of_splices._gt.ag,Number_canonical_splices_GT_AG_STAR,No,Sequencing metrics
+recount_qc.star.number_of_splices._non.canonical,Number_non_canonical_splices_STAR,No,Sequencing metrics
+recount_qc.star.number_of_splices._total,Number_splices_total_STAR,No,Sequencing metrics
+recount_qc.star.number_of_chimeric_reads_both,Number_chimeric_reads_both_STAR,No,Sequencing metrics
+recount_qc.star.number_of_reads_mapped_to_multiple_loci_both,Number_reads_mapped_multiple_loci_both_STAR,No,Sequencing metrics
+recount_qc.star.number_of_reads_mapped_to_too_many_loci_both,Numner_reads_mapped_too_many_loci_both_STAR,No,Sequencing metrics
+recount_qc.star.number_of_reads_unmapped._other_both,Number_reads_unmapped_other_both_STAR,No,Sequencing metrics
+recount_qc.star.number_of_reads_unmapped._too_many_mismatches_both,Number_reads_unmapped_mismatches_both_STAR,No,Sequencing metrics
+recount_qc.star.number_of_reads_unmapped._too_short_both,Number_reads_unmapped_too_short_both_STAR,No,Sequencing metrics
+recount_qc.star.uniquely_mapped_reads_number_both,Number_reads_mapped_uniquely_both_STAR,No,Sequencing metrics
+recount_qc.star.._chimeric_reads_both,Percent_Chimeric_both,No,Sequencing metrics
+recount_seq_qc.min_len,MinReadLength,No,Sequencing metrics
+recount_seq_qc.max_len,MaxReadLength,No,Sequencing metrics
+recount_seq_qc.avg_len,Average_length,No,Sequencing metrics
+recount_seq_qc..distinct_quality_values,DIstinctQualityValues,No,Sequencing metrics
+recount_seq_qc..bases,Percent_Bases,No,Sequencing metrics
+recount_seq_qc..a,Percent_A,No,Sequencing metrics
+recount_seq_qc..c,Percent_C,No,Sequencing metrics
+recount_seq_qc..g,Percent_G,No,Sequencing metrics
+recount_seq_qc..t,Percent_T,No,Sequencing metrics
+recount_seq_qc..n,Percent_N,No,Sequencing metrics
+recount_seq_qc.avgq,Average_Phred,No,Sequencing metrics
+recount_seq_qc.errq,ErrQ,No,Sequencing metrics
+recount_pred.sample_acc.y,SampleAccPrediction,No,Sequencing metrics
+recount_pred.curated.type,CuratedTypePrediction,No,Sequencing metrics
+recount_pred.curated.tissue,CuratedTissuePrediction,No,Sequencing metrics
+recount_pred.pattern.predict.type,PatternPredictionType,No,Sequencing metrics
+recount_pred.pred.type,PredictionType,No,Sequencing metrics
+recount_pred.curated.cell_type,CellTypePrediction,No,Sequencing metrics
+recount_pred.curated.cell_line,CellLinePrediction,No,Sequencing metrics
+BigWigURL,BigWigFile,No,Sequencing metrics
+NA,Proportion of Neurons (MultiBrain),Yes,Cell Type
+NA,Proportion of Astrocytes (MultiBrain),Yes,Cell Type
+NA,Proportion of Microglia (MultiBrain),Yes,Cell Type
+NA ,Proportion of Endothelia (MultiBrain),Yes,Cell Type
+NA ,Proportion of Oligodendrocytes (MultiBrain),Yes,Cell Type

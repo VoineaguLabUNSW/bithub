@@ -1,0 +1,1758 @@
+---
+title: "Pre-processing of metadata and expression matrices"
+author: "Urwah Nawaz"
+date: "2023-09-20"
+output:
+  html_document:
+    toc: true
+    toc_float: 
+      collapsed: true
+    df_print: paged
+    code_folding: hide
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    autodep = TRUE,
+    eval = TRUE,
+	echo = TRUE,
+	warning = FALSE,
+	message = FALSE
+)
+```
+
+
+# Introduction 
+
+This R markdown document contains code to pre-process RNA-seq files for BITHub. Both expression matrices and metadata were retrieved as described in Table 1 in the GitHub Repository. 
+
+In order to re-run the scripts, please change the location of input files. All directories are defined in `config/paths-example.yaml`. For each dataset, a pre-defined annotation file exists in the `data/annotations` folder. These files contains the original metadata name, and the BITHub column name for each dataset. 
+
+A copy of each processed metadata will also be saved in 'output/metadata/'.
+
+## Harmonization of metadata 
+
+* Stages defined in def stages 
+* anatomical regions defined in def regions and more explicity explained in Supp table and atlas 
+* include photos 
+
+## Selection of metadata variables 
+
+Each metadata column was categorized into one of the following four categories:
+
+* Phenotype attributes, describing observable characteristics relating to samples such as DonorID, Diagnosis, Sex and Age.
+
+* Sample characteristics: referring to sample specific metrics such as site of sampling.
+
+* Sequencing metrics: covering quality control (QC) metrics of a given RNA-seq sample, including QC output of bioinformatics protocol of a given sample.
+
+* Cell type: capturing information on cell-types or cell specific metrics related to the single-nucleus RNA-seq or cell-type deconvolution for bulk RNA-seq datasets. 
+
+
+Metadata were filtered prior to inclusion in BITHub to redunce redundancy and improve inerpretability. 
+
+Filtering rules: 
+
+* Drop variables with a single value across all samples 
+
+* Drop variables with mostly missing values of `NA/Unknown`
+
+* Drop categorial variables with > 50 categories (e.g DonorID)
+
+* For sequencing metrics, drop variables that are highly correlated with another metric within the same dataset and keep one representative metric 
+
+
+Metadata were filtered prior to inclusion in BITHub to reduce redundancy and improve interpretability. 
+
+Filtering excluded:
+
+* Variables with a single value across samples
+
+* Variables with predominantly missing values
+
+*  Categorical variables with more than 50 levels. 
+
+Sequencing metrics that were highly correlated within a dataset were flagged to identify redundancy, and typically one representative metric was retained. Exceptions were made after manual review when keeping both metrics was useful and informative.
+
+
+```{r libraries}
+library(recount3)
+library(magrittr)
+library(tibble)
+library(reshape2)
+library(SummarizedExperiment)
+library(corrplot)
+library(dplyr)
+library(ggvenn)
+library(pander)
+library(gridExtra)
+library(variancePartition)
+library(DT)
+library(EnsDb.Hsapiens.v86)
+library(AnnotationHub)
+library(stargazer)
+library(ggfortify)
+library(patchwork)
+library(foreach)
+library(glue)
+library(cowplot)
+library(broom)
+library(glmpca)
+library(DT)
+library(naniar)
+library(Seurat)
+source(here::here("code/functions.R"))
+source(here::here("code/def_stages.R"))
+source(here::here("code/def_death.R"))
+source(here::here("code/def_regions.R"))
+
+paths <- yaml::read_yaml(here::here("config/paths-example.yaml"))
+```
+
+
+
+```{r set-up}
+strc_acr <- map_df(structure_acronym, ~as.data.frame(.x), .id="id") %>% 
+  set_colnames("Structure Acronym")
+colnames(strc_acr)[2] = c("Structure")
+
+rgns = map_df(regions, ~as.data.frame(.x), .id="id") %>% 
+  set_colnames("Regions")
+colnames(rgns)[2] = c("Structure Acronym")
+
+
+rgns_ftl = map_df(regions_fetal, ~as.data.frame(.x), .id="id") %>% 
+  set_colnames("Regions")
+colnames(rgns_ftl)[2] = c("Structure Acronym")
+
+order_vec <- c("Phenotype",
+               "Sample characteristics",
+               "Cell Type",
+               "Sequencing metrics")
+```
+
+# Bulk RNA-seq data 
+
+## BrainSeq
+
+The BrainSeq data used for BITHub is obtained from BrainSeq Phase 2, which comprises RiboZero bulk RNA-seq data from the dorsolateral prefrontal cortex (DLPFC), and hippocampus (HIP). This cohort includes neurotypical individuals spanning from prenatal stages to ageing, as well as adult patients diagnosed with schizophrenia. 
+
+The [gene expression matrices and the corresponding sample level metadata](https://s3.us-east-2.amazonaws.com/libd-brainseq2/rse_gene_unfiltered.Rdata) were downloaded from the BrainSeq consortium website. The release also includes pre-computed [cell type deconvolution estimates](https://s3.us-east-2.amazonaws.com/libd-brainseq2/methprop_pd.Rdata) which were generated as a part of the BrainSeq Phase 2 processing pipeline. 
+
+### Metadata pre-processing
+
+```{r load-bseq}
+bseq.annot = read.csv(here::here("data/annotations/BrainSeq-metadata-annot.csv"), 
+                      header = TRUE, 
+                      check.names=FALSE)
+load(file.path(paths$bulk$raw$brainseq, "rse_gene_unfiltered.Rdata"), envir = .GlobalEnv)
+load(file.path(paths$bulk$raw$brainseq,"methprop_pd.Rdata"), envir = .GlobalEnv)
+```
+ 
+  
+```{r preprocess-bseq}
+x = rse_gene@colData %>% 
+  as.data.frame() %>%
+  t() %>% as.data.frame()
+replicated <- colnames(x)[grep(",", x["SAMPLE_ID",])]
+y <- as.list(x)
+y[replicated] <- lapply(y[replicated], function(z) {
+  # which variables to merge
+  to.weight <- which(sapply(z, length) > 1 & sapply(z, class) %in% c("numeric", "integer"))
+  # weighting of the merge
+  weighting <- z$numReads # total reads
+  weighting <- weighting / sum(weighting) # rather than a straight average, it's based on the number of reads
+  
+  # apply weighting
+  z[to.weight] <- lapply(z[to.weight], function(zz) {
+    if (length(weighting) == length(zz)) {
+      sum(weighting * zz)
+      } else {
+          NaN
+        }
+        
+      })
+      
+      # quickly fix character variables
+      char <- which(sapply(z, length) > 1 & sapply(z, class) == "character")
+      z[char] <- lapply(z[char], function(zz) {
+        paste(zz, collapse = " & ")
+      })
+      
+      return(z)
+    })
+    
+w <- lapply(y, as.data.frame)
+w <- do.call("rbind", w)
+comp <- as.data.frame(pd)
+comp <- comp[,57:64]
+m <- match(rownames(comp), rownames(w)) # they are
+md<- cbind(w, comp[m,])
+    
+md = rename_from_annot(md, bseq.annot)
+    
+    
+# Adding features 
+md %<>% 
+  rownames_to_column("SampleID") %>%
+  mutate(Period = ifelse(.$`Age (Numeric)` > 0, "Postnatal", "Prenatal"), 
+                   `Structure Acronym` = gsub("HIPPO", "HIP", .$`Structure Acronym`),
+                   Diagnosis = gsub("Schizo", "Schizophrenia", .$Diagnosis)) %>%
+      mutate(Regions = add_feature(.$`Structure Acronym`, regions)) %>% 
+      mutate(Age_rounded = as.character(sapply(na.omit(.$`Age (Numeric)`), num_to_round))) %>% as.data.frame() %>%
+      mutate(`Age Interval` = as.character(add_feature(.$Age_rounded, age_intervals))) %>% 
+      dplyr::select(-Age_rounded) %>%
+      dplyr::select("SampleID", everything()) %>%
+      as.data.frame()
+```
+
+After harmonization of metadata, a series of exploratory analyses, including correlation analysis was performed to remove redundant or non-informative metadata. 
+
+For categorical metadata, a table is shown below which total number of unique values in each category.
+
+```{r}
+cat_tbl <- cat_summary(md, max_show = 50)
+
+
+cat_tbl %>% as.data.frame() %>% DT::datatable(caption= "Summary of all categorial metadata in BrainSeq")
+```
+
+
+For sequencing metrics, a correlation analysis was performed using the `corrplot` R package. 
+```{r}
+seq_cols <- get_seq_metrics_cols(bseq.annot)  
+seq_cols <- intersect(seq_cols, colnames(md))    
+```
+
+```{r}
+res <- select_seq_metrics(
+  md = md,
+  seq_cols = seq_cols,
+  corr_thresh = 0.95,
+  missing_thresh = 0.5,
+  min_unique = 2,
+  prefer = "less_missing"
+)
+
+res$summary %>% DT::datatable(caption="Summary and correlation of all seqeuncing metrics metadata in BrainSeq")
+
+```
+
+```{r, fig.width=8, fig.height=8, fig.cap="Correlation plot showing correlation of sequencing metrics in BrainSeq"}
+
+md.clean = md %>% 
+  dplyr::select(contains(seq_cols))
+md.clean = md.clean %>% select_if(~ !any(is.na(.)))
+md.clean = md.clean[vapply(md.clean, function(x) length(unique(x)) > 1, logical(1L))]
+
+M = cor(data.matrix(md.clean), use = "complete.obs")
+corrplot(M, order='hclust',
+         method = "circle", 
+         number.cex = .50, 
+         tl.cex=0.75)
+
+
+```
+
+
+
+Based on the above filtering criteria, followed by manual inspection, categorial metadata which have >50 unique or non-informative values were dropped. Additionally highly correlating sequencing metrics were also dropped. Additionally, FastQC metrics and SNP-based principal components were also removed. 
+
+
+
+
+```{r}
+bseq.order = bseq.annot %>% 
+  dplyr::mutate(`Include (Yes/No) - Interest` = ifelse(BITColumnName == "Reads Mapped to Mitochondrial Genes", "No", `Include (Yes/No) - Interest`)) %>%
+  dplyr::filter(`Include (Yes/No) - Interest` == "Yes") %>% 
+  arrange(factor(Type, levels = order_vec)) %>% 
+  arrange(factor(BITColumnName, levels = c("SampleID",
+                                          "Age Interval",
+                                          "Age (Numeric)",
+                                          "Period",
+                                          "DonorID", 
+                                          "Sex", 
+                                          "Ethnicity",
+                                          "Diagnosis",
+                                          "Structure Acronym",
+                                          "Regions",
+                                          "Proportion of Neurons (MultiBrain)",
+                                          "Proportion of Astrocytes (MultiBrain)",
+                                          "Proportion of Microglia (MultiBrain)",
+                                          "Proportion of Oligodendrocytes (MultiBrain)",
+                                          "Proportion of Endothelia (MultiBrain)"
+                                          )))
+
+```
+
+
+```{r}
+md %>% 
+  dplyr::select(contains(bseq.order$BITColumnName)) %>%
+  DT::datatable(caption = "BrainSeq metadata after harmonizing column names, ages and structure acronyms, and filtering for redundancy.")
+md %<>% 
+  dplyr::select(contains(bseq.order$BITColumnName))
+```
+
+In total BrainSeq contains `r length(unique(colnames(md)))` metadata columns. Here is the metadata summary:  
+
+
+* Categorical values 
+
+```{r}
+res <- profile_df(md)
+res$categorical_tables %>%
+  do.call(rbind,.) %>% 
+  DT::datatable(caption = "Summary for the selected categorial BrainSeq metadata, including number of samples per category and total proprotion of samples in the category")
+```
+
+
+```{r, fig.width = 10, fig.height = 14, fig.cap="Barplot showing counts of categorial metadata for BrainSeq"}
+wrap_plots(res$categorical_plots, ncol = 3)
+```
+
+
+* Numerical values 
+
+```{r}
+
+
+res$numeric_summary %>% DT::datatable(caption = "Summary statistics for the selected numerical BrainSeq metadata, including number of samples per category, range of numerical distributions and number of samples with NAs.")
+```
+
+
+```{r, fig.width = 10, fig.height = 14, fig.cap = "Histogram showing distribution of numerical metadata."}
+wrap_plots(res$numeric_plots, ncol = 3)
+```
+
+
+
+
+
+### Gene expression pre-processing
+```{r exp-gene}
+exp = rse_gene@assays@.xData$data$rpkm
+rownames(exp) <- sub("\\.[0-9]*$", "", rownames(exp))
+```
+### Export data
+```{r}
+#write.csv(exp, file = file.path(bseq.out, "BrainSeq-exp.csv"))
+#write.csv(md, file = file.path(bseq.out, "BrainSeq-metadata.csv"))
+write.csv(md, file = file.path(here::here("output/metadata"), "BrainSeq-metadata.csv"))
+write.csv(bseq.order , file = file.path(here::here("data/annotations"), "BrainSeq-annot-final.csv"))
+```
+
+```{r include=FALSE}
+rm(exp)
+rm(md)
+```
+
+## BrainSpan
+
+The BrainSpan dataset comprises 524 anatomically annotated post-mortem samples across multiple brain regions, obtained from donors spanning early postnatal development to ageing
+
+The [expression matrix](http://www.brainspan.org/api/v2/well_known_file_download/267666525) and [metadata](http://www.brainspan.org/api/v2/well_known_file_download/267666525) were downloaded from the [BrainSpan Developmental Altas](https://www.brainspan.org/rnaseq/search/index.html). Additional metadata which includes sequencing metrics including PMI, RIN and pH was downloaded from the [Allen Brain Atlas](https://help.brain-map.org/download/attachments/3506181/Human_Brain_Seq_Stages.pdf?). 
+
+
+
+### Metadata pre-processing
+
+```{r load-bspan}
+bspan.annot = read.csv(here::here("data/annotations/BrainSpan-metadata-annot.csv"), 
+                       header = TRUE, 
+                       check.names = FALSE)
+
+columns.metadata = read.csv(file.path(paths$bulk$raw$brainspan, "columns_metadata.csv"), header = TRUE)
+exp = read.csv(file.path(paths$bulk$raw$brainspan, "expression_matrix.csv"),
+               header= FALSE, row.names= 1)
+rows.metadata = read.csv(file.path(paths$bulk$raw$brainspan, "rows_metadata.csv"))
+```
+
+
+```{r md-bspan}
+columns.metadata = rename_from_annot(columns.metadata, bspan.annot)
+
+md = columns.metadata %>%
+      mutate(Stage = add_feature(.$Age, stages),
+             `Age Interval` = add_feature(.$Age, age_intervals),
+             Age = gsub(" ","_", .$Age)) %>%
+      mutate(SampleID = paste(DonorID, Age, `Structure Acronym`, Stage, sep = "_"),
+             DonorName = gsub("\\.","_", .$DonorName),
+            `Structure Acronym` = gsub("DFC", "DLPFC", `Structure Acronym`),
+            `Structure Acronym` = gsub("MFC", "ACC", `Structure Acronym`)) %>%  ## Changed this for consistency across the datasets
+  mutate(Regions = add_feature(.$`Structure Acronym`, regions)) %>%
+    mutate(
+    `Age (Numeric)` = case_when(
+      str_detect(Age, regex("pcw", ignore_case = TRUE)) ~
+        (as.numeric(str_remove(Age, "_pcw")) - 40) / 52,
+      str_detect(Age, regex("mos", ignore_case = TRUE)) ~
+        as.numeric(str_remove(Age, "_mos")) / 12,
+      str_detect(Age, regex("yrs", ignore_case = TRUE)) ~
+        as.numeric(str_remove(Age, "_yrs")),
+      TRUE ~ NA_real_
+    )
+  ) %>% mutate(Period = ifelse(.$`Age (Numeric)` >= 0, "Postnatal", "Prenatal"),
+                   colname = paste(DonorName, Age, `Structure Acronym`, sep = "_"))
+```
+
+
+
+```{r}
+md.excel = read_excel(here::here("data/annotations/BrainSpan-additional.xlsx"),sheet =2, col_names = TRUE, skip =1) %>%
+      as.data.frame() %>% mutate_at(.vars = "AllenInstituteID",
+                                    .funs = gsub, pattern = "\\.", replacement = "\\_") %>%
+      mutate_at(.vars = "Age", .funs = gsub, pattern = "PCW", replacement = "_pcw") %>%
+      mutate_at(.vars = "Age", .funs = gsub, pattern = "M", replacement = "_mos") %>%
+      mutate_at(.vars = "Age", .funs = gsub, pattern = "Y", replacement = "_yrs") %>%
+      mutate_at(.vars = "Region/Area", .funs = gsub, pattern = "\\/", replacement = "-") %>%
+      mutate(colname = paste(AllenInstituteID, Age, `Region/Area`, sep = "_")) %>%
+      dplyr::select(-c(Agerange, Age, Description))
+
+md = md %>%
+      left_join(.,md.excel, by = "colname", keep = TRUE)
+```
+
+```{r}
+md.excel = read_excel(here::here("data/annotations/BrainSpan-additional.xlsx"), sheet = 1, col_names = TRUE) %>%
+      as.data.frame() %>%
+      mutate_at(.vars="Internal ID", .funs = gsub, pattern = "\\.", replacement = "\\_") %>%
+      dplyr::rename("Braincode" = "External ID")
+
+md %<>%
+  left_join(md.excel, by ="Braincode") %>%
+      dplyr::select(-c("Age.y", "colname.y", "colname.x", "Gender", AllenInstituteID,
+                     "Region/Area", "Internal ID")) %>%
+      dplyr::rename("Ethnicity"="Ethn.")  %>%
+  distinct(SampleID, .keep_all = TRUE)
+
+
+
+md = md[!duplicated(md[,c('column_num')]),]
+md %<>%
+      dplyr::arrange(column_num)
+
+md %<>%
+  dplyr::select(-DonorID) %>% ## DonorID is numeric but DonorName is character, so replacing this
+  dplyr::rename(DonorID = DonorName,
+                `PMI (hours)` = "PMI",
+                `Dissection Score` = Dissectionscore) %>%
+  mutate(
+  Ethnicity = recode(
+    Ethnicity,
+    "E"   = "CAUC",
+    "H"   = "HISP",
+    "As"  = "AS",
+    "A"   = "AA",
+    "A/E" = "Multiracial",
+    .default = Ethnicity
+  )
+) %>% 
+  mutate( `PMI (hours)` = as.numeric( `PMI (hours)`),
+          `Dissection Score` = as.numeric(`Dissection Score`),
+          `pH` = as.numeric(`pH`))
+  
+```
+
+After harmonization of metadata, a series of exploratory analyses, including correlation analysis was performed to remove redundant or non-informative metadata. 
+
+For categorical metadata, a table is shown below which total number of unique values in each category.
+
+
+```{r}
+cat_tbl <- cat_summary(md, max_show = 50)
+
+
+cat_tbl %>% as.data.frame() %>% DT::datatable()
+```
+
+For sequencing metrics, a correlation analysis was performed using the `corrplot` R package. 
+
+```{r}
+seq_cols <- get_seq_metrics_cols(bspan.annot)  
+seq_cols <- intersect(seq_cols, colnames(md))    
+```
+
+```{r}
+res <- select_seq_metrics(
+  md = md,
+  seq_cols = seq_cols,
+  corr_thresh = 0.95,
+  missing_thresh = 0.5,
+  min_unique = 2,
+  prefer = "less_missing"
+)
+
+res$summary %>% DT::datatable()
+
+```
+
+```{r fig.cap="Correlation plot sequencing metrics in BrainSpan"}
+
+md.clean = md %>% 
+  dplyr::select(contains(seq_cols))
+#md.clean = md.clean %>% select_if(~ !any(is.na(.)))
+md.clean = md.clean[vapply(md.clean, function(x) length(unique(x)) > 1, logical(1L))]
+
+M = cor(data.matrix(md.clean), use = "complete.obs")
+corrplot(M, order='hclust',
+         method = "circle", 
+         number.cex = .50, 
+         tl.cex=0.75)
+
+
+```
+
+Other than BrainCode, no metadata variables were removed from the BrainSpan meatdata. 
+
+```{r}
+bspan.order = bspan.annot %>%
+  dplyr::filter(`Include (Yes/No) - Interest` == "Yes" | BITColumnName == "Dissection Score") %>%
+  arrange(factor(Type, levels = order_vec)) %>%
+  mutate(BITColumnName = ifelse(BITColumnName == "DonorName", "DonorID", BITColumnName)) %>%
+  arrange(factor(BITColumnName, levels = c("Age Interval",
+                                          "Age (Numeric)",
+                                          "Period",
+                                          "DonorID",
+                                          "Sex",
+                                          "Ethnicity",
+                                          "Diagnosis",
+                                          "Structure Acronym",
+                                          "Regions",
+                                          "SampleID",
+                                          "Proportion of Neurons (MultiBrain)",
+                                          "Proportion of Astrocytes (MultiBrain)",
+                                          "Proportion of Microglia (MultiBrain)",
+                                          "Proportion of Oligodendrocytes (MultiBrain)",
+                                          "Proportion of Endothelia (MultiBrain)"
+                                          )))
+
+```
+
+
+```{r bspan-md-final}
+md %>%
+  dplyr::select(contains(bspan.order$BITColumnName)) %>%
+  DT::datatable(caption = "BrainSpan Metadata after harmonizing column names, ages and structure acronyms")
+
+md %<>%
+  dplyr::select(contains(bspan.order$BITColumnName)) %>%
+  dplyr::select(SampleID, everything())
+```
+
+
+In total BrainSpan contains `r length(unique(colnames(md)))` metadata columns. Here is the metadata summary:  
+
+* Categorical values 
+
+```{r}
+res <- profile_df(md)
+res$categorical_tables %>%
+  do.call(rbind,.) %>% 
+  DT::datatable(caption = "Summary for the selected categorial BrainSpan metadata, including number of samples per category and total proprotion of samples in the category")
+```
+
+
+```{r, fig.width = 10, fig.height = 14, fig.cap="Barplot showing counts of categorial metadata for BrainSpan"}
+wrap_plots(res$categorical_plots, ncol = 3)
+```
+
+
+* Numerical values 
+
+```{r}
+
+
+res$numeric_summary %>% DT::datatable(caption = "Summary statistics for the selected numerical BrainSpan metadata, including number of samples per category, range of numerical distributions and number of samples with NAs.")
+```
+
+
+```{r, fig.width = 10, fig.height = 14, fig.cap = "Histogram showing distribution of numerical metadata."}
+wrap_plots(res$numeric_plots, ncol = 3)
+```
+
+
+
+
+### Expression data
+```{r exp-rename}
+colnames(exp) = md$SampleID
+rownames(exp) <- rows.metadata$ensembl_gene_id
+```
+
+
+
+### Export
+
+```{r}
+#write.csv(exp, file = file.path(paths$bulk$formatted$brainspan, "BrainSpan-exp.csv"))
+#write.csv(md, file = file.path(paths$bulk$formatted$brainspan,  "BrainSpan-metadata.csv"))
+write.csv(md, file = file.path(here::here("output/metadata"), "BrainSpan-metadata.csv"))
+write.csv(bspan.order, file = file.path(here::here("data/annotations"), "BrainSpan-annot-final.csv"))
+```
+
+```{r include =FALSE}
+rm(exp)
+rm(md)
+rm(rows.metadata)
+rm(columns.metadata)
+```
+
+
+
+
+
+## GTEx
+
+The GTEx dataset provides RNA-seq profiles across a broad range of adult human tissues, including from several regions of the brain. 
+
+
+Gene expression data and associated sample-level metadata were retrieved directly from the GTEx portal. For inclusion in BITHub, the dataset was subset to retain brain samples only, with non-brain tissues excluded. 
+
+```{r}
+gtex.annot = read.csv(here::here("data/annotations/GTEx-metadata-annot.csv"),
+                      header = TRUE,
+                      check.names= FALSE)
+
+attributes = list.files(paths$bulk$raw$gtex, full.names = TRUE, pattern = "\\SampleAttributesDS.txt") # Sample attributes contains sample level information
+phenotype = list.files(paths$bulk$raw$gtex, full.names = TRUE, pattern = "\\SubjectPhenotypesDS.txt") # Phenotype level information related to each donor
+```
+
+
+```{r}
+md.attrbutes = read_tsv(attributes, col_types = c('.default' = 'c')) %>%
+      dplyr::filter(SMTS == 'Brain') %>%
+      mutate(SUBJID = sapply(str_split(SAMPID, pattern = "-"),
+                             function(x) paste(x[1:2], collapse = '-'))) %>%
+  left_join(read_tsv(phenotype, col_types = c('.default' = 'c')))  %>%
+  as.data.frame()
+
+
+md.attrbutes = rename_from_annot(md.attrbutes, gtex.annot)
+
+md.attrbutes %<>%
+  as.data.frame() %>%
+  mutate(`Structure Acronym` = add_feature(.$`Structure Acronym`, structure_acronym)) %>%
+      mutate(Regions = add_feature(.$`Structure Acronym`, regions),
+             `Age Interval` = paste(.$`Age Interval`, "yrs", sep = ""),
+             Sex = ifelse(Sex == 1, "M", "F"), ## Information taken from the corresponding excel sheet provided
+             Period = "Postnatal") %>%
+  as.data.frame() %>%
+  mutate(
+    `PMI (hours)` = as.numeric(`PMI (hours)`) / 60,
+
+    `Hardy Scale` = recode(
+      as.character(`Hardy Scale`), ## Coded from GTEx excel sheet
+      "0" = "Ventilator Case",
+      "1" = "Violent and fast death",
+      "2" = "Fast death of natural causes",
+      "3" = "Intermediate Death",
+      "4" = "Natural Death",
+      .default = as.character(`Hardy Scale`)
+    ),
+
+    `Autolysis Score` = recode(
+      as.character(`Autolysis Score`), ## Coded from GTEx excel sheet
+      "0" = "None",
+      "1" = "Mild",
+      "2" = "Moderate",
+      "3" = "Severe",
+      .default = as.character(`Autolysis Score`)
+    )
+  ) 
+```
+
+
+```{r gtex-exp}
+exp = list.files(paths$bulk$raw$gtex, full.names = TRUE, pattern = "\\gene_tpm.gct.gz") # File used for expression matrix
+
+exp = read.delim(exp, skip = 2)
+colnames(exp) <- gsub("\\.", "-", colnames(exp)) # Changing expression file names to match metadata SampleIDs
+exp %<>% column_to_rownames("Name")
+
+exp = exp %>%
+      dplyr::select(contains(md.attrbutes$SampleID))
+message(paste0("Samples subsetted - Exp matrix contains ", ncol(exp), " samples"))
+rownames(exp) <- sub("\\.[0-9]*$", "", rownames(exp))
+
+md.attrbutes= md.attrbutes[which(md.attrbutes$SampleID %in% colnames(exp)),]  ## Only keeping sampleIDs which are present in the expression matrix
+```
+
+
+After harmonization of metadata, a series of exploratory analyses, including correlation analysis was performed to remove redundant or non-informative metadata. 
+
+For categorical metadata, a table is shown below which total number of unique values in each category.
+
+```{r}
+cat_tbl <- cat_summary(md.attrbutes, max_show = 50)
+
+
+cat_tbl %>% as.data.frame() %>% DT::datatable()
+```
+
+
+For sequencing metrics, a correlation analysis was performed for flagging potentially redundant variables.
+
+```{r}
+seq_cols <- get_seq_metrics_cols(gtex.annot)
+seq_cols <- intersect(seq_cols, colnames(md.attrbutes))
+```
+
+```{r}
+res <- select_seq_metrics(
+  md = md.attrbutes,
+  seq_cols = seq_cols,
+  corr_thresh = 0.95,
+  missing_thresh = 0.5,
+  min_unique = 2,
+  prefer = "less_missing"
+)
+
+res$summary %>% DT::datatable(caption = "Summary and correlation of all seqeuncing metrics metadata in GTEx")
+
+```
+
+
+```{r fig.cap="Correlation plot showing highly correlating metadata variables in GTEx"}
+
+md.clean = md.attrbutes %>%
+  dplyr::select(contains(seq_cols))
+#md.clean = md.clean %>% select_if(~ !any(is.na(.)))
+md.clean = md.clean[vapply(md.clean, function(x) length(unique(x)) > 1, logical(1L))]
+
+M = cor(data.matrix(md.clean), use = "complete.obs")
+corrplot(M, order='hclust',
+         method = "circle",
+         number.cex = .50,
+         tl.cex=0.75)
+
+
+```
+
+Although several sequencing metrics were flagged for removal in the final metadata matrix, they were retained where they corresponded to standard quality control measures that provide relevant technical or experimental context.
+
+
+```{r}
+gtex.order = gtex.annot %>%
+  dplyr::filter(`Include (Yes/No) - Interest` == "Yes") %>%
+  mutate(Type = ifelse(Type == "Sample charactertics", "Sample characteristics", Type)) %>% ## In case there is any misspelling
+  arrange(factor(Type, levels = order_vec)) %>%
+  mutate(BITColumnName = ifelse(BITColumnName == "DonorName", "DonorID", BITColumnName)) %>%
+  arrange(factor(BITColumnName, levels = c( "SampleID",
+                                          "Age Interval",
+                                          "Age (Numeric)",
+                                          "Period",
+                                          "DonorID",
+                                          "Hardy Scale",
+                                          "Sex",
+                                          "Ethnicity",
+                                          "Diagnosis",
+                                          "Structure Acronym",
+                                          "Regions",
+                                          "Autolysis Score",
+                                          "Sequencing Batch",
+                                          "Type of Batch",
+                                          "Date of Batch",
+                                          "Genotype or Expression Batch ID",
+                                          "Date of Genotype or Expression Batch",
+                                          "Type of Genotype or Expression Batch",
+                                          "BSS Collection side code",
+                                          "Proportion of Neurons (MultiBrain)",
+                                          "Proportion of Astrocytes (MultiBrain)",
+                                          "Proportion of Microglia (MultiBrain)",
+                                          "Proportion of Oligodendrocytes (MultiBrain)",
+                                          "Proportion of Endothelia (MultiBrain)"
+                                          )))
+```
+
+```{r gtex-md}
+md.attrbutes %>%
+  dplyr::select(contains(gtex.order$BITColumnName)) %>%
+  DT::datatable(caption = "GTEx Metadata after harmonizing column names, ages and structure acronyms")
+
+md.attrbutes %<>%
+  dplyr::select(contains(gtex.order$BITColumnName)) %>%
+dplyr::select(SampleID, everything())
+```
+
+
+
+In total the GTEx contains `r length(unique(colnames(md.attrbutes)))` metadata columns. Here is the metadata summary:  
+
+* Categorical values 
+
+```{r}
+res <- profile_df(md.attrbutes)
+res$categorical_tables %>%
+  do.call(rbind,.) %>% 
+  DT::datatable(caption = "Summary for the selected categorial GTEx metadata, including number of samples per category and total proprotion of samples in the category")
+```
+
+
+```{r, fig.width = 10, fig.height = 14, fig.cap="Barplot showing counts of categorial metadata for GTEx"}
+wrap_plots(res$categorical_plots, ncol = 3)
+```
+
+
+* Numerical values 
+
+```{r}
+
+res$numeric_summary %>% DT::datatable(caption = "Summary statistics for the selected numerical GTEx metadata, including number of samples per category, range of numerical distributions and number of samples with NAs.")
+```
+
+
+```{r, fig.width = 10, fig.height = 5, fig.cap = "Histogram showing distribution of numerical metadata."}
+wrap_plots(res$numeric_plots, ncol = 3)
+```
+
+
+
+### Export files
+```{r}
+#write.csv(exp, file = file.path(paths$bulk$formatted$gtex, "GTEx-exp.csv"))
+#write.csv(md.attrbutes, file = file.path(paths$bulk$formatted$gtex, "GTEx-metadata.csv"))
+write.csv(md.attrbutes, file = file.path(here::here("output/metadata"), "GTEx-metadata.csv"))
+
+write.csv(gtex.order, file = file.path(here::here("data/annotations"), "GTEx-annot-final.csv"))
+```
+
+```{r}
+rm(gtex.order)
+rm(exp)
+rm(md.attrbutes)
+```
+
+## HDBR
+
+The Human Developmental Biology Resource (HDBR) dataset comprises human brain RNA-seq samples collected across prenatal developmental stages from multiple anatomical sites.
+
+The gene expression data and corresponding bioinformatics sequencing quality metrics were retrieved from the recount3 R package, which provides uniformly processed and normalized RNA-seq data derived from public repositories. 
+
+Additional clinical and sample-level metadata, including developmental and experimental annotations not available in recount3, were obtained from the European Nucleotide Archive (ENA).
+
+```{r hdbr-setup}
+hdbr = recount3::create_rse_manual(
+  project = "ERP016243",
+  type = "gene"
+)
+
+hdbr.annot = read.csv(here::here("data/annotations/HDBR-metadata-annot.csv"),
+                      header=TRUE,
+                      check.names = FALSE)
+hdbr_supp = read_excel(file.path(paths$bulk$raw$hdbr,"Amended Supplementary Table 1.xlsx"),
+                       sheet = 1, skip =6) %>%
+  as.data.frame()
+hdbr_phenotype = read.csv(file.path(paths$bulk$raw$hdbr,"hdbr-phenotype.csv"),
+                          header=TRUE)
+
+colnames(hdbr_supp) = c("DonorID","Age", "SampleID", "Structure","Hemisphere", "Sex", "PMI")
+hdbr_supp %<>% dplyr::select("DonorID","Structure", "PMI")
+```
+
+
+```{r}
+md.hdbr = read.table(file.path(paths$bulk$raw$hdbr, "E-MTAB-4840-experiment-design.tsv"),
+                     fill=TRUE, sep = "\t", header=TRUE )
+
+```
+
+
+```{r}
+md.hdbr = md.hdbr[,1:15]
+
+md.hdbr= rename_from_annot(md.hdbr, hdbr.annot)
+
+md.hdbr %<>%
+  as.data.frame() %>%
+  dplyr::select(-c(Block, OntologyIndividual,  KaryotypeOntology, Organism, OrganismOntology,
+                   StructureOntology, HemisphereOntology, OntologyAge)) %>%
+  mutate(`Age Interval` = add_feature(.$Age, age_intervals))  %>%
+  dplyr::rename("Structure"= "Structure Acronym") %>%
+  left_join(strc_acr, by = "Structure") %>%
+  left_join(rgns_ftl, by = "Structure Acronym") %>%
+  mutate(Sex = toupper(Sex)) %>%
+  mutate(Sex = ifelse(str_detect(Sex,"XX"), "F",
+                      ifelse(str_detect(Sex, "XY"), "M", "Unknown" )),
+         Period = c("Prenatal")) %>%
+    mutate(Hemisphere = gsub("right", "R", Hemisphere),
+         Hemisphere = gsub("left", "L", Hemisphere),
+         Hemisphere = gsub("frontal", "Frontal", Hemisphere))
+
+md = colData(hdbr) %>%
+  as.data.frame() %>%
+   dplyr::select(-contains("2"))
+md = rename_from_annot(md, hdbr.annot)
+
+
+
+hdbr_supp %<>%
+  distinct(DonorID, .keep_all = TRUE) %>%
+  mutate(PMI = ifelse(PMI == "UNKNOWN", NA, PMI))
+md.hdbr %<>%
+  left_join(hdbr_supp, by = c("DonorID"))
+full.md.hdbr =left_join(md.hdbr, md)
+full.md.hdbr %<>%
+  mutate(PMI = as.numeric(PMI))
+
+full.md.hdbr %<>%
+  dplyr::filter(Structure.x != "stomach") %>%
+  mutate(PMI = as.numeric(PMI) /60) %>%
+  dplyr::rename(`PMI (hours)` = PMI) %>%
+  mutate(DonorID = paste0(DonorID, "_donorID"))
+
+```
+
+
+
+```{r}
+cat_tbl <- cat_summary(full.md.hdbr, max_show = 50)
+
+
+cat_tbl %>% as.data.frame() %>% DT::datatable()
+```
+
+```{r}
+seq_cols <- get_seq_metrics_cols(hdbr.annot)
+seq_cols <- intersect(seq_cols, colnames(full.md.hdbr))
+```
+
+```{r}
+res <- select_seq_metrics(
+  md =full.md.hdbr,
+  seq_cols = seq_cols,
+  corr_thresh = 0.95,
+  missing_thresh = 0.5,
+  min_unique = 2,
+  prefer = "less_missing"
+)
+
+res$summary %>% DT::datatable()
+
+```
+
+
+
+
+
+```{r fig.height=10, fig.width=10,fig.cap="Correlation plot showing highly correlating metadata variables in HDBR"}
+
+md.clean = full.md.hdbr %>%
+  dplyr::select(contains(seq_cols))
+#md.clean = md.clean %>% select_if(~ !any(is.na(.)))
+md.clean = md.clean[vapply(md.clean, function(x) length(unique(x)) > 1, logical(1L))]
+
+M = cor(data.matrix(md.clean), use = "complete.obs")
+corrplot(M, order='hclust',
+         method = "circle",
+         number.cex = .50,
+         tl.cex=0.75)
+
+
+```
+
+
+```{r}
+hdbr.order = hdbr.annot %>%
+  dplyr::filter(`Include (Yes/No) - Interest` == "Yes") %>%
+  mutate(Type = ifelse(Type == "Sample charactertics", "Sample characteristics", Type)) %>%
+  arrange(factor(Type, levels = order_vec)) %>%
+  mutate(BITColumnName = ifelse(BITColumnName == "DonorName", "DonorID", BITColumnName)) %>%
+  arrange(factor(BITColumnName, levels = c("SampleID",
+                                          "Age Interval",
+                                          "Age (Numeric)",
+                                          "Period",
+                                          "DonorID",
+                                          "Sex",
+                                          "Ethnicity",
+                                          "Diagnosis",
+                                          "Structure Acronym",
+                                          "Regions",
+                                          "Hemisphere",
+                                          "Proportion of Neurons (MultiBrain)",
+                                          "Proportion of Astrocytes (MultiBrain)",
+                                          "Proportion of Microglia (MultiBrain)",
+                                          "Proportion of Oligodendrocytes (MultiBrain)",
+                                          "Proportion of Endothelia (MultiBrain)",
+                                          "PMI (hours)"
+                                          )))
+```
+
+
+
+```{r hdbr-md}
+full.md.hdbr %>%
+  dplyr::select(contains(hdbr.order$BITColumnName)) %>%
+  DT::datatable(caption = "HDBR Metadata after harmonizing column names, ages and structure acronyms")
+
+full.md.hdbr %<>%
+  dplyr::select(contains(hdbr.order$BITColumnName))
+```
+
+
+```{r hdbr-tpm}
+assay(hdbr, "counts") = transform_counts(hdbr, round = TRUE)
+
+hdbr.tpm = recount::getTPM(hdbr)
+
+filter <- rowSums(hdbr.tpm, na.rm = TRUE) > 0.05
+hdbr.filter.tpm = hdbr.tpm[filter,]
+hdbr.filter.tpm <- thresh(hdbr.filter.tpm)
+
+
+hdbr.final = hdbr.tpm %>%
+  as.data.frame() %>%
+  dplyr::select(contains(full.md.hdbr$SampleID)) %>%
+  rownames_to_column("EnsemblID") %>%
+  mutate_at(.vars = "EnsemblID", .funs = gsub, pattern = "\\.[0-9]*$", replacement = "")
+```
+
+### Export data
+```{r}
+#write.csv(hdbr.final, file =file.path(paths$bulk$formatted$hdbr, "HDBR-exp.csv"))
+#write.csv(full.md.hdbr, file =file.path(paths$bulk$formatted$hdbr, "HDBR-metadata.csv"))
+write.csv(full.md.hdbr, file = file.path(here::here("output/metadata"), "HDBR-metadata.csv"))
+
+write.csv(hdbr.order, file = file.path(here::here("data/annotations"), "HDBR-annot-final.csv"))
+```
+
+```{r}
+rm(hdbr.final)
+rm(full.md.hdbr)
+rm(hdbr.order)
+rm(hdbr)
+rm(hdbr_phenotype)
+```
+
+## PsychENCODE
+
+The PsychENCODE data used for BITHub were obtained from the PsychENCODE Capstone 4 release, a large-scale transcriptomic resource profiling post-mortem human brain tissue across neurotypical individuals and psychiatric disease cohorts. The dataset includes bulk RNA-sequencing data generated primarily from the DLPFC. 
+
+The [gene expression matrix](http://resource.psychencode.org/Datasets/Derived/Controls_only_PEC_Gene_expression_matrix_normalized.txt) and corresponding [sample-level metadata](https://www.synapse.org/#!Synapse:syn18915911) were retrieved from the [PsychENCODE Capstone 4 project repository](http://resource.psychencode.org).
+
+In addition, the PsychENCODE release includes pre-computed [cell type proportion estimates derived](http://resource.psychencode.org/Datasets/Derived/SC_Decomp/DER-24_Cell_fractions_Normalized.xlsx) from reference-based deconvolution approaches. These cell-type estimates were downloaded from the PsychENCODE Capstone 4 resource and incorporated into the BITHub preprocessing pipeline.
+
+
+```{r pe-data}
+pe.annot = read.csv(here::here("data/annotations/PsychEncode-metadata-annot.csv"),
+                    header=TRUE,
+                    check.names = FALSE) %>%
+  dplyr::rename(OriginalMetadataColumnName = OriginalColumnName)  %>%
+mutate(
+     OriginalMetadataColumnName = gsub("\\.", "-", OriginalMetadataColumnName)
+    )
+
+md = list.files(paths$bulk$raw$psychencode, full.names = TRUE, pattern = "Job*") %>% read.csv(., header=TRUE) %>%
+  dplyr::filter(individualID != "2015-1")
+md.clinical = read.csv(file.path(paths$bulk$raw$psychencode, "PEC_capstone_data_map_clinical.csv"), header=TRUE, check.names = FALSE)
+
+```
+
+```{r}
+exp = list.files(paths$bulk$raw$psychencode, full.names = TRUE, pattern = "\\Gene_expression_matrix_TPM.txt") %>%
+      read.table(., header=TRUE, row.names = 1, check.names = FALSE)
+```
+
+
+```{r}
+comp = list.files(paths$bulk$raw$psychencode, full.names = TRUE, pattern = "\\Cell_fractions*") %>% read_excel() %>%
+      as.data.frame() %>%
+      column_to_rownames("CellType")
+```
+
+
+A Venn diagram revealed column names that could not be matched to the metadata matrix. In total, 442 column names were unmappable and were therefore excluded; these columns corresponded to the GTEx dataset integrated into the PsychENCODE analysos. 
+
+```{r}
+library(VennDiagram)
+
+pe.overlap = list("md individual ID" = md.clinical$`Synapse: individualID`,
+                 #  "md pe individual ID" = md.clinical$`resource.psychencode.org: individualID`,
+                  # "md original" = md$individualID,
+                   "exp" = colnames(exp))
+ggvenn(pe.overlap)
+
+#x = calculate.overlap(pe.overlap)
+
+#colnames(exp) %>%
+ # as.data.frame() %>% dplyr::rename(SampleID = ".") %>%
+  #dplyr::filter(!SampleID %in% md$individualID)
+```
+
+### Metadata pre-processing
+```{r md-meta}
+
+  # Fix existing columns
+
+comp = as.data.frame(t(comp))
+
+md %<>%
+ left_join(comp %>% # So only those in the main MD can be used
+  tibble::rownames_to_column("individualID"), by= "individualID")
+
+md  = rename_from_annot(md, pe.annot, strict = FALSE)
+
+# PCW to age numeric
+md$`Age (Numeric)`[grepl("PCW", md$`Age (Numeric)`, ignore.case = TRUE)] = md$`Age (Numeric)`[grepl("PCW", md$`Age (Numeric)`)] %>%
+  str_remove("PCW")%>%
+  as.numeric() %>% `-` (40) %>% divide_by(52)
+
+md$`Age (Numeric)` = gsub("90+", "91", md$`Age (Numeric)`)
+md$`Age (Numeric)` =gsub("\\+", "", md$`Age (Numeric)`)
+
+
+md$`Age (Numeric)` <- as.numeric(as.character(md$`Age (Numeric)`))
+
+md %<>%
+      dplyr::filter(Diagnosis == "Affective Disorder" |
+               Diagnosis == "Autism Spectrum Disorder" |
+               Diagnosis == "Bipolar Disorder" |
+               Diagnosis == "Control" |
+               Diagnosis == "Schizophrenia") %>%
+      mutate(Structure = c("Dorsolateral Prefrontal Cortex"),  ## Adding name of structure
+             `Structure Acronym` = c("DLPFC")) %>%
+      mutate(Period = ifelse(.$`Age (Numeric)` >= 0, "Postnatal", "Prenatal"))  %>%
+      mutate(Age_rounded = as.character(sapply(.$`Age (Numeric)`, num_to_round))) %>% as.data.frame() %>%
+      mutate(`Age Interval` = as.character(add_feature(.$Age_rounded, age_intervals)),
+             `Cause of Death` = as.character(add_feature(.$`Cause of Death`, death_cause))) %>%
+      mutate(Regions = c("Cortex")) %>%
+      mutate(DonorID = as.character(.$SampleID)) %>%
+      dplyr::select(-Age_rounded) %>%
+      as.data.frame() %>%
+  mutate(Ethnicity = ifelse(Ethnicity == "HiSP", "HISP", Ethnicity))
+
+exp = exp %>%
+  dplyr::select(contains(md$SampleID))
+
+md = md %>%
+  dplyr::filter(SampleID %in% colnames(exp))
+exp = exp[colnames(exp) %in% md$SampleID,]
+md = md[md$SampleID %in% colnames(exp),]
+
+
+
+```
+
+
+
+As PsychENCODE did not contain sequencing metrics, no correlation analysis was performed. and an exploratory analysis of the categoiral metadata was performed to remove redundant data. All numerical metadata in this instance were kept. 
+
+
+```{r}
+cat_tbl <- cat_summary(md, max_show = 50)
+
+
+cat_tbl %>% as.data.frame() %>% DT::datatable()
+```
+
+```{r}
+pe.order = pe.annot %>%
+  mutate(`Include (Yes/No) - Interest` = ifelse(BITColumnName == "individualIDSource","Yes", `Include (Yes/No) - Interest`),
+         `Include (Yes/No) - Interest` = ifelse(BITColumnName == "DonorID","No", `Include (Yes/No) - Interest`)) %>% ## Amending this after discussion with Irina
+  dplyr::filter(`Include (Yes/No) - Interest` == "Yes") %>%
+  mutate(Type = ifelse(Type == "Sample charactertics", "Sample characteristics", Type)) %>%
+  arrange(factor(Type, levels = order_vec)) %>%
+  mutate(BITColumnName = ifelse(BITColumnName == "DonorName", "DonorID", BITColumnName)) %>%
+  arrange(factor(BITColumnName, levels = c("SampleID",
+                                           "Age Interval",
+                                          "Age (Numeric)",
+                                          "Period",
+                                          "DonorID",
+                                          "Sex",
+                                          "Ethnicity",
+                                          "Cause of Death",
+                                          "Brain Weight",
+                                          "Height",
+                                          "Weight",
+                                          "Diagnosis",
+                                          "Structure Acronym",
+                                          "Regions",
+                                          "Capstone_4",
+                                           "individualIDSource",
+                                          "Proportion of Neurons (MultiBrain)",
+                                          "Proportion of Astrocytes (MultiBrain)",
+                                          "Proportion of Microglia (MultiBrain)",
+                                          "Proportion of Oligodendrocytes (MultiBrain)",
+                                          "Proportion of Endothelia (MultiBrain)"
+                                          )))
+
+
+
+```
+
+```{r pe-md}
+md %>%
+   DT::datatable(caption = "PsychENCODE Metadata after harmonizing column names, ages and structure acronyms")
+
+md %<>%
+   dplyr::select(contains(pe.order$BITColumnName))
+```
+
+* Categorical values 
+
+```{r}
+res <- profile_df(md)
+res$categorical_tables %>%
+  do.call(rbind,.) %>% 
+  DT::datatable(caption = "Summary for the selected categorial PsychENCODE metadata, including number of samples per category and total proprotion of samples in the category")
+```
+
+
+```{r, fig.width = 10, fig.height = 14, fig.cap="Barplot showing counts of categorial metadata for PsychENCODE"}
+wrap_plots(res$categorical_plots, ncol = 3)
+```
+
+
+* Numerical values 
+
+```{r}
+res$numeric_summary %>% DT::datatable(caption = "Summary statistics for the selected numerical PsychENCODE metadata, including number of samples per category, range of numerical distributions and number of samples with NAs.")
+```
+
+
+```{r, fig.width = 10, fig.height = 14, fig.cap = "Histogram showing distribution of numerical metadata."}
+wrap_plots(res$numeric_plots, ncol = 3)
+```
+
+ 
+### Export data
+
+```{r}
+#write.csv(exp, file = file.path(paths$bulk$formatted$psychencode, "PsychEncode-exp.csv"))
+#write.csv(md, file = file.path(paths$bulk$formatted$psychencode,"PsychEncode-metadata.csv"), row.names = FALSE)
+ write.csv(md, file = file.path(here::here("output/metadata"), "PsychEncode-metadata.csv"), row.names = FALSE)
+ write.csv(pe.order, file = file.path(here::here("data/annotations"), "PE-annot-final.csv"))
+```
+
+
+# Single nucleus RNA-seq data pre-process
+
+
+<!-- ## Human Cell Atlas (HCA -->
+
+<!-- ```{r} -->
+<!-- exp <- read.csv(file.path(paths$single_nucleus$raw$hca, "matrix.csv"), check.names=FALSE) -->
+
+<!-- meta <- read.csv(file.path(paths$single_nucleus$raw$hca, "metadata.csv")) -->
+<!-- #metaold <- read.csv("../../data/metadata.csv") -->
+<!-- hca.annot <- read.csv(here::here("data/annotations/HCA-annot.csv"), -->
+<!--                   header=TRUE, -->
+<!--                   check.names = FALSE) %>% -->
+<!--   dplyr::rename("OriginalMetadataColumnName" = "OriginalMetadata") -->
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- rownames(exp) <- exp$sample_name -->
+<!-- exp <- exp[,-1] -->
+<!-- # dat2 <- dat -->
+<!-- exp <- t(exp) -->
+
+
+<!-- # create Seurat object -->
+<!-- HCA <- CreateSeuratObject(counts = exp, -->
+<!--                              min.cells = round(ncol(exp) / 100), -->
+<!--                              min.features = min.features, -->
+<!--                              project = "CA") -->
+
+
+<!-- # read in metadata -->
+<!-- HCA$orig.celltype <-meta$cluster_label -->
+
+<!-- ## Remove cells with no class -->
+<!-- keep <- which(!(HCA$orig.celltype == "")) -->
+<!-- HCA <- subset(HCA, cells = keep) -->
+
+<!-- ## Preprocess -->
+<!-- max.depth <- get.max.depth(HCA) -->
+<!-- HCA <- preprocess.fun(HCA, max.depth = max.depth) -->
+
+
+<!-- ## Save CPM -->
+<!-- dat <- HCA[["RNA"]]$counts -->
+<!-- dat <- make.cpm(dat) -->
+<!-- dat <- cbind(rownames(dat), dat) -->
+<!-- colnames(dat)[1] <- "Symbol" -->
+<!-- rownames(dat) <- 1:nrow(dat) -->
+
+<!-- ``` -->
+
+
+
+<!-- # create Seurat object -->
+<!-- obj$CA <- CreateSeuratObject(counts = dat, -->
+<!--                              min.cells = round(ncol(dat) / 100), -->
+<!--                              min.features = min.features, -->
+<!--                              project = "CA") -->
+
+
+<!-- obj$CA$orig.celltype <- meta$cluster_label -->
+
+<!-- ## Remove cells with no class -->
+<!-- keep <- which(!(obj$CA$orig.celltype == "")) -->
+<!-- obj$CA <- subset(obj$CA, cells = keep) -->
+
+<!-- ## Preprocess -->
+<!-- max.depth <- get.max.depth(obj$CA) -->
+<!-- obj$CA <- preprocess.fun(obj$CA, max.depth = max.depth) -->
+
+
+<!-- ## Save CPM -->
+<!-- dat <- as.data.frame(obj$CA@assays$RNA@layers$counts) ## There has been a version change -->
+<!-- dat <- make.cpm(dat) -->
+<!-- dat <- cbind(rownames(dat), dat) -->
+<!-- colnames(dat)[1] <- "Symbol" -->
+<!-- rownames(dat) <- 1:nrow(dat) -->
+
+<!-- # ```{r} -->
+<!-- # ## Process metadata -->
+<!-- # # rename cell-types -->
+<!-- # rownames(meta) <- meta$sample_name -->
+<!-- # meta <- meta[colnames(obj$CA),] -->
+<!-- #  -->
+<!-- # meta %<>% -->
+<!-- #   mutate( -->
+<!-- #     MajorCelltype = case_when( -->
+<!-- #       str_detect(cluster_label, "Inh|GABA")        ~ "Inhibitory Neurons", -->
+<!-- #       str_detect(cluster_label, "Exc|Glut")        ~ "Excitatory Neurons", -->
+<!-- #       str_detect(cluster_label, "Astro")            ~ "Astrocytes", -->
+<!-- #       str_detect(cluster_label, "Endo|VLMC|Peri")  ~ "Vasculature", -->
+<!-- #       str_detect(cluster_label, "Micro")            ~ "Microglia", -->
+<!-- #       str_detect(cluster_label, "Oligo")            ~ "Oligodendrocytes", -->
+<!-- #       str_detect(cluster_label, "OPC")              ~ "OPCs", -->
+<!-- #       str_detect(cluster_label, "Non")              ~ "Unassigned Nonneuronal", -->
+<!-- #       TRUE                                          ~ NA_character_ -->
+<!-- #     ) -->
+<!-- #   ) -->
+<!-- #  -->
+<!-- #  -->
+<!-- # # add further donor information from the metadata of HCA release 1 -->
+<!-- #  -->
+<!-- # m <- match(meta$external_donor_name_label, metaold$donor) -->
+<!-- # meta$donor_age_days <- as.numeric(as.character(metaold$age_days[m])) -->
+<!-- # meta$`Age (Numeric)` <- meta$donor_age_days / 365 -->
+<!-- # meta %<>% mutate(Age_rounded = as.character(sapply(na.omit(.$`Age (Numeric)`), num_to_round))) %>% -->
+<!-- #     mutate(`Age Interval` = add_feature(.$Age_rounded, age_intervals)) %>% -->
+<!-- #     dplyr::select(-Age_rounded) %>% -->
+<!-- #     mutate(Regions = add_feature(.$region_label, regions)) -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- # meta  = rename_from_annot(meta , hca.annot, strict = FALSE) -->
+<!-- #  -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ```{r} -->
+<!-- # #write.csv(meta, file = file.path(hca.outfile, "HCA-metadata.csv"), quote = FALSE, row.names = FALSE) -->
+<!-- # #write.csv(names, file= "../annotations/HCA-annot2.csv") -->
+<!-- #  -->
+<!-- # #write.csv(dat, file = file.path(hca.outfile, "HCA-exp.csv"), row.names = TRUE, col.names = TRUE, quote = FALSE) -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ## Velmeshev et al -->
+<!-- #  -->
+<!-- # ```{r} -->
+<!-- # vel = file.path(paths$single_nucleus$raw$velmeshev) -->
+<!-- # vel.annot = read.csv(here::here("data/annotations/Velmeshev-annot.csv"), -->
+<!-- #                      header=TRUE, -->
+<!-- #                      check.names = FALSE) -->
+<!-- # ## Load -->
+<!-- #  -->
+<!-- # dat <- Read10X(vel) -->
+<!-- #  -->
+<!-- # VL <- CreateSeuratObject(counts = dat, -->
+<!-- #                              min.cells = round(ncol(dat) / 100), -->
+<!-- #                              min.features = min.features, -->
+<!-- #                              project = "VL") -->
+<!-- # rm(dat) -->
+<!-- #  -->
+<!-- # ## Annotate -->
+<!-- # meta <- read.table(file.path(vel, "meta.txt"), sep = "\t", header = TRUE) -->
+<!-- # m <- match(colnames(VL), meta$cell) -->
+<!-- #  -->
+<!-- # VL$orig.celltype <- meta$cluster[m] -->
+<!-- # VL$Region <- meta$region[m] -->
+<!-- # VL$Disorder <- meta$diagnosis[m] -->
+<!-- # VL$orig.ident <- paste0("Vel_", substr(meta$cell[m], start = 1, stop = 16)) -->
+<!-- # VL$Individual <- meta$individual[m] -->
+<!-- #  -->
+<!-- # ## Preprocess and normalise -->
+<!-- # max.depth <- get.max.depth(VL) -->
+<!-- # VL <- preprocess.fun(VL, max.depth = max.depth) -->
+<!-- #  -->
+<!-- # ## CPM -->
+<!-- # dat <- GetAssayData(object = VL, assay = "RNA", slot = "counts") %>% as.data.frame() -->
+<!-- # dat <- make.cpm(dat) -->
+<!-- # dat <- cbind(rownames(dat), dat) -->
+<!-- # colnames(dat)[1] <- "Symbol" -->
+<!-- # rownames(dat) <- 1:nrow(dat) -->
+<!-- #  -->
+<!-- #  -->
+<!-- # meta <- meta %>% -->
+<!-- #   mutate( -->
+<!-- #     MajorCelltype = case_when( -->
+<!-- #       str_detect(cluster, "IN")        ~ "Inhibitory Neurons", -->
+<!-- #       str_detect(cluster, "^L")        ~ "Excitatory Neurons", -->
+<!-- #       str_detect(cluster, "AST")       ~ "Astrocytes", -->
+<!-- #       str_detect(cluster, "Endo")      ~ "Endothelia", -->
+<!-- #       str_detect(cluster, "Micro")     ~ "Microglia", -->
+<!-- #       str_detect(cluster, "Oligo")     ~ "Oligodendrocytes", -->
+<!-- #       str_detect(cluster, "OPC")       ~ "OPCs", -->
+<!-- #       str_detect(cluster, "NRGN")      ~ "NRGN Neurons", -->
+<!-- #       str_detect(cluster, "mat")       ~ "Maturing Neurons", -->
+<!-- #       TRUE                             ~ NA_character_ -->
+<!-- #     ) -->
+<!-- #   ) %>% -->
+<!-- #   mutate( -->
+<!-- #     # only add Age_rounded for non-NA age, keep NA otherwise -->
+<!-- #     Age_rounded = if_else( -->
+<!-- #       is.na(age), -->
+<!-- #       NA_character_, -->
+<!-- #       as.character(sapply(age, num_to_round)) -->
+<!-- #     ), -->
+<!-- #     `Age Interval` = add_feature(Age_rounded, age_intervals), -->
+<!-- #     region = str_replace(region, "PFC", "DLPFC"), ## change PFC to DLPFC -->
+<!-- #     Regions = add_feature(region, regions) -->
+<!-- #   ) %>% -->
+<!-- #   dplyr::select(-Age_rounded) %>% -->
+<!-- #   mutate(individual = paste0(individual, "_donorID")) -->
+<!-- #  -->
+<!-- #  -->
+<!-- # # save -->
+<!-- # m <- match(colnames(VL), meta$cell) -->
+<!-- # meta <-  meta[m,] -->
+<!-- #  -->
+<!-- # meta = rename_from_annot(meta, vel.annot, strict=FALSE) -->
+<!-- # meta %>% DT::datatable() -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ### Selection of metadata  -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ```{r} -->
+<!-- # cat_tbl <- cat_summary(meta , max_show = 50) -->
+<!-- #  -->
+<!-- #  -->
+<!-- # cat_tbl %>% as.data.frame() %>% DT::datatable() -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ```{r} -->
+<!-- # seq_cols <- get_seq_metrics_cols(vel.annot)   -->
+<!-- # seq_cols <- intersect(seq_cols, colnames(meta))     -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ```{r} -->
+<!-- # res <- select_seq_metrics( -->
+<!-- #   md = meta, -->
+<!-- #   seq_cols = seq_cols, -->
+<!-- #   corr_thresh = 0.9, -->
+<!-- #   missing_thresh = 0.5, -->
+<!-- #   min_unique = 2, -->
+<!-- #   prefer = "less_missing" -->
+<!-- # ) -->
+<!-- #  -->
+<!-- # res$summary %>% DT::datatable() -->
+<!-- #  -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ```{r fig.cap="Correlation plot showing highly correlating metadata variables in BrainSeq"} -->
+<!-- #  -->
+<!-- # md.clean = meta %>%  -->
+<!-- #   dplyr::select(contains(seq_cols)) -->
+<!-- # #md.clean = md.clean %>% select_if(~ !any(is.na(.))) -->
+<!-- # md.clean = md.clean[vapply(md.clean, function(x) length(unique(x)) > 1, logical(1L))] -->
+<!-- #  -->
+<!-- # M = cor(data.matrix(md.clean), use = "complete.obs") -->
+<!-- # corrplot(M, order='hclust', -->
+<!-- #          method = "circle",  -->
+<!-- #          number.cex = .50,  -->
+<!-- #          tl.cex=0.75) -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ### Checks  -->
+<!-- #  -->
+<!-- # ```{r} -->
+<!-- # res <- profile_df(meta) -->
+<!-- #  -->
+<!-- # res$numeric_summary %>% DT::datatable() -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ```{r} -->
+<!-- # res$categorical_tables %>% -->
+<!-- #   do.call(rbind,.) %>%  -->
+<!-- #   DT::datatable() -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ```{r, fig.width = 10, fig.height = 14} -->
+<!-- # wrap_plots(res$categorical_plots, ncol = 3) -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ```{r, fig.width = 10, fig.height = 14} -->
+<!-- # wrap_plots(res$numeric_plots, ncol = 3) -->
+<!-- # ```  -->
+<!-- #  -->
+<!-- # ## Export  -->
+<!-- # ```{r} -->
+<!-- # #write.csv(meta, file = file.path(vel.outfile, "Velmeshev-metadata.csv"), quote = FALSE, row.names = FALSE) -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ## Cameron et al -->
+<!-- #  -->
+<!-- # ```{r} -->
+<!-- # ## Cameron -->
+<!-- #  -->
+<!-- # cam.annot <- read.csv(here::here("data/annotations/Cameron-metadata.csv"), -->
+<!-- #                       header=TRUE, -->
+<!-- #                       check.names=FALSE) -->
+<!-- # cam.dir <- paths$single_nucleus$raw$cameron -->
+<!-- #  -->
+<!-- # strc <- c("Thal", "Cer", "FC", "Hipp", "GE") -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- # region_by_ds <- c( -->
+<!-- #   Thal = "Subcortex", -->
+<!-- #   Cer  = "Cerebellum", -->
+<!-- #   FC   = "Cortex", -->
+<!-- #   Hipp = "Subcortex", -->
+<!-- #   GE   = "Cortex" -->
+<!-- # ) -->
+<!-- #  -->
+<!-- # structure_by_ds <- c( -->
+<!-- #   Thal = "DTH", -->
+<!-- #   Cer  = "CB", -->
+<!-- #   FC   = "DLPFC", -->
+<!-- #   Hipp = "HIP", -->
+<!-- #   GE   = "GE" -->
+<!-- # ) -->
+<!-- #  -->
+<!-- #  -->
+<!-- # e <- setNames(strc, strc) %>% -->
+<!-- #   map(\(s) { -->
+<!-- #     file <- file.path(cam.dir, paste0("cameron_2021_snRNAseq_", s, "_raw_count_gEX_matrix.txt")) -->
+<!-- #     fread(file) %>% -->
+<!-- #       as.data.frame() %>% -->
+<!-- #       column_to_rownames("V1") -->
+<!-- #   }) -->
+<!-- #  -->
+<!-- # md <- setNames(strc, strc) %>% -->
+<!-- #   map(\(s) { -->
+<!-- #     file <- file.path(cam.dir, paste0("cameron_2021_snRNAseq_", s, "_metadata.txt")) -->
+<!-- #     read.table(file, header = TRUE, stringsAsFactors = FALSE) -->
+<!-- #   }) -->
+<!-- #  -->
+<!-- #  -->
+<!-- # exp_mat <- list() -->
+<!-- # md_ful  <- list() -->
+<!-- #  -->
+<!-- # for (f in strc) { -->
+<!-- #  -->
+<!-- #   name <- f -->
+<!-- #   meta <- md[[f]] -->
+<!-- #   exp_dat <- e[[f]] -->
+<!-- #  -->
+<!-- #   message("Now pre-processing ", name) -->
+<!-- #  -->
+<!-- #   ser <- CreateSeuratObject( -->
+<!-- #     counts = exp_dat, -->
+<!-- #     min.cells = round(ncol(exp_dat) / 100), -->
+<!-- #     min.features = min.features, -->
+<!-- #     project = name -->
+<!-- #   ) -->
+<!-- #  -->
+<!-- #   # Align metadata rows to Seurat cells -->
+<!-- #   m1 <- match(colnames(ser), meta$cells) -->
+<!-- #   ser$orig.celltype <- meta$cellIDs[m1] -->
+<!-- #  -->
+<!-- #   # Keep only cells with a non-empty cell type -->
+<!-- #   keep_cells <- colnames(ser)[!is.na(ser$orig.celltype) & ser$orig.celltype != ""] -->
+<!-- #   ser <- subset(ser, cells = keep_cells) -->
+<!-- #  -->
+<!-- #   # preprocess -->
+<!-- #   max.depth <- get.max.depth(ser) -->
+<!-- #   ser <- preprocess.fun(ser, max.depth = max.depth) -->
+<!-- #  -->
+<!-- #   # QC vars -->
+<!-- #   nCount = ser$nCount_RNA %>% -->
+<!-- #       reshape2::melt() %>% set_colnames("nCount_RNA") %>% -->
+<!-- #       rownames_to_column("CellID") -->
+<!-- #  -->
+<!-- #   nFeature = ser$nFeature_RNA %>% -->
+<!-- #       reshape2::melt() %>% set_colnames("nFeature_RNA") %>% -->
+<!-- #       rownames_to_column("CellID") -->
+<!-- #  -->
+<!-- #   # CPM matrix -->
+<!-- #   dat <- GetAssayData(object = ser, assay = "RNA", slot = "counts") %>% as.data.frame() -->
+<!-- #   dat <- make.cpm(dat) -->
+<!-- #   dat <- rownames_to_column(dat, var = "Symbol") -->
+<!-- #   rownames(dat) <- seq_len(nrow(dat)) -->
+<!-- #  -->
+<!-- #   # Re-align meta -->
+<!-- #   m2 <- match(colnames(ser), meta$cells) -->
+<!-- #   meta2 <- meta[m2, , drop = FALSE] -->
+<!-- #  -->
+<!-- #   # Metadata standardisation + cell type grouping (all in mutate; no helper funcs) -->
+<!-- #   meta2 <- meta2 %>% -->
+<!-- #     dplyr::rename(CellID = cells, CellType = cellIDs, DonorID = sample) %>% -->
+<!-- #     mutate( -->
+<!-- #       Regions = unname(region_by_ds[name]), -->
+<!-- #       StructureAcroynm = unname(structure_by_ds[name]), -->
+<!-- #       AgeInterval = "13-15pcw", -->
+<!-- #  -->
+<!-- #       MajorCelltype = case_when( -->
+<!-- #         str_detect(CellType, "Ex")      ~ "Excitatory Neurons", -->
+<!-- #         str_detect(CellType, "InN")     ~ "Inhibitory Neurons", -->
+<!-- #         str_detect(CellType, "MG")      ~ "Microglia", -->
+<!-- #         str_detect(CellType, "OPC")     ~ "OPC", -->
+<!-- #         str_detect(CellType, "CycPro")  ~ "Cycling progenitor cell", -->
+<!-- #         str_detect(CellType, "IP")      ~ "Intermediate progenitor", -->
+<!-- #         str_detect(CellType, "RG")      ~ "Radial glia", -->
+<!-- #         str_detect(CellType, "Endo")    ~ "Endothelial", -->
+<!-- #         str_detect(CellType, "CR")      ~ "Cajal-Retzius cell", -->
+<!-- #         TRUE                            ~ "Undefined Class Neurons" -->
+<!-- #       ), -->
+<!-- #  -->
+<!-- #       CellTypegroup = case_when( -->
+<!-- #         str_detect(MajorCelltype, "Neurons") ~ "Neurons", -->
+<!-- #         MajorCelltype %in% c("Microglia", "OPC") ~ "Glia", -->
+<!-- #         MajorCelltype == "Endothelial" ~ "Vasculature", -->
+<!-- #         TRUE ~ "Developing" -->
+<!-- #       ) -->
+<!-- #     ) %>% -->
+<!-- #       left_join(nCount, by = "CellID") %>% -->
+<!-- #       left_join(nFeature, by = "CellID") -->
+<!-- #  -->
+<!-- #   md_ful[[name]]  <- meta2 -->
+<!-- #   exp_mat[[name]] <- dat -->
+<!-- # } -->
+<!-- #  -->
+<!-- # md.cameron <- bind_rows(md_ful, .id = "Structure") %>%  -->
+<!-- #   mutate(DonorID  = sub("_.*$", "", DonorID)) %>%  -->
+<!-- #   mutate(DonorID = paste0(DonorID, "_donorID")) -->
+<!-- #    -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- # dim(md.cameron) -->
+<!-- #  -->
+<!-- # joined <- exp_mat %>% -->
+<!-- #   reduce(full_join, by = "Symbol") %>% -->
+<!-- #   mutate(across(-Symbol, ~replace_na(.x, 0))) -->
+<!-- # ``` -->
+
+
+<!-- ### Export -->
+
+
+
+
+<!-- # Figures  -->
+
+<!-- ## Bulk RNA-seq dataset  -->
+
+<!-- * Distribution of samples across age intervals  -->
+
+<!-- ```{r} -->
+<!-- summarise_stats = function(x, dataset) -->
+<!-- { -->
+<!--     age = table(x$`Age Interval`) %>% reshape2::melt() -->
+<!--     age$Type = c(paste(dataset, "Sample", sep = "_")) -->
+<!--     individuals = x %>% group_by(`Age Interval`, DonorID) %>%  -->
+<!--         dplyr::summarise(n = n()) %>%  -->
+<!--         as.data.frame()  -->
+<!--     individuals = table(individuals$`Age Interval`) %>% reshape2::melt() -->
+<!--     individuals$Type = c(paste("Individual", dataset, sep = "_")) -->
+
+<!--     age = rbind(age, individuals) -->
+<!--     colnames(age) = c("Age Interval", "n", "Type") -->
+<!--     age$dataset = c(as.character(dataset)) -->
+<!--     return(age) -->
+
+<!-- } -->
+
+<!-- summarise_regions = function(x, dataset){ -->
+<!--     regions = x %>%  -->
+<!--         dplyr::group_by(AgeInterval, Regions) %>%  -->
+<!--         dplyr::summarise(n = n())  %>%  -->
+<!--         as.data.frame() %>%  -->
+<!--         mutate(Dataset = dataset) -->
+<!--     return(regions) -->
+<!-- } -->
+<!-- ``` -->
+
+
+<!-- # ```{r} -->
+<!-- # age_interval_stats = list() -->
+<!-- # directory = file.path("/home/neuro/Documents/Brain_integrative_transcriptome/BITHub-preprocessing/data/metadata") -->
+<!-- # pattern = "/home/neuro/Documents/Brain_integrative_transcriptome/BITHub-preprocessing/data/metadata/" -->
+<!-- #  -->
+<!-- # for (f in directory){ -->
+<!-- #     md = list.files(f, full.names = TRUE, pattern = "\\-metadata.csv$") -->
+<!-- #      -->
+<!-- #     for (j in md){ -->
+<!-- #         ct_file = read.csv(j, header= TRUE) -->
+<!-- #         dataset = gsub(pattern, "", j) -->
+<!-- #         dataset = gsub("\\-metadata.csv","", dataset) -->
+<!-- #         message("Now calculating statistics for ", dataset) -->
+<!-- #         stats = summarise_stats(ct_file, dataset) -->
+<!-- #         age_interval_stats[[paste(dataset)]] = stats -->
+<!-- #     } -->
+<!-- #      -->
+<!-- # } -->
+<!-- #  -->
+<!-- #  -->
+<!-- # bulk_plot_version2 = age_interval_stats %>%  -->
+<!-- #     do.call(rbind, .) %>%  -->
+<!-- #     mutate(AgeInterval = factor(AgeInterval, levels = c("4-7pcw", "8-9pcw", -->
+<!-- #                                                         "10-12pcw", "13-15pcw", "16-18pcw", -->
+<!-- #                                                         "19-24pcw", "25-38pcw", "0-5mos", -->
+<!-- #                                                         "6-18mos", "19mos-5yrs", "6-11yrs", -->
+<!-- #                                                         "12-19yrs", "20-29yrs", "30-39yrs", "40-49yrs", -->
+<!-- #                                                         "50-59yrs", "60-69yrs", "70-79yrs", "80-89yrs", "90-99yrs")),  -->
+<!-- #            Type = factor(Type, levels = c("BrainSeq_Sample", "Individual_BrainSeq", -->
+<!-- #                                           "BrainSpan_Sample", "Individual_BrainSpan", -->
+<!-- #                                           "GTEx_Sample", "Individual_GTEx",  -->
+<!-- #                                           "HDBR_Sample", "Individual_HDBR",  -->
+<!-- #                                           "PsychEncode_Sample", "Individual_PsychEncode"))) %>% -->
+<!-- #     drop_na() %>% -->
+<!-- #     ggplot(aes(x= AgeInterval, y = n, fill =Type)) + -->
+<!-- #     geom_bar(position = "dodge",stat= "identity") +  -->
+<!-- #     facet_grid(dataset~AgeInterval, scales = "free") + xlab("") + ylab("")  + theme_bw() + -->
+<!-- #     theme(legend.position = "none", axis.text.x=element_blank(), -->
+<!-- #           strip.background =element_rect(fill="#AA9A9C", color = "#E1DFDB"),  -->
+<!-- #           panel.border = element_rect(color = "#f7f4ed", fill = NA, size = 2)) +  -->
+<!-- #     theme(strip.text = element_text(colour = 'white')) + -->
+<!-- #     scale_fill_manual(values = c("#F75E5E", "#FFC6BD", -->
+<!-- #                                  "#49165E", "#EBBAFF", -->
+<!-- #                                  "#78A2EB", "#36466A", -->
+<!-- #                                  "#74C69D", "#2D6A4F", -->
+<!-- #                                  "#F9AD79", "#FF5F0F")) +  -->
+<!-- #     theme( -->
+<!-- #         panel.background = element_rect(fill = "transparent",colour = NA), # or theme_blank() -->
+<!-- #         plot.background = element_rect(fill = "transparent",colour =NA) -->
+<!-- #     ) -->
+<!-- #  -->
+<!-- #  -->
+<!-- # bulk_plot_version2  -->
+<!-- # ``` -->
+
+* Distribution of samples for each region across age intervals 
+
+## snRNA-seq 
+
+* Cell types in each dataset 
+
+```{r}
+
+
+```

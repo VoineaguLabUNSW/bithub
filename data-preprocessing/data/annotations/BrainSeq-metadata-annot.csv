@@ -1,0 +1,72 @@
+OriginalMetadataColumnName,BITColumnName,Include (Yes/No) - Interest,Type
+X,SampleID,Yes,Sample characteristics
+trimmed,Trimmed,Yes,Sequencing metrics
+numReads,Total N Reads,Yes,Sequencing metrics
+numMapped,Number of Reads Mapped,No,Sequencing metrics
+numUnmapped,Number of Reads Unmapped,Yes,Sequencing metrics
+overallMapRate,Mapping Rate,Yes,Sequencing metrics
+concordMapRate,Concordant Mapping Rate,Yes,Sequencing metrics
+totalMapped,Reads Mapped,No,Sequencing metrics
+mitoMapped,Reads Mapped to Mitochondrial Genes,Yes,Sequencing metrics
+mitoRate,Mito Ratio,Yes,Sequencing metrics
+totalAssignedGene,Total Assigned Gene,Yes,Sequencing metrics
+rRNA_rate,rRNA ratio,Yes,Sequencing metrics
+RNum,Rnum,No,Phenotype
+BrNum,DonorID,Yes,Phenotype
+Region,Structure Acronym,Yes,Sample characteristics
+RIN,RIN,Yes,Sequencing metrics
+Age,Age (Numeric),Yes,Phenotype
+Sex,Sex,Yes,Phenotype
+Race,Ethnicity,Yes,Phenotype
+Dx,Diagnosis,Yes,Phenotype
+Fetal_replicating,Dev Replicating (BrainSeq),Yes,Cell Type
+Fetal_quiescent,Dev Quiescent (BrainSeq),Yes,Cell Type
+OPC,Adult OPC (BrainSeq),Yes,Cell Type
+Neurons,Adult Neurons (BrainSeq),Yes,Cell Type
+Astrocytes,Adult Astrocytes (BrainSeq),Yes,Cell Type
+Oligodendrocytes,Adult Oligo (BrainSeq),Yes,Cell Type
+Microglia,Adult Microglia (BrainSeq),Yes,Cell Type
+Endothelial,Adult Endothelial (BrainSeq),Yes,Cell Type
+NA,Age Interval,Yes,Phenotype
+NA,Period,Yes,Phenotype
+NA,Regions,Yes,Sample characteristics
+SAMPLE_ID,SAMPLE_ID,No,Sample characteristics
+FQCbasicStats,FQCbasicStats,No,Sequencing metrics
+perBaseQual,perBaseQual,No,Sequencing metrics
+perTileQual,perTileQual,No,Sequencing metrics
+perSeqQual,perSeqQual,No,Sequencing metrics
+perBaseContent,perBaseContent,No,Sequencing metrics
+GCcontent,GCcontent,No,Sequencing metrics
+Ncontent,Ncontent,No,Sequencing metrics
+SeqLengthDist,SeqLengthDist,No,Sequencing metrics
+SeqDuplication,SeqDuplication,No,Sequencing metrics
+OverrepSeqs,OverrepSeqs,No,Sequencing metrics
+AdapterContent,AdapterContent,No,Sequencing metrics
+KmerContent,KmerContent,No,Sequencing metrics
+percentGC_R1,percentGC_R1,No,Sequencing metrics
+phred100_R1,phred100_R1,No,Sequencing metrics
+phredGT30_R1,phredGT30_R1,No,Sequencing metrics
+phredGT35_R1,phredGT35_R1,No,Sequencing metrics
+Adapter88_R1,Adapter88_R1,No,Sequencing metrics
+percentGC_R2,percentGC_R2,No,Sequencing metrics
+phred100_R2,phred100_R2,No,Sequencing metrics
+phredGT30_R2,phredGT30_R2,No,Sequencing metrics
+phredGT35_R2,phredGT35_R2,No,Sequencing metrics
+Adapter88_R2,Adapter88_R2,No,Sequencing metrics
+ERCCsumLogErr,ERCCsumLogErr,No,Sequencing metrics
+bamFile,bamFile,No,Sequencing metrics
+snpPC1,snpPC1,No,Sequencing metrics
+snpPC2,snpPC2,No,Sequencing metrics
+snpPC3,snpPC3,No,Sequencing metrics
+snpPC4,snpPC4,No,Sequencing metrics
+snpPC5,snpPC5,No,Sequencing metrics
+snpPC6,snpPC6,No,Sequencing metrics
+snpPC7,snpPC7,No,Sequencing metrics
+snpPC8,snpPC8,No,Sequencing metrics
+snpPC9,snpPC9,No,Sequencing metrics
+snpPC10,snpPC10,No,Sequencing metrics
+NA,Proportion of Neurons (MultiBrain),Yes,Cell Type
+NA,Proportion of Astrocytes (MultiBrain),Yes,Cell Type
+NA,Proportion of Microglia (MultiBrain),Yes,Cell Type
+NA,Proportion of Endothelia (MultiBrain),Yes,Cell Type
+NA,Proportion of Oligodendrocytes (MultiBrain),Yes,Cell Type

@@ -1,0 +1,113 @@
+---
+title: "snRNA-preprocess"
+author: "unawaz1996"
+date: "2023-09-20"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+# Set-up
+
+```{r}
+source(here::here("code/preprocess/functions.R"))
+source(here::here("code/preprocess/def_stages.R"))
+source(here::here("code/preprocess/sn-RNAseq-preprocess.R"))
+library(foreach)
+```
+
+# Background
+
+
+# Datasets 
+
+## Aldringer et al 
+
+```{r aldringer}
+mat <- fread("/home/neuro/Documents/BrainData/single-cell/aldinger/exprMatrix.tsv")
+meta <- read.table("/home/neuro/Documents/BrainData/single-cell/aldinger/meta.tsv", header=T, sep="\t", as.is=TRUE)
+  
+obj$CER = CreateSeuratObject(counts = mat, 
+                            min.cells = round(ncol(mat) / 100), 
+                            min.features = min.features, 
+                            project = "Cer")  
+
+
+## Check which cells don't have any classes 
+m <- match(colnames(obj$CER), meta$cellId)
+obj$CER$orig.celltype <- meta$Cluster[m]
+
+keep <- which(!(obj$CER$orig.celltype == ""))
+obj$CER<- subset(obj$CER, cells = keep)
+
+
+## Preprocess and normalise
+max.depth <- get.max.depth(obj$CER)
+#obj$CER <- preprocess.fun(obj$CER, max.depth = max.depth)
+
+PercentageFeatureSet(obj$CER, pattern = "^MT-")
+
+ 
+obj$CER[["percent.mito"]] <- PercentageFeatureSet(object = obj$CER, pattern = "^MT-")
+ 
+# filter to remove outlier nuclei: 
+ 
+#obj$CER <- subset(x = obj$CER, subset = (nCount_RNA > min.depth) & (nCount_RNA < max.depth) & (percent.mito < max.mito))
+ 
+
+## CPM
+dat <- as.data.frame(obj$CER@assays$RNA@counts)
+dat <- make.cpm(dat)
+dat <- cbind(rownames(dat), dat)
+colnames(dat)[1] <- "Symbol"
+rownames(dat) <- 1:nrow(dat)
+
+write.csv(dat, file =  "/home/neuro/Documents/BrainData/single-cell/aldinger/Aldringer-exp.csv", row.names = TRUE, col.names = TRUE, quote = FALSE)
+
+## metadata preprocessing 
+aldringer = file.path("/home/neuro/Documents/BrainData/single-cell/aldinger")
+md.sample = read_excel("/home/neuro/Documents/BrainData/single-cell/aldinger/NIHMS1703002-supplement-Supplementary_Tables.xlsx", sheet =2, skip=3)[,-1] %>% 
+  as.data.frame()
+  dplyr::rename("DonorID" = "Specimen") %>% 
+  dplyr::select(-Sex)
+clust_names = read_excel("/home/neuro/Documents/BrainData/single-cell/aldinger/NIHMS1703002-supplement-Supplementary_Tables.xlsx", sheet =8, skip=2) %>%
+  dplyr::rename("Cluster" = "Cluster-Cell Type Abbreviation") %>% 
+  dplyr::select(Cluster, "Cell Type")
+
+md.cells = read.table("/home/neuro/Documents/BrainData/single-cell/aldinger/meta.tsv", header=TRUE, fill = TRUE, 
+                      sep = "\t") %>% head()
+  dplyr::rename("DonorID" = "sample_id")
+
+md.full = left_join(md.cells, md.sample, by = "DonorID")
+md.full = left_join(md.full, clust_names, by = "Cluster")
+
+
+
+md.full %<>% 
+  dplyr::rename("Sex" = "sex", 
+                "Age" = "age", 
+                "mito_ratio" = "percent.mito", 
+                "CellID" ="cellId") %>% 
+  mutate(Age = gsub("PCW", "pcw", Age)) %>% 
+  mutate(AgeNumeric = Age %>% str_remove(" pcw") %>% 
+           as.numeric() %>% `-` (40) %>% divide_by(52)) %>%
+  mutate(AgeInterval = add_feature(.$Age, age_intervals))
+
+#write.csv(md.full, file = "/home/neuro/Documents/BrainData/single-cell/aldinger/Aldringer-metadata.csv")
+md_aldringer = read.csv("/home/neuro/Documents/BrainData/single-cell/aldinger/Aldringer-metadata.csv", header=TRUE)[,-1]
+
+colnames(md) = pe.annot$BITColumnName[match(colnames(md), pe.annot$OriginalColumnName)]
+
+md_aldringer %<>%
+  dplyr::rename("CellType" = "Cluster", 
+                "mito_ratio" =  "MitoRate",
+                "SequencingBatch" = "experiment",
+                "GenesDetected" ="nGene...9", 
+                "TotalUMI" = "nUMI...12",
+                "CellTypeGroup" = "Cell.Type",
+                "nCells" = "Cells.Nuclei") %>%
+  dplyr::select(-c("nUMI...10", "nGene...11")) %>% 
+  mutate(Regions = c("Cerebellum"))
+
+write.csv(md_aldringer, file = "/home/neuro/Documents/BrainData/single-cell/aldinger/Aldringer-metadata.csv")
+```

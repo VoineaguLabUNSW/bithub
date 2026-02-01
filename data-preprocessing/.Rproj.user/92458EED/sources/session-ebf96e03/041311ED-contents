@@ -1,0 +1,139 @@
+---
+title: "Drivers of variation"
+author: "Urwah Nawaz"
+date: "2026-01-30"
+output:
+  html_notebook: default
+  workflowr::wflow_html:
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    autodep = TRUE,
+    eval = TRUE,
+	echo = TRUE,
+	warning = FALSE,
+	message = FALSE
+)
+```
+
+# Introduction 
+
+
+```{r set-up}
+library(magrittr)
+library(tibble)
+library(reshape2)
+library(corrplot)
+library(dplyr)
+library(ggvenn)
+library(glue)
+library(pander)
+library(gridExtra)
+library(variancePartition)
+library(DT)
+library(ggplot2)
+library(UpSetR)
+library(patchwork)
+library(ggpubr)
+library(variancePartition)
+library(yaml)
+library(EnsDb.Hsapiens.v86)
+```
+
+
+```{r}
+gene2symbol = genes(EnsDb.Hsapiens.v86, return.type="DataFrame") %>%
+    as.data.frame()
+gene2symbol %<>% 
+    dplyr::select("EnsemblID" = "gene_id", gene_name)
+```
+
+
+```{r load-data}
+
+paths <- yaml::read_yaml("config/paths-example.yaml")
+
+expr_specs <- list(
+  GTEx = list(dir = paths$bulk$formatted$gtex,        file = "GTEx-exp.csv"),
+  PsychENCODE= list(dir = paths$bulk$formatted$psychencode, file = "PsychEncode-exp.csv"),
+  BrainSpan= list(dir = paths$bulk$formatted$brainspan,   file = "BrainSpan-exp.csv"),
+  BrainSeq = list(dir = paths$bulk$formatted$brainseq,    file = "BrainSeq-exp.csv"),
+  HDBR = list(dir = paths$bulk$formatted$hdbr,        file = "HDBR-exp.csv")
+)
+
+
+e <- list()
+e$Raw <- lapply(names(expr_specs), \(ds) {
+  f <- file.path(expr_specs[[ds]]$dir, expr_specs[[ds]]$file)
+  read_expr(f, ds)
+})
+names(e$Raw) <- names(expr_specs)
+```
+
+# Determining drivers of variation 
+
+## Thresholding 
+To investigate the impact of biological and technical factors on gene expression, we performed an analysis using the variancePartition package on the bulk RNA-seq data. Prior to the analysis, the count matrices were filtered to remove lowly expressed genes. The expression cut-off was selected at 1 RPKM/TPM in at least 10% of the samples 
+
+```{r}
+raw_list <- e$Raw
+
+thresh_list <- lapply(raw_list, thresh)
+
+# Summary table: genes before/after
+gene_counts <- tibble(
+  Dataset = names(raw_list),
+  Genes_before = sapply(raw_list, nrow),
+  Genes_after  = sapply(thresh_list, nrow)
+) %>%
+  mutate(Genes_removed = Genes_before - Genes_after,
+         Pct_kept = round(100 * Genes_after / Genes_before, 1))
+```
+
+```{r}
+DT::datatable(
+  gene_counts,
+  rownames = FALSE,
+  options = list(
+    pageLength = nrow(gene_counts),
+    dom = "t"   
+  ),
+  caption = "Gene counts before and after thresholding - Adapted for Supplementary Table S5"
+)
+```
+
+
+## Variance partition analysis 
+
+variancePartition is a statistical and visualization framework which fits a linear mixed model for each gene and partitions the total variance into the contribution of each variable in the experimental design, plus the residual variance. The fractions sum to 1 for each gene, the variance fractions are easily interpretable across genes and sources of variation. 
+
+Prior to performing a variancePartition analysis, the correlation of all variables considered for varianceParition analysis was performed using a Canonical Correlation Analysis (CCA), where variables with a highly correlating score (correlation > 0.95) were dropped, as high correlation can overestimate the contribution of variation. For each dataset, we performed variancePartition analysis with and without cell type composition estimates.  
+
+
+### BrainSeq
+
+```{r}
+form.bseq <- ~ `Age (Numeric)` + (1|Regions) + (1|Sex) + RIN +  (1|Diagnosis) + `Mito Ratio` + `rRNA ratio` + `Total N Reads` + `Mapping Rate` +  (1|Period) + `Proportion of Neurons (MultiBrain)` + `Proportion of Astrocytes (MultiBrain)` + `Proportion of Microglia (MultiBrain)` + `Proportion of Endothelia (MultiBrain)`+ `Proportion of Microglia (MultiBrain)` + `Proportion of Oligodendrocytes (MultiBrain)` +`Total Assigned Gene`
+C.bseq = canCorPairs(form.bseq, md$BSeq)
+plotCorrMatrix( C.bseq )
+```
+
+- With cell type estimates 
+```{r}
+form.bseq <- ~ `Age (Numeric)` + (1|Regions) + (1|Sex) + RIN +  (1|Diagnosis) + `Mito Ratio` +
+  `rRNA ratio` + `Total N Reads`  +  (1|Period) + `Proportion of Neurons (MultiBrain)` +
+  `Proportion of Astrocytes (MultiBrain)` + `Proportion of Microglia (MultiBrain)` +
+  `Proportion of Endothelia (MultiBrain)`+ `Total Assigned Gene`
+
+md$BSeq %<>%
+  column_to_rownames("SampleID")
+varPar.bseq <- fitExtractVarPartModel(thresh_list$BrainSeq, form.bseq, md$BSeq)
+varPar.bseq = sortCols(varPar.bseq)
+plot_varPart = plotVarPart(varPar.bseq)
+```
+
+- Without cell type estimates 

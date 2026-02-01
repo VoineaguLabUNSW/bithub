@@ -1,0 +1,27 @@
+OriginalMetadataColumnName,BITColumnName,Include (Yes/No) - Interest,Type
+SampleID,SampleID,Yes,Sample characteristics
+column_num,column_num,No,Sample characteristics
+donor_id,DonorID,No,Phenotype
+donor_name,DonorName,Yes,Phenotype
+age,Age,No,Phenotype
+gender,Sex,Yes,Phenotype
+structure_id,StructureID,No,Sample characteristics
+structure_acronym,Structure Acronym,Yes,Sample characteristics
+structure_name,Structure,No,Sample characteristics
+stage,Stage,No,Phenotype
+NA,Period,Yes,Phenotype
+NA,Age (Numeric),Yes,Phenotype
+NA,Age Interval,Yes,Phenotype
+NA,Diagnosis,Yes,Phenotype
+NA,Regions,Yes,Sample characteristics
+Hemisphere,Hemisphere,Yes,Sample characteristics
+RIN,RIN,Yes,Sequencing metrics
+Dissectionscore,Dissection Score, Yes,Sequencing metrics
+PMI,PMI (hours),Yes,Sequencing metrics
+pH,pH,Yes,Sequencing metrics
+Ethnicity,Ethnicity,Yes,Phenotype
+NA,Proportion of Neurons (MultiBrain),Yes,Cell Type
+NA,Proportion of Astrocytes (MultiBrain),Yes,Cell Type
+NA,Proportion of Microglia (MultiBrain),Yes,Cell Type
+NA ,Proportion of Endothelia (MultiBrain),Yes,Cell Type
+NA ,Proportion of Oligodendrocytes (MultiBrain),Yes,Cell Type

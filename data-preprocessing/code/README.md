@@ -208,15 +208,89 @@ list(
 BrainSeq, BrainSpan, GTEx, HDBR
 
 
+
+- Single-nucleus utilities used in this R Markdown
+
+These functions support Seurat-based preprocessing and conversion to CPM-like matrices.
+
+
+```{r}
+get.max.depth()
+```
+
+**Purpose**
+	-	Computes an upper library-size cutoff for snRNA-seq QC filtering
+	-	Uses a percentile threshold (max.depth.percentile) defined in functions.R
+
+**Arguments**
+	-	x: Seurat object
+
+**Returns**
+  -	Numeric maximum depth value (library size cutoff)
+
+**Used in**
+	-	HCA, Velmeshev et al, Cameron et al
+	
+```{r}	
+preprocess.fun()
+```
+**Purpose**
+	- Applies standard Seurat QC + normalisation workflow:
+	-	mitochondrial fraction calculation
+	-	filtering on depth and mitochondrial reads
+	-	optional downsampling
+	-	normalisation + variable feature selection
+	-	optional SCTransform
+
+**Arguments**
+	-	x: Seurat object
+	-	run.downsample: whether to downsample (default driven by global downsample)
+	-	SCTransform: whether to run SCTransform (default driven by global use.SCTransform)
+	-	max.depth: max library-size cutoff (typically from get.max.depth())
+
+**Returns**
+	-	Updated Seurat object after QC + normalisation
+
+Used in
+	•	HCA, Velmeshev et al, Cameron et al
+
+
+```{r}
+make.cpm()
+```
+
+**Purpose**
+	•	Performs library-size correction to convert counts to CPM-like values
+	•	Scales each column to sum to 1e6
+
+**Arguments**
+	•	x: gene-by-cell count matrix
+
+**Returns**
+	•	CPM-like matrix
+
+**Used in**
+	•	HCA, Velmeshev et al, Cameron et al
+
+
 #### Notes
 Dataset-specific lookup tables are defined in:
 
 -`def_stages.R`
-- `def_regions.R`
-- `def_death.R`
+-`def_regions.R`
+-`def_death.R`
 
 Processed metadata outputs are written to:
 `output/metadata/`
 
 Final “included metadata” annotation files are written back to:
 `data/annotations/*-annot-final.csv`
+
+
+## Cell type deconvolution 
+
+In progress 
+
+## Variance parititioning 
+
+In progress

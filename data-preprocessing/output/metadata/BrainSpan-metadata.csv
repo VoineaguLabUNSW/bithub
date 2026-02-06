@@ -2,7 +2,7 @@
 "1","13058_8_pcw_Ocx_s2a","8-9pcw",-0.615384615384615,"Prenatal","H376_IIA_51","M",NA,"Ocx","Cortex",NA,NA,NA,NA,NA
 "2","13058_8_pcw_M1C-S1C_s2a","8-9pcw",-0.615384615384615,"Prenatal","H376_IIA_51","M","CAUC","M1C-S1C","Cortex","R",10,5,1,6.94
 "3","13058_8_pcw_AMY_s2a","8-9pcw",-0.615384615384615,"Prenatal","H376_IIA_51","M","CAUC","AMY","Subcortex","R",9.9,3,1,6.94
-"4","13058_8_pcw_MGE_s2a","8-9pcw",-0.615384615384615,"Prenatal","H376_IIA_51","M","CAUC","MGE","Cortex","R",10,4,1,6.94
+"4","13058_8_pcw_MGE_s2a","8-9pcw",-0.615384615384615,"Prenatal","H376_IIA_51","M","CAUC","MGE","Subcortex","R",10,4,1,6.94
 "5","13058_8_pcw_STC_s2a","8-9pcw",-0.615384615384615,"Prenatal","H376_IIA_51","M",NA,"STC","Cortex",NA,NA,NA,NA,NA
 "6","13058_8_pcw_URL_s2a","8-9pcw",-0.615384615384615,"Prenatal","H376_IIA_51","M","CAUC","URL","Cerebellum","R",9.9,4,1,6.94
 "7","13058_8_pcw_CGE_s2a","8-9pcw",-0.615384615384615,"Prenatal","H376_IIA_51","M","CAUC","CGE","Subcortex","R",10,3,1,6.94
@@ -22,7 +22,7 @@
 "21","12833_9_pcw_URL_s2a","8-9pcw",-0.596153846153846,"Prenatal","H376_IIA_50","M","CAUC","URL","Cerebellum","L",9.5,5,1,6.01
 "22","12833_9_pcw_LGE_s2a","8-9pcw",-0.596153846153846,"Prenatal","H376_IIA_50","M","CAUC","LGE","Subcortex","L",10,5,1,6.01
 "23","12833_9_pcw_M1C-S1C_s2a","8-9pcw",-0.596153846153846,"Prenatal","H376_IIA_50","M","CAUC","M1C-S1C","Cortex","L",10,5,1,6.01
-"24","12833_9_pcw_MGE_s2a","8-9pcw",-0.596153846153846,"Prenatal","H376_IIA_50","M","CAUC","MGE","Cortex","L",10,5,1,6.01
+"24","12833_9_pcw_MGE_s2a","8-9pcw",-0.596153846153846,"Prenatal","H376_IIA_50","M","CAUC","MGE","Subcortex","L",10,5,1,6.01
 "25","12833_9_pcw_TCx_s2a","8-9pcw",-0.596153846153846,"Prenatal","H376_IIA_50","M",NA,"TCx","Cortex",NA,NA,NA,NA,NA
 "26","12833_9_pcw_HIP_s2a","8-9pcw",-0.596153846153846,"Prenatal","H376_IIA_50","M","CAUC","HIP","Subcortex","L",9.5,5,1,6.01
 "27","12833_9_pcw_Ocx_s2a","8-9pcw",-0.596153846153846,"Prenatal","H376_IIA_50","M",NA,"Ocx","Cortex",NA,NA,NA,NA,NA

@@ -1344,11 +1344,7 @@ meta %<>%
   )
 
 
-meta %>% 
-  dplyr::select(contains(hca.annot %>% 
-                           dplyr::filter(`Include (Yes/No) - Interest` == "Yes") %>% 
-                           with(BITColumnName))) %>% 
-  dplyr::select(-c(donor_sex_color, donor_sex_order,subclass_color, subclass_order ))
+
  
 ```
 
@@ -1380,8 +1376,11 @@ res$summary %>% DT::datatable()
 ```
 
 ```{r}
-meta %>% 
-  dplyr::select(contains())
+meta %<>% 
+  dplyr::select(contains(hca.annot %>% 
+                           dplyr::filter(`Include (Yes/No) - Interest` == "Yes") %>% 
+                           with(BITColumnName))) %>% 
+  dplyr::select(-c(donor_sex_color, donor_sex_order,subclass_color, subclass_order ))
 ```
 
 In total the HCA dataset contains `r length(unique(colnames(meta)))` metadata columns. Here is the metadata summary:  
@@ -1624,11 +1623,11 @@ strc <- c("Thal", "Cer", "FC", "Hipp", "GE")
 
 
 region_by_ds <- c(
-  Thal = "Subcortex",
-  Cer  = "Cerebellum",
-  FC   = "Cortex",
-  Hipp = "Subcortex",
-  GE   = "Cortex"
+  Thal = "Forebrain",
+  Cer  = "Hindbrain",
+  FC   = "Forebrain",
+  Hipp = "Forebrain",
+  GE   = "Forebrain"
 )
 
 structure_by_ds <- c(

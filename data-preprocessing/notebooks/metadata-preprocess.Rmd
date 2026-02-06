@@ -259,7 +259,7 @@ corrplot(M, order='hclust',
 
 
 
-Based on the above filtering criteria, followed by manual inspection, categorial metadata which have >50 unique or non-informative values were dropped. Additionally highly correlating sequencing metrics were also dropped. Additionally, FastQC metrics and SNP-based principal components were also removed. 
+Based on the above filtering criteria, followed by manual inspection, categorial metadata which have >50 unique or non-informative values were dropped. Additionally highly correlating sequencing metrics were also dropped. Additionally, FastQC metrics were also removed. 
 
 
 
@@ -267,6 +267,7 @@ Based on the above filtering criteria, followed by manual inspection, categorial
 ```{r}
 bseq.order = bseq.annot %>% 
   dplyr::mutate(`Include (Yes/No) - Interest` = ifelse(BITColumnName == "Reads Mapped to Mitochondrial Genes", "No", `Include (Yes/No) - Interest`)) %>%
+  dplyr::mutate(`Include (Yes/No) - Interest` = ifelse(grepl("snp",BITColumnName),"Yes", `Include (Yes/No) - Interest`)) %>%
   dplyr::filter(`Include (Yes/No) - Interest` == "Yes") %>% 
   arrange(factor(Type, levels = order_vec)) %>% 
   arrange(factor(BITColumnName, levels = c("SampleID",
@@ -339,9 +340,8 @@ rownames(exp) <- sub("\\.[0-9]*$", "", rownames(exp))
 ```
 ### Export data
 ```{r}
-#write.csv(exp, file = file.path(bseq.out, "BrainSeq-exp.csv"))
-#write.csv(md, file = file.path(bseq.out, "BrainSeq-metadata.csv"))
-write.csv(md, file = file.path(here::here("output/metadata"), "BrainSeq-metadata.csv"))
+write.csv(exp, file = file.path(paths$bulk$formatted$brainseq$dir, paths$bulk$formatted$brainseq$expr))
+write.csv(md, file = file.path(paths$bulk$formatted$brainseq$dir, paths$bulk$formatted$brainseq$metadata))
 write.csv(bseq.order , file = file.path(here::here("data/annotations"), "BrainSeq-annot-final.csv"))
 ```
 
@@ -587,9 +587,8 @@ rownames(exp) <- rows.metadata$ensembl_gene_id
 ### Export
 
 ```{r}
-#write.csv(exp, file = file.path(paths$bulk$formatted$brainspan, "BrainSpan-exp.csv"))
-#write.csv(md, file = file.path(paths$bulk$formatted$brainspan,  "BrainSpan-metadata.csv"))
-write.csv(md, file = file.path(here::here("output/metadata"), "BrainSpan-metadata.csv"))
+write.csv(exp, file = file.path(paths$bulk$formatted$brainspan$dir, paths$bulk$formatted$brainspan$expr))
+write.csv(md, file = file.path(paths$bulk$formatted$brainspan$dir, paths$bulk$formatted$brainspan$metadata))
 write.csv(bspan.order, file = file.path(here::here("data/annotations"), "BrainSpan-annot-final.csv"))
 ```
 
@@ -812,9 +811,8 @@ wrap_plots(res$numeric_plots, ncol = 3)
 
 ### Export files
 ```{r}
-#write.csv(exp, file = file.path(paths$bulk$formatted$gtex, "GTEx-exp.csv"))
-#write.csv(md.attrbutes, file = file.path(paths$bulk$formatted$gtex, "GTEx-metadata.csv"))
-write.csv(md.attrbutes, file = file.path(here::here("output/metadata"), "GTEx-metadata.csv"))
+write.csv(exp, file = file.path(paths$bulk$formatted$gtex$dir, paths$bulk$formatted$gtex$expr))
+write.csv(md.attrbutes, file =file.path(paths$bulk$formatted$gtex$dir, paths$bulk$formatted$gtex$metadata))
 
 write.csv(gtex.order, file = file.path(here::here("data/annotations"), "GTEx-annot-final.csv"))
 ```
@@ -1011,10 +1009,8 @@ hdbr.final = hdbr.tpm %>%
 
 ### Export data
 ```{r}
-#write.csv(hdbr.final, file =file.path(paths$bulk$formatted$hdbr, "HDBR-exp.csv"))
-#write.csv(full.md.hdbr, file =file.path(paths$bulk$formatted$hdbr, "HDBR-metadata.csv"))
-write.csv(full.md.hdbr, file = file.path(here::here("output/metadata"), "HDBR-metadata.csv"))
-
+write.csv(hdbr.final, file =file.path(paths$bulk$formatted$hdbr$dir,paths$bulk$formatted$hdbr$expr ))
+write.csv(full.md.hdbr, file =file.path(paths$bulk$formatted$hdbr$dir,paths$bulk$formatted$hdbr$metadata))
 write.csv(hdbr.order, file = file.path(here::here("data/annotations"), "HDBR-annot-final.csv"))
 ```
 
@@ -1220,9 +1216,9 @@ wrap_plots(res$numeric_plots, ncol = 3)
 ### Export data
 
 ```{r}
-#write.csv(exp, file = file.path(paths$bulk$formatted$psychencode, "PsychEncode-exp.csv"))
-#write.csv(md, file = file.path(paths$bulk$formatted$psychencode,"PsychEncode-metadata.csv"), row.names = FALSE)
- write.csv(md, file = file.path(here::here("output/metadata"), "PsychEncode-metadata.csv"), row.names = FALSE)
+write.csv(exp, file = file.path(paths$bulk$formatted$psychencode$dir, paths$bulk$formatted$psychencode$expr))
+write.csv(md, file = file.path(paths$bulk$formatted$psychencode$dir,paths$bulk$formatted$psychencode$metadata), row.names = FALSE)
+
  write.csv(pe.order, file = file.path(here::here("data/annotations"), "PE-annot-final.csv"))
 ```
 
@@ -1414,10 +1410,10 @@ wrap_plots(res$numeric_plots, ncol = 3)
 
 
 ```{r}
-#write.csv(meta, file = file.path(hca.outfile, "HCA-metadata.csv"), quote = FALSE, row.names = FALSE)
+write.csv(meta, file = file.path(paths$single_nucleus$formatted$hca$dir, paths$single_nucleus$formatted$hca$metadata), quote = FALSE, row.names = FALSE)
 #write.csv(names, file= "../annotations/HCA-annot2.csv")
 
-#write.csv(dat, file = file.path(hca.outfile, "HCA-exp.csv"), row.names = TRUE, col.names = TRUE, quote = FALSE)
+write.csv(dat, file = file.path(paths$single_nucleus$formatted$hca$dir, paths$single_nucleus$formatted$hca$expr), row.names = TRUE, col.names = TRUE, quote = FALSE)
 ```
 
 
@@ -1587,11 +1583,10 @@ wrap_plots(res$numeric_plots, ncol = 3)
 ### Export
 ```{r}
 
-write.csv(dat, file = file.path(paths$single_nucleus$formatted$velmeshev, "Velmeshev-exp.csv"), quote = FALSE)
+write.csv(dat, file = file.path(paths$single_nucleus$formatted$velmeshev$dir, paths$single_nucleus$formatted$velmeshev$expr), quote = FALSE)
 
-write.csv(meta, file = file.path(paths$single_nucleus$formatted$velmeshev, "Velmeshev-metadata.csv"), quote = FALSE, row.names = FALSE)
+write.csv(meta, file = file.path(paths$single_nucleus$formatted$velmeshev$dir, paths$single_nucleus$formatted$velmeshev$metadata), quote = FALSE, row.names = FALSE)
 
- write.csv(meta, file = file.path(here::here("output/metadata"), "Velmeshev-metadata.csv"), row.names = FALSE)
 ```
 
 
@@ -1844,9 +1839,9 @@ md.cameron %<>%
 
 ```{r}
 
-write.csv(joined, file = file.path(paths$single_nucleus$formatted$cameron, "Cameron-exp.csv"), quote = FALSE)
+write.csv(joined, file = file.path(paths$single_nucleus$formatted$cameron$dir, paths$single_nucleus$formatted$cameron$expr), quote = FALSE)
 
-write.csv(md.cameron, file = file.path(paths$single_nucleus$formatted$cameron, "Cameron-metadata.csv"), quote = FALSE, row.names = FALSE)
+write.csv(md.cameron, file = file.path(paths$single_nucleus$formatted$cameron$dir, paths$single_nucleus$formatted$cameron$metadata), quote = FALSE, row.names = FALSE)
 
 #write.csv(md.cameron, file = file.path(here::here("output/metadata"), "Cameron-metadata.csv"), row.names = FALSE)
 ```

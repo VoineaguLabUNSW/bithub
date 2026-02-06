@@ -7,7 +7,9 @@ BITHub is an web resource that allows exploration of gene expression across eigh
 
 ## Data Processing 
 
-All expression files were pre-processed using the code in the `data-preprocessing` folder. 
+The expression files were pre-processed using the code in the `data-preprocessing` folder, whereas the data packing pipeline, including the z-score transformations are in the `pipelines` folder.
+
+
 
 
 ## Search options

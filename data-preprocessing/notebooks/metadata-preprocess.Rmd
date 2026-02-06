@@ -7,7 +7,6 @@ output:
     toc: true
     toc_float: 
       collapsed: true
-    df_print: paged
     code_folding: hide
 editor_options:
   chunk_output_type: console
@@ -15,7 +14,6 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-    autodep = TRUE,
     eval = TRUE,
 	echo = TRUE,
 	warning = FALSE,
@@ -33,10 +31,13 @@ In order to re-run the scripts, please change the location of input files. All d
 A copy of each processed metadata will also be saved in 'output/metadata/'.
 
 ## Harmonization of metadata 
+Developmental stages and anatomical regions were harmonised across datasets to ensure consistent filtering and downstream comparisons.
 
-* Stages defined in def stages 
-* anatomical regions defined in def regions and more explicity explained in Supp table and atlas 
-* include photos 
+**Developmental stage definitions**:
+Developmental stages were assigned using the lookup table in `code/def_stages.R`, which maps dataset-specific age fields to a standard BITHub stage label (e.g., prenatal vs postnatal groupings and broader developmental intervals). Where available, both the original age field and the harmonised stage label are retained in the final metadata.
+
+**Anatomical region harmonisation**
+Brain structures were mapped to harmonised anatomical regions using `code/def_regions.R`. Dataset-provided structure labels (or acronyms) were standardised and then grouped into broader regions (e.g., cortex, subcortex, cerebellum). Full definitions and mappings are provided in the Supplementary Table and referenced brain atlas documentation, enabling transparent interpretation of region-level comparisons.
 
 ## Selection of metadata variables 
 
@@ -1231,6 +1232,11 @@ wrap_plots(res$numeric_plots, ncol = 3)
 
 ## Human Cell Atlas (HCA)
 
+Sn-RNAseq data were obtained from the Human Cell Atlas cortical cell-types resource. This dataset comprises transcriptomic profiles from 49,495 nuclei sampled across multiple regions of the human cerebral cortex, including the middle temporal gyrus (MTG), anterior cingulate cortex (ACC; ventral division of medial prefrontal cortex, A24), primary visual cortex (V1C), primary motor cortex (M1C), primary somatosensory cortex (S1C), and primary auditory cortex (A1C). Individual cortical layers were microdissected prior to profiling.
+
+Expression matrices and accompanying metadata were downloaded directly from the Allen Brain Institute Cell Types Database (Human Multiple Cortical Areas, SMART-Seq) at:
+https://brain-map.org/our-research/cell-types-taxonomies/cell-types-database-rna-seq-data/human-multiple-cortical-areas-smart-seq.
+
 ```{r}
 exp <- read.csv(file.path(paths$single_nucleus$raw$hca, "matrix.csv"), check.names=FALSE)
 
@@ -1329,7 +1335,25 @@ meta %<>% left_join(nCount, by = "CellID") %>%
       left_join(nFeature, by = "CellID") %>%
   left_join(mito_ratio, by="CellID")
 
+meta %<>% 
+  mutate(
+    `Structure Acronym` = dplyr::recode(
+      `Structure Acronym`,
+      "M1lm" = "M1C",
+      "M1ul" = "M1C",
+      "S1lm" = "S1C",
+      "S1ul" = "S1C",
+      .default = `Structure Acronym`
+    )
+  )
 
+
+meta %>% 
+  dplyr::select(contains(hca.annot %>% 
+                           dplyr::filter(`Include (Yes/No) - Interest` == "Yes") %>% 
+                           with(BITColumnName))) %>% 
+  dplyr::select(-c(donor_sex_color, donor_sex_order,subclass_color, subclass_order ))
+ 
 ```
 
 
@@ -1359,7 +1383,12 @@ res$summary %>% DT::datatable()
 
 ```
 
-In total the Velmeshev et al contains `r length(unique(colnames(meta)))` metadata columns. Here is the metadata summary:  
+```{r}
+meta %>% 
+  dplyr::select(contains())
+```
+
+In total the HCA dataset contains `r length(unique(colnames(meta)))` metadata columns. Here is the metadata summary:  
 
 ```{r}
 res <- profile_df(meta)
@@ -1393,6 +1422,12 @@ wrap_plots(res$numeric_plots, ncol = 3)
 
 
 ## Velmeshev et al
+
+Sn-RNAseq data were obtained from the study by Velmeshev et al. investigating cell-type–specific transcriptional changes in autism spectrum disorder (ASD). Post-mortem human cortical tissue samples from ASD patients and neurotypical control subjects were processed for nuclei isolation and profiled using the 10× Genomics single-nucleus RNA-sequencing platform.
+
+Processed expression matrices and associated metadata were downloaded from the UCSC Autism Cell Atlas portal at:
+https://autism.cells.ucsc.edu/.
+
 
 ```{r}
 vel = file.path(paths$single_nucleus$raw$velmeshev)
@@ -1572,6 +1607,16 @@ rm(VL)
 
 ## Cameron et al
 
+Sn-RNA-seq data were obtained from the study by Cameron et al., which profiled transcriptional programs in the prenatal human brain. This dataset comprises snRNA-seq profiles generated from second-trimester fetal brain tissue sampled across five regions of relevance to neurodevelopmental disorders: frontal cortex (FC), ganglionic eminence (GE), hippocampus, thalamus, and cerebellum.
+
+
+Processed expression matrices were downloaded from Figshare at:
+https://figshare.com/articles/dataset/11629311.
+
+Expression files were provided separately for each brain region and were analysed on a per-region basis.
+
+The original study is described in Cameron et al., Biological Psychiatry (2022).
+
 ```{r}
 
 
@@ -1700,6 +1745,7 @@ for (f in strc) {
 }
 
 md.cameron <- bind_rows(md_ful, .id = "Structure") %>%
+  mutate(SampleID = DonorID) %>%
   mutate(DonorID  = sub("_.*$", "", DonorID)) %>%
   mutate(DonorID = paste0(DonorID, "_donorID"))
 
@@ -1802,18 +1848,11 @@ write.csv(joined, file = file.path(paths$single_nucleus$formatted$cameron, "Came
 
 write.csv(md.cameron, file = file.path(paths$single_nucleus$formatted$cameron, "Cameron-metadata.csv"), quote = FALSE, row.names = FALSE)
 
- write.csv(md.cameron, file = file.path(here::here("output/metadata"), "Cameron-metadata.csv"), row.names = FALSE)
+#write.csv(md.cameron, file = file.path(here::here("output/metadata"), "Cameron-metadata.csv"), row.names = FALSE)
 ```
 
 
 
 
 
-## snRNA-seq 
 
-* Cell types in each dataset 
-
-```{r}
-
-
-```

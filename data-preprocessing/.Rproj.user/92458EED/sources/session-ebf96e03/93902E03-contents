@@ -3,10 +3,13 @@ title: "Inferring Cell Type estimates"
 author: "Urwah Nawaz"
 date: "2023-09-24"
 output:
-  html_notebook: default
-  workflowr::wflow_html:
+  html_document:
+    toc: true
+    toc_float: 
+      collapsed: true
+    df_print: paged
     code_folding: hide
-editor_options: 
+editor_options:
   chunk_output_type: console
 ---
 
@@ -19,6 +22,8 @@ knitr::opts_chunk$set(
 	message = FALSE
 )
 ```
+
+
 
 # Introduction 
 
@@ -35,8 +40,8 @@ library(preprocessCore)
 library(Metrics)
 library(DTWBI)
 library(purrr)
-source("config/fun-cibersort.R")
-load("data/cell-type-signatures/sigsBrain.rda")
+source(here::here("code/fun-cibersort.R"))
+load(here::here("data/cell-type-signatures/sigsBrain.rda"))
 ```
 
 
@@ -98,6 +103,7 @@ decon_results <- imap(e, function(exp, d) {
 decon_results_flat <- setNames(decon_results, paste0(names(decon_results), "_CIBERSORT"))
 
 
+save(decon_results_flat)
 ```
 
 ## Goodness-of-fit and deconvolution results 

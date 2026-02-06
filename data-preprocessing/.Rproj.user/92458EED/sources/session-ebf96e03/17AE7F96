@@ -1,6 +1,6 @@
 {
     "id": "17AE7F96",
-    "path": "~/Documents/Brain_integrative_transcriptome/data-preprocessing/notebooks/metadata-preprocess.Rmd",
+    "path": "~/Documents/Brain_integrative_transcriptome/update/bithub/data-preprocessing/notebooks/metadata-preprocess.Rmd",
     "project_path": "notebooks/metadata-preprocess.Rmd",
     "type": "r_markdown",
     "hash": "0",
@@ -12,17 +12,17 @@
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "0,0",
-        "scrollLine": "0",
+        "cursorPosition": "39,88",
+        "scrollLine": "29",
         "chunk_output_type": "console",
         "docOutlineVisible": "1"
     },
     "folds": "",
-    "lastKnownWriteTime": 1769946972,
+    "lastKnownWriteTime": 1770349616,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1769946973035,
+    "last_content_update": 1770349616735,
     "read_only": false,
     "read_only_alternatives": []
 }

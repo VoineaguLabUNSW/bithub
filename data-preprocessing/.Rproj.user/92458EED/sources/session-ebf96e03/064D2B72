@@ -1,6 +1,6 @@
 {
     "id": "064D2B72",
-    "path": "~/Documents/Brain_integrative_transcriptome/data-preprocessing/config/paths-example.yaml",
+    "path": "~/Documents/Brain_integrative_transcriptome/update/bithub/data-preprocessing/config/paths-example.yaml",
     "project_path": "config/paths-example.yaml",
     "type": "yaml",
     "hash": "0",
@@ -13,14 +13,14 @@
         "source_window_id": "",
         "Source": "Source",
         "cursorPosition": "11,55",
-        "scrollLine": "0"
+        "scrollLine": "28"
     },
     "folds": "",
-    "lastKnownWriteTime": 1769757757,
+    "lastKnownWriteTime": 1770345091,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1769757757588,
+    "last_content_update": 1770345091,
     "read_only": false,
     "read_only_alternatives": []
 }

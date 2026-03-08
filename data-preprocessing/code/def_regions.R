@@ -38,10 +38,10 @@ structure_acronym[["TEL"]] = c("telencephalon")
 regions = list()
 
 regions[["Subcortex"]] = c("AMY", "CGE", "DTH", "HIP", "LGE", "MD", "CAU",
-                           "STR", "SNA", "PUT", "HYP", "NAC")
+                           "STR", "SNA", "PUT", "HYP", "NAC","MGE", "GE")
 
 regions[["Cortex"]] = c("A1C", "DLPFC", "IPC", "ITC", "M1C",
-                        "M1C-S1C", "ACC", "MGE", "Ocx", "OFC",
+                        "M1C-S1C", "ACC", "Ocx", "OFC",
                         "PCx", "S1C", "STC","TCx", "V1C", "VFC",
                         "CTX", "MTG", "M1lm", "M1ul","CgG",
                         "S1ul","S1lm", "MFC")
@@ -61,7 +61,7 @@ regions[["Spinal Cord"]] = c("SCI")
 regions_fetal = list()
 
 regions_fetal[["Forebrain"]] = c("FB", "FBF", "DIEN", "PIT-DIEN", "TEL",
-                                 "CTX", "TCx", "CGE", "HIP", "CAU")
+                                 "CTX", "TCx", "CGE", "HIP", "CAU", "GE", "DTH", "HIP", "DLPFC")
 regions_fetal[["Midbrain"]] = c("MB")
 regions_fetal[["Hindbrain"]] = c("HB", "HBF", "HB/C",
                                  "CB", "MEDU", "PONS")

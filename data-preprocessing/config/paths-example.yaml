@@ -15,28 +15,28 @@ bulk:
   formatted:
     brainseq:
       dir: "/home/neuro/Documents/Brain_integrative_transcriptome/update/bithub/data-preprocessing/output"
-      expr: "/expression/BrainSeq-exp.csv"
-      metadata: "/metadata/BrainSeq-metadata.csv"
+      expr: "expression/BrainSeq-exp.csv"
+      metadata: "metadata/BrainSeq-metadata.csv"
       rownames: 1
     brainspan:
       dir: "/home/neuro/Documents/Brain_integrative_transcriptome/update/bithub/data-preprocessing/output"
-      expr: "/expression/BrainSpan-exp.csv"
-      metadata: "/metadata/BrainSpan-metadata.csv"
+      expr: "expression/BrainSpan-exp.csv"
+      metadata: "metadata/BrainSpan-metadata.csv"
       rownames: 1
     gtex:
       dir: "/home/neuro/Documents/Brain_integrative_transcriptome/update/bithub/data-preprocessing/output"
-      expr: "/expression/GTEx-exp.csv"
-      metadata: "/metadata/GTEx-metadata.csv"
+      expr: "expression/GTEx-exp.csv"
+      metadata: "metadata/GTEx-metadata.csv"
       rownames: 1
     psychencode:
       dir: "/home/neuro/Documents/Brain_integrative_transcriptome/update/bithub/data-preprocessing/output"
-      expr: "/expression/PsychEncode-exp.csv"
-      metadata: "/metadata/PsychEncode-metadata.csv"
+      expr: "expression/PsychEncode-exp.csv"
+      metadata: "metadata/PsychEncode-metadata.csv"
       rownames: 1
     hdbr:
       dir: "/home/neuro/Documents/Brain_integrative_transcriptome/update/bithub/data-preprocessing/output"
       expr: "expression/HDBR-exp.csv"
-      metadata: "/metadata/HDBR-metadata.csv"
+      metadata: "metadata/HDBR-metadata.csv"
       drop_cols: ["X"]
       rownames: "EnsemblID"
 
@@ -50,14 +50,14 @@ single_nucleus:
   formatted:
     hca:
       dir: "/home/neuro/Documents/Brain_integrative_transcriptome/update/bithub/data-preprocessing/output"
-      expr: "/expression/HCA-exp.csv"
-      metadata: "/metadata/HCA-metadata.csv"
+      expr: "expression/HCA-exp.csv"
+      metadata: "metadata/HCA-metadata.csv"
     cameron:
       dir: "/home/neuro/Documents/Brain_integrative_transcriptome/update/bithub/data-preprocessing/output"
-      expr: "/expression/Cameron-exp.csv"
-      metadata: "/metadata/Cameron-exp.csv"
+      expr: "expression/Cameron-exp.csv"
+      metadata: "metadata/Cameron-exp.csv"
 
     velmeshev:
       dir: "/home/neuro/Documents/Brain_integrative_transcriptome/update/bithub/data-preprocessing/output"
-      expr: "/expression/Velmeshev-exp.csv"
-      metadata: "/metadata/Velmeshev-metadata.csv"
+      expr: "expression/Velmeshev-exp.csv"
+      metadata: "metadata/Velmeshev-metadata.csv"

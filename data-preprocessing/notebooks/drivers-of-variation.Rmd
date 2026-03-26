@@ -25,6 +25,9 @@ knitr::opts_chunk$set(
 
 # Introduction 
 
+This R markdown document contains the code to perform variance partition analysis on the bulk RNA-seq files for BITHub. All metadata and expression matrices were preprocessed using in the `notebooks/metadata-preprocess.Rmd`, whereas the deconvolution analysis for the cell type estimates were performed in `notebooks/bulk-deconvolution.Rmd`
+
+In order to re-run the scripts, please change the location of input files. All directories are defined in `config/paths-example.yaml`. A copy of each processed metadata and deconvolution estimates are also available in `output/metadata/` and `output/deconvolution`, respectively.
 
 ```{r set-up}
 library(magrittr)
@@ -59,8 +62,7 @@ gene2symbol %<>%
 
 ```{r load-data}
 
-paths <- yaml::read_yaml("config/paths-example.yaml")
-
+paths <- yaml::read_yaml(here::here("config/paths-example.yaml"))
 expr_specs <- list(
   GTEx = list(dir = paths$bulk$formatted$gtex$dir,        file = "expression/GTEx-exp.csv"),
   PsychENCODE= list(dir = paths$bulk$formatted$psychencode$dir, file = "expression/PsychEncode-exp.csv"),
@@ -138,51 +140,6 @@ names(md) <- names(md_specs)
 
 ### BrainSeq
 
-
-* With cell type estimates  
-
-```{r}
-form.bseq <- ~ `Age (Numeric)` + (1|Regions) + (1|Sex) + RIN +  (1|Diagnosis) + `Mito Ratio` + `rRNA ratio` + `Total N Reads` + `Mapping Rate` +  (1|Period) + `Proportion of Neurons (MultiBrain)` + `Proportion of Astrocytes (MultiBrain)` + `Proportion of Microglia (MultiBrain)` + `Proportion of Endothelia (MultiBrain)`+ `Proportion of Microglia (MultiBrain)` + `Proportion of Oligodendrocytes (MultiBrain)` +`Total Assigned Gene`
-C.bseq = canCorPairs(form.bseq, md$BrainSeq)
-plotCorrMatrix( C.bseq )
-```
-
-```{r}
-form <- ~`Age (Numeric)` + RIN +  `Mito Ratio` + `rRNA ratio` + `Total N Reads`  +  `Proportion of Neurons (MultiBrain)` +
-  `Proportion of Astrocytes (MultiBrain)` + `Proportion of Microglia (MultiBrain)` +
-  `Proportion of Endothelia (MultiBrain)`+ `Total Assigned Gene`
-X <- model.matrix(form, data = md$BrainSeq)
-
-apply(X, 2, sd)
-apply(X, 2, var)
-
-sd_vals <- apply(X, 2, sd)
-sd_vals / min(sd_vals[sd_vals > 0])
-```
-
-- With cell type estimates 
-```{r}
-
-form.bseq <- ~ `Age (Numeric)` + (1|Regions) + (1|Sex) + RIN +  (1|Diagnosis) + `Mito Ratio` +
-  `rRNA ratio` + `Total N Reads`  +  (1|Period) + `Proportion of Neurons (MultiBrain)` +
-  `Proportion of Astrocytes (MultiBrain)` + `Proportion of Microglia (MultiBrain)` +
-  `Proportion of Endothelia (MultiBrain)`+ `Total Assigned Gene`
-
-md$BrainSeq %<>%
-  column_to_rownames("SampleID")
-
-num_cols <- sapply(md$BrainSeq, is.numeric)
-md$BrainSeq[num_cols] <- scale(md$BrainSeq[num_cols])
-
-varPar.ct.bseq <- fitExtractVarPartModel(thresh_list$BrainSeq, form.bseq, md$BrainSeq)
-varPar.bseq = sortCols(varPar.bseq)
-plot_varPart = plotVarPart(varPar.bseq)
-
-
-save(varPar.bseq, file = here::here("output/variance-partition/results/BrainSeq-CT.Rda"))
-```
-
-
 - Without cell type estimates 
 
 ```{r}
@@ -204,8 +161,8 @@ sd_vals / min(sd_vals[sd_vals > 0])
 
 ```{r}
 
-form.bseq <- ~ `Age (Numeric)` + (1|Regions) + (1|Sex) + RIN +  (1|Diagnosis) + `Mito Ratio` +
-  `rRNA ratio` + `Total N Reads`  +  (1|Period) +  `Total Assigned Gene`
+form.bseq <- ~ `Age (Numeric)` + (1|Regions) + (1|Sex) + RIN +  (1|Diagnosis) + `Mito Ratio` + `Mapping Rate` +
+  `rRNA ratio` + `Total N Reads`  +  (1|Period) 
 
 md$BrainSeq %<>%
   column_to_rownames("SampleID")
@@ -213,15 +170,47 @@ md$BrainSeq %<>%
 num_cols <- sapply(md$BrainSeq, is.numeric)
 md$BrainSeq[num_cols] <- scale(md$BrainSeq[num_cols])
 
-varPar.bseq <- fitExtractVarPartModel(thresh_list$BrainSeq, form.bseq, md$BrainSeq)
-varPar.bseq = sortCols(varPar.bseq)
+#varPar.bseq <- fitExtractVarPartModel(thresh_list$BrainSeq, form.bseq, md$BrainSeq)
+#varPar.bseq = sortCols(varPar.bseq)
+#save(varPar.bseq, file = ("output/variance-partition/results/BrainSeq.Rda"))
+```
+
+```{r}
+
+load(here::here("output/variance-partition/results/BrainSeq.Rda"))
 plot_varPart = plotVarPart(varPar.bseq)
 
 plot_varPart
-
-save(varPar.bseq, file = here::here("output/variance-partition/results/BrainSeq.Rda"))
 ```
 
+
+
+
+* With cell type estimates  
+
+```{r}
+
+
+form.bseq <- ~ `Age (Numeric)` + (1|Regions) + (1|Sex) + RIN +  (1|Diagnosis) + `Mito Ratio` + `rRNA ratio` + `Total N Reads` + `Mapping Rate` +  (1|Period) + `Proportion of Neurons (MultiBrain)` + `Proportion of Astrocytes (MultiBrain)` + `Proportion of Microglia (MultiBrain)` + `Proportion of Endothelia (MultiBrain)` + `Proportion of Oligodendrocytes (MultiBrain)`
+C.bseq = canCorPairs(form.bseq, md$BrainSeq)
+plotCorrMatrix( C.bseq )
+```
+
+- With cell type estimates 
+```{r}
+form.bseq <- ~ `Age (Numeric)` + (1|Regions) + (1|Sex) + RIN +  (1|Diagnosis) + `Mito Ratio` + `rRNA ratio` + `Total N Reads` + `Mapping Rate` +  (1|Period) + `Proportion of Neurons (MultiBrain)` + `Proportion of Astrocytes (MultiBrain)` +  `Proportion of Endothelia (MultiBrain)` + `Proportion of Oligodendrocytes (MultiBrain)`
+
+#varPar.ct.bseq <- fitExtractVarPartModel(thresh_list$BrainSeq, form.bseq, md$BrainSeq)
+#varPar.ct.bseq = sortCols(varPar.ct.bseq )
+#save(varPar.ct.bseq, file = here::here("output/variance-partition/results/BrainSeq-CT.Rda"))
+```
+
+```{r}
+load(here::here("output/variance-partition/results/BrainSeq-CT.Rda"))
+plot_varPart = plotVarPart(varPar.ct.bseq )
+
+plot_varPart
+```
 
 
 ### BrainSpan
@@ -235,21 +224,75 @@ plotCorrMatrix( C.bspan )
 ```
 
 ```{r}
-form.bspan <- ~`Age (Numeric)` + (1|Sex) + (1|Period) + (1|Regions) + RIN +  pH + `PMI (hours)` + `Dissection Score` + (1|DonorID)
+num_cols <- sapply( md$BrainSpan, is.numeric)
+md$BrainSpan[num_cols] <- scale( md$BrainSpan[num_cols])
 
-varPar.bspan <- fitExtractVarPartModel(thresh_list$BrainSpan, form.bspan , md$BrainSpan)
-varPar.bspan = sortCols(varPar.bspan )
-plot_varPart = plotVarPart(varPar.bspan )
+md$BrainSpan %<>%
+  column_to_rownames("SampleID")
 
-plot_varPart
-
-save(varPar.bspan, file = here::here("output/variance-partition/results/BrainSpan.Rda"))
+#varPar.bspan <- fitExtractVarPartModel(thresh_list$BrainSpan, form.bspan , md$BrainSpan)
+#varPar.bspan = sortCols(varPar.bspan )
+#save(varPar.bspan, file = here::here("output/variance-partition/results/BrainSpan.Rda"))
 ```
 
 
 ```{r}
-form <- ~`Age (Numeric)` + RIN +  `Mito Ratio` + `rRNA ratio` + `Total N Reads`  + `Total Assigned Gene`
-X <- model.matrix(form, data = md$BrainSeq)
+
+load(here::here("output/variance-partition/results/BrainSpan.Rda"))
+
+plot_varPart = plotVarPart(varPar.bspan )
+plot_varPart
+```
+
+
+```{r}
+form.bspan <- ~`Age (Numeric)` + (1|Sex) + (1|Period) + (1|Regions) + RIN +  pH + `PMI (hours)` + `Dissection Score` + (1|DonorID) + `Proportion of Neurons (MultiBrain)` + `Proportion of Astrocytes (MultiBrain)` + `Proportion of Oligodendrocytes (MultiBrain)` + `Proportion of Endothelia (MultiBrain)`
+C.bspan = canCorPairs(form.bspan, md$BrainSpan)
+plotCorrMatrix( C.bspan )
+
+#varPar.bspan <- fitExtractVarPartModel(thresh_list$BrainSpan, form.bspan , md$BrainSpan)
+#varPar.bspan = sortCols(varPar.bspan )
+#save(varPar.bspan, file = here::here("output/variance-partition/results/BrainSpan-CT.Rda"))
+
+```
+
+
+```{r}
+load(here::here("output/variance-partition/results/BrainSpan-CT.Rda"))
+plot_varPart = plotVarPart(varPar.bspan )
+plot_varPart
+```
+
+
+
+### GTEx
+
+- Without cell type estimates 
+
+
+
+```{r}
+gtex.form <- ~ `Total N Reads` + `rRNA ratio` + (1|`Type of Batch`)  + (1|`Age Interval`) + (1|Sex) + (1|Regions) + RIN + (1|`Hardy Scale`) + `PMI (hours)` + `Mapping Rate` + `Exonic Rate` + `Intronic Rate` + (1|`Autolysis Score`) + 
+  `Mapped Unique (no dup flags)` + `End 2 Mismatch Rate` +  `End 2 Antisense` +  `End Sense 2` + 
+  `End 1 Antisense` +  `End 1 Sense`  + `End 1 Sense percentage` +  `Percentage Intragenic End 2 Reads`
+C.gtex = canCorPairs(gtex.form, md$GTEx)
+plotCorrMatrix(C.gtex)
+```
+
+The canonical correlation analysis revealed several metadata had highly correlating score. These variables were mostly sequencing metrics, including End 1 Sense, End 2 Antisense, Mapped Unique (no dip flags), End Sense 2 and were dropped. In addition, Autolysis Score had a high number of missing values across datasets and was also dropped. 
+
+
+```{r}
+gtex.form <- ~ `Total N Reads` + `rRNA ratio` + (1|`Type of Batch`)  + (1|`Age Interval`) + (1|Sex) + (1|Regions) + RIN + (1|`Hardy Scale`) + `PMI (hours)` + `Mapping Rate` + `Exonic Rate` + (1|DonorID)
+
+C.gtex = canCorPairs(gtex.form, md$GTEx)
+plotCorrMatrix(C.gtex)
+```
+
+```{r}
+form <- ~`Total N Reads` + `rRNA ratio` + RIN + `PMI (hours)` + `Mapping Rate` + `Exonic Rate`
+
+X <- model.matrix(form, data = md$GTEx)
 
 apply(X, 2, sd)
 apply(X, 2, var)
@@ -259,16 +302,164 @@ sd_vals / min(sd_vals[sd_vals > 0])
 ```
 
 ```{r}
-
-form.bseq <- ~ `Age (Numeric)` + (1|Regions) + (1|Sex) + RIN +  (1|Diagnosis) + `Mito Ratio` +
-  `rRNA ratio` + `Total N Reads`  +  (1|Period) +  `Total Assigned Gene`
-
-md$BrainSpan %<>%
+md$GTEx %<>%
   column_to_rownames("SampleID")
 
-num_cols <- sapply(md$BrainSeq, is.numeric)
-md$BrainSeq[num_cols] <- scale(md$BrainSeq[num_cols])
+num_cols <- sapply(md$GTEx , is.numeric)
+md$GTEx [num_cols] <- scale(md$GTEx[num_cols])
+
+#varPar.gtex <- fitExtractVarPartModel(thresh_list$GTEx, gtex.form  , md$GTEx)
+#varPar.gtex  = sortCols(varPar.gtex  )
+#save(varPar.gtex , file = here::here("output/variance-partition/results/GTEx.Rda"))
 
 ```
 
 
+```{r}
+load( here::here("output/variance-partition/results/GTEx.Rda"))
+plot_varPart = plotVarPart(varPar.gtex)
+plot_varPart
+```
+
+- With cell types 
+
+```{r}
+gtex.form <- ~ `Total N Reads` + `rRNA ratio` + (1|`Type of Batch`)  + (1|`Age Interval`) + (1|Sex) + (1|Regions) + RIN + (1|`Hardy Scale`) + `PMI (hours)` + `Mapping Rate` + `Exonic Rate` + `Intronic Rate` + (1|`Autolysis Score`) +
+  `Mapped Unique (no dup flags)` + `End 2 Mismatch Rate` +  `End 2 Antisense` +  `End Sense 2` + 
+  `End 1 Antisense` +  `End 1 Sense`  + `End 1 Sense percentage` +  `Percentage Intragenic End 2 Reads` +
+  `Proportion of Neurons (MultiBrain)` + `Proportion of Microglia (MultiBrain)` + `Proportion of Oligodendrocytes (MultiBrain)` +  `Proportion of Endothelia (MultiBrain)` +  `Proportion of Astrocytes (MultiBrain)` 
+C.gtex = canCorPairs(gtex.form, md$GTEx)
+plotCorrMatrix(C.gtex)
+
+```
+
+```{r}
+gtex.form <- ~ `Total N Reads` + `rRNA ratio` + (1|`Type of Batch`)  + (1|`Age Interval`) + (1|Sex) + (1|Regions) + RIN + (1|`Hardy Scale`) + `PMI (hours)` + `Mapping Rate` +
+  `Proportion of Neurons (MultiBrain)` +  `Proportion of Oligodendrocytes (MultiBrain)` +  `Proportion of Endothelia (MultiBrain)` +  `Proportion of Astrocytes (MultiBrain)` + (1|DonorID)
+
+
+
+varPar.gtex.ct <- fitExtractVarPartModel(thresh_list$GTEx, gtex.form  , md$GTEx)
+varPar.gtex.ct  = sortCols(varPar.gtex.ct  )
+save(varPar.gtex.ct  , file = here::here("output/variance-partition/results/GTEx-CT.Rda"))
+```
+
+```{r}
+load(here::here("output/variance-partition/results/GTEx-CT.Rda"))
+plot_varPart = plotVarPart(varPar.gtex.ct )
+
+plot_varPart
+```
+
+### HDBR 
+
+```{r}
+form.hdbr <- ~(1|Sex) + (1|Hemisphere) + (1|`Sequencing Batch`)+  `Total N Reads` + `Mapping Rate` + (1|Regions) + `PMI (hours)` + (1|DonorID)  + `Intronic Rate` + (1|`Age Interval`) 
+
+
+C.hdbr = canCorPairs(form.hdbr, md$HDBR)
+plotCorrMatrix(C.hdbr)
+```
+
+```{r}
+
+md$HDBR %<>% 
+   dplyr::select(-which(names(.) == "")) %>% 
+ mutate(DonorID = factor(DonorID)) 
+
+md$HDBR %<>% 
+  distinct(SampleID, .keep_all=TRUE) %>% 
+  column_to_rownames("SampleID")
+
+num_cols <- sapply(md$HDBR , is.numeric)
+md$HDBR[num_cols] <- scale(md$HDBR[num_cols])
+
+
+#varPar.hdbr <- fitExtractVarPartModel(thresh_list$HDBR, form.hdbr ,md$HDBR)
+#varPar.hdbr = sortCols(varPar.hdbr)
+#save(varPar.hdbr , file = here::here("output/variance-partition/results/HDBR-2.Rda"))
+```
+
+
+```{r}
+load(here::here("output/variance-partition/results/HDBR-2.Rda"))
+plot_varPart = plotVarPart(varPar.hdbr)
+plot_varPart
+```
+
+
+- With cell types 
+
+
+```{r}
+form.hdbr <- ~(1|Sex) + (1|Hemisphere) + (1|`Sequencing Batch`)+  `Total N Reads` + `Mapping Rate` + (1|Regions) + `PMI (hours)` + (1|DonorID)  + `Intronic Rate` + (1|`Age Interval`) + `Proportion of Neurons (MultiBrain)` + `Proportion of Astrocytes (MultiBrain)` + `Proportion of Oligodendrocytes (MultiBrain)` + `Proportion of Endothelia (MultiBrain)`
+
+
+C.hdbr = canCorPairs(form.hdbr, md$HDBR)
+plotCorrMatrix(C.hdbr)
+```
+
+
+```{r}
+#varPar.hdbr.ct <- fitExtractVarPartModel(thresh_list$HDBR, form.hdbr ,md$HDBR)
+#varPar.hdbr.ct = sortCols(varPar.hdbr.ct)
+#save(varPar.hdbr.ct , file = here::here("output/variance-partition/results/HDBR-CT-2.Rda"))
+```
+
+```{r}
+load(here::here("output/variance-partition/results/HDBR-CT-2.Rda"))
+plot_varPart = plotVarPart(varPar.hdbr)
+plot_varPart
+```
+
+
+### PsychENCODE
+
+- Without cell type 
+
+```{r}
+form.pe <- ~`Age (Numeric)` + (1|Sex) + (1|Period) + (1|`Cause of Death`) + (1|Diagnosis) + (1|Ethnicity) + (1|individualIDSource)
+
+C.pe = canCorPairs(form.pe, md$PsychENCODE)
+plotCorrMatrix(C.pe )
+
+md$PsychENCODE %<>%
+  dplyr::select(-which(names(.) == "")) %>% 
+  distinct(SampleID, .keep_all = TRUE) %>%
+  column_to_rownames("SampleID")
+
+#varPar.pe <- fitExtractVarPartModel(thresh_list$PsychENCODE, form.pe , md$PsychENCODE)
+#varPar.pe = sortCols(varPar.pe)
+#save(varPar.pe , file = here::here("output/variance-partition/results/PsychENCODE.Rda"))
+
+
+```
+
+```{r}
+
+load(here::here("output/variance-partition/results/PsychENCODE.Rda"))
+plot_varPart = plotVarPart(varPar.pe)
+plot_varPart
+```
+
+- With cell type 
+
+```{r}
+form.pe <- ~`Age (Numeric)` + (1|Sex) + (1|Period) + (1|`Cause of Death`) + (1|Diagnosis) + (1|Ethnicity) + (1|individualIDSource) + `Proportion of Neurons (MultiBrain)` + `Proportion of Astrocytes (MultiBrain)` + `Proportion of Oligodendrocytes (MultiBrain)` + `Proportion of Endothelia (MultiBrain)`
+
+C.pe = canCorPairs(form.pe, md$PsychENCODE)
+plotCorrMatrix(C.pe )
+
+
+#varPar.pe.ct <- fitExtractVarPartModel(thresh_list$PsychENCODE, form.pe , md$PsychENCODE)
+
+#varPar.pe.ct = sortCols(varPar.pe.ct)
+#save(varPar.pe.ct , file = here::here("output/variance-partition/results/PsychENCODE-CT.Rda"))
+```
+
+
+```{r}
+load(here::here("output/variance-partition/results/PsychENCODE-CT.Rda"))
+plot_varPart = plotVarPart(varPar.pe.ct)
+plot_varPart
+```

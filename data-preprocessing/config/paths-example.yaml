@@ -55,7 +55,7 @@ single_nucleus:
     cameron:
       dir: "/home/neuro/Documents/Brain_integrative_transcriptome/update/bithub/data-preprocessing/output"
       expr: "expression/Cameron-exp.csv"
-      metadata: "metadata/Cameron-exp.csv"
+      metadata: "metadata/Cameron-metadata.csv"
 
     velmeshev:
       dir: "/home/neuro/Documents/Brain_integrative_transcriptome/update/bithub/data-preprocessing/output"

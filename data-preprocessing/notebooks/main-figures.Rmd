@@ -11,7 +11,10 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Figures
 
-## Bulk RNA-seq dataset
+## Figure 2
+
+
+### Figure 2a 
 
 * Distribution of samples across age intervals
 

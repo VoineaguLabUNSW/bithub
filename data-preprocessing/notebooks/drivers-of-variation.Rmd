@@ -262,9 +262,9 @@ form.bspan <- ~`Age (Numeric)` + (1|Sex) + (1|Period) + (1|Regions) + RIN +  pH 
 C.bspan = canCorPairs(form.bspan, md$BrainSpan)
 plotCorrMatrix( C.bspan )
 
-varPar.bspan_log <- fitExtractVarPartModel(log2(thresh_list$BrainSpan + 1), form.bspan , md$BrainSpan)
-varPar.bspan_log = sortCols(varPar.bspan_log)
-save(varPar.bspan_log , file = here::here("output/variance-partition/results/BrainSpan-CT_log.Rda"))
+varPar.bspan.CT_log <- fitExtractVarPartModel(log2(thresh_list$BrainSpan + 1), form.bspan , md$BrainSpan)
+varPar.bspan.CT_log= sortCols(varPar.bspan.CT_log)
+save(varPar.bspan.CT_log , file = here::here("output/variance-partition/results/BrainSpan-CT_log.Rda"))
 
 ```
 
@@ -520,6 +520,7 @@ plot_varPart
 
 ### PsychENCODE
 
+
 - Without cell type 
 
 ```{r}
@@ -532,6 +533,9 @@ md$PsychENCODE %<>%
   dplyr::select(-which(names(.) == "")) %>% 
   distinct(SampleID, .keep_all = TRUE) %>%
   column_to_rownames("SampleID")
+
+num_cols <- sapply(md$PsychENCODE, is.numeric)
+md$PsychENCODE[num_cols] <- scale(md$PsychENCODE[num_cols])
 
 varPar.pe_log <- fitExtractVarPartModel(log2(thresh_list$PsychENCODE +1 ), form.pe , md$PsychENCODE)
 varPar.pe_log = sortCols(varPar.pe_log)

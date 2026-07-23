@@ -45,7 +45,7 @@ single_nucleus:
   raw:
     hca: "/home/neuro/Documents/BrainData/single-cell/hca/Raw"
     cameron: "/home/neuro/Documents/BrainData/single-cell/cameron"
-    velmeshev: "/home/neuro/Documents/BrainData/single-cell/velmeshev/Velmeshev2019"
+    velmeshev: "/home/neuro/Documents/BrainData/single-cell/velmeshev/2026-data"
 
   formatted:
     hca:

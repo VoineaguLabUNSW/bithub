@@ -299,7 +299,6 @@ max(abs(D))
 round(apply(abs(D), 2, max), 8)        
 round(colMeans(D), 8)            
 
-=
 print(round(D, 6))
 head(data.frame(max_diff = apply(abs(D), 1, max))[order(-apply(abs(D), 1, max)), , drop = FALSE], 20)
 

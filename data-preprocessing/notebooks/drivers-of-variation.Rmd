@@ -252,7 +252,10 @@ save(varPar.bspan_log, file = here::here("output/variance-partition/results/Brai
 
 load(here::here("output/variance-partition/results/BrainSpan_log.Rda"))
 
+
 write.csv(varPar.bspan_log, file = here::here("output/BrainSpan/BrainSpan_varPart.csv"))
+
+
 plot_varPart = plotVarPart(varPar.bspan )
 plot_varPart
 

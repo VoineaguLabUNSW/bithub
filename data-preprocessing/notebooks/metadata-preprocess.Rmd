@@ -1745,7 +1745,8 @@ for (f in strc) {
 md.cameron <- bind_rows(md_ful, .id = "Structure") %>%
   mutate(SampleID = DonorID) %>%
   mutate(DonorID  = sub("_.*$", "", DonorID)) %>%
-  mutate(DonorID = paste0(DonorID, "_donorID"))
+  mutate(DonorID = paste0(DonorID, "_donorID")) %>% 
+  dplyr::select(CellID, everything())
 
 
 
@@ -1849,7 +1850,10 @@ write.csv(md.cameron, file = file.path(paths$single_nucleus$formatted$cameron$di
 #write.csv(md.cameron, file = file.path(here::here("output/metadata"), "Cameron-metadata.csv"), row.names = FALSE)
 ```
 
-
+```{r}
+cameron_exp = read.csv(here::here("output/Cameron/Cameron-exp.csv"), header=TRUE)
+cameron_md = read.csv(here::here("output/Cameron/Cameron-metadata.csv"), check.names=FALSE)
+```
 
 
 

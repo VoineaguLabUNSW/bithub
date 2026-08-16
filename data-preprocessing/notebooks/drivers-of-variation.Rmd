@@ -180,6 +180,8 @@ save(varPar.bseq_log, file = here::here("output/variance-partition/results/Brain
 load(here::here("output/variance-partition/results/BrainSeq.Rda"))
 load(here::here("output/variance-partition/results/BrainSeq_log.Rda"))
 
+write.csv(varPar.bseq_log, file = here::here("output/BrainSeq/BrainSeq_varPart.csv"))
+
 
 varPar.bseq_log %>% 
   as.data.frame() %>% 
@@ -248,8 +250,9 @@ save(varPar.bspan_log, file = here::here("output/variance-partition/results/Brai
 
 ```{r}
 
-load(here::here("output/variance-partition/results/BrainSpan.Rda"))
+load(here::here("output/variance-partition/results/BrainSpan_log.Rda"))
 
+write.csv(varPar.bspan_log, file = here::here("output/BrainSpan/BrainSpan_varPart.csv"))
 plot_varPart = plotVarPart(varPar.bspan )
 plot_varPart
 
@@ -263,6 +266,11 @@ C.bspan = canCorPairs(form.bspan, md$BrainSpan)
 plotCorrMatrix( C.bspan )
 
 varPar.bspan.CT_log <- fitExtractVarPartModel(log2(thresh_list$BrainSpan + 1), form.bspan , md$BrainSpan)
+
+
+
+
+
 varPar.bspan.CT_log= sortCols(varPar.bspan.CT_log)
 save(varPar.bspan.CT_log , file = here::here("output/variance-partition/results/BrainSpan-CT_log.Rda"))
 
@@ -270,11 +278,34 @@ save(varPar.bspan.CT_log , file = here::here("output/variance-partition/results/
 
 
 ```{r}
-load(here::here("output/variance-partition/results/BrainSpan-CT.Rda"))
-
+#load(here::here("output/variance-partition/results/BrainSpan-CT_log.Rda"))
+write.csv(varPar.bspan.CT_log, file = here::here("output/variance-partition/results/BrainSpan_varPart_cellTypes.csv"))
 
 plotVarPart(varPar.bspan_log ) | plotVarPart(varPar.bspan )
 ```
+
+diagnostic 
+```{r}
+A <- varPar.bspan.CT_log
+B <- read.csv(here::here("output/variance-partition/results/Gavin-comparison/Varpart_BrainSpan_CT_logged_gjs.csv"), row.names = 1, check.names = FALSE)
+
+sum(rownames(B) %in% rownames(A))     
+setdiff(rownames(B), rownames(A))    
+
+g <- intersect(rownames(B), rownames(A))
+k <- intersect(colnames(A), colnames(B))
+A <- as.matrix(A[g, k]); B <- as.matrix(B[g, k])
+D <- A - B
+
+max(abs(D))                            
+round(apply(abs(D), 2, max), 8)        
+round(colMeans(D), 8)            
+
+print(round(D, 6))
+head(data.frame(max_diff = apply(abs(D), 1, max))[order(-apply(abs(D), 1, max)), , drop = FALSE], 20)
+
+```
+
 
 ### GTEx 
 
@@ -333,7 +364,8 @@ save(varPar.gtex_log, file = here::here("output/variance-partition/results/GTEx_
 
 **Step 6 — Load and plot final no-CT model**
 ```{r}
-load(here::here("output/variance-partition/results/GTEx.Rda"))
+load(here::here("output/variance-partition/results/GTEx_log.Rda"))
+write.csv(varPar.gtex_log, file= here::here("output/GTEx/GTEx_varPart.csv"))
 
 plotVarPart(varPar.gtex_log) | plotVarPart(varPar.gtex)
 
@@ -487,7 +519,9 @@ save(varPar.hdbr_log , file = here::here("output/variance-partition/results/HDBR
 
 
 ```{r}
-load(here::here("output/variance-partition/results/HDBR-2.Rda"))
+load(here::here("output/variance-partition/results/HDBR-log.Rda"))
+write.csv(varPar.hdbr_log, file = here::here("output/HDBR/HDBR_varPart.csv"))
+
 plotVarPart(varPar.hdbr_log) | plotVarPart(varPar.hdbr)
 
 ```
@@ -546,7 +580,10 @@ save(varPar.pe_log , file = here::here("output/variance-partition/results/PsychE
 
 ```{r}
 
-load(here::here("output/variance-partition/results/PsychENCODE.Rda"))
+load(here::here("output/variance-partition/results/PsychENCODE_log.Rda"))
+write.csv(varPar.pe_log, file =here::here("output/PsychENCODE/PsychENCODE_varPart.csv"))
+
+
 plot_varPart = plotVarPart(varPar.pe)
 plot_varPart
 ```

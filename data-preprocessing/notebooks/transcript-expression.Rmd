@@ -1,0 +1,140 @@
+---
+title: "Transcript expression"
+author: "Urwah Nawaz"
+date: "2026-08-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    autodep = TRUE,
+    eval = TRUE,
+	echo = TRUE,
+	warning = FALSE,
+	message = FALSE
+)
+```
+
+# Introduction 
+
+
+```{r load-md}
+library(magrittr)
+library(tibble)
+library(reshape2)
+library(corrplot)
+library(dplyr)
+library(ggvenn)
+library(glue)
+library(pander)
+library(gridExtra)
+library(tidyverse)
+library(CePa)
+paths <- yaml::read_yaml(here::here("config/paths-example.yaml"))
+
+
+md_specs <- list(
+  GTEx = list(dir = paths$bulk$formatted$gtex$dir,        file = "GTEx/GTEx-metadata.csv"),
+  BrainSeq = list(dir = paths$bulk$formatted$brainseq$dir,    file = "BrainSeq/BrainSeq-metadata.csv")
+)
+
+md <- lapply(names(md_specs), \(ds) {
+  f <- file.path(md_specs[[ds]]$dir, md_specs[[ds]]$file)
+  read.csv(f, check.names = FALSE)
+})
+names(md) <- names(md_specs)
+```
+
+
+## BrainSeq 
+
+```{r}
+load(file.path(paths$bulk$raw$brainseq, "rse_tx_unfiltered.Rdata"), envir = .GlobalEnv)
+
+
+exp = rse_tx@assays@.xData$data$tpm %>%
+  as.data.frame() %>% 
+  rownames_to_column("tx_id") %>%
+  mutate_at(.vars = "tx_id", .funs = gsub, pattern = "\\.[0-9]*$", replacement = "") %>%
+  column_to_rownames("tx_id")
+
+offset <- 0.05 
+
+bs_region_lookup <- with(md$BrainSeq, setNames(Regions, SampleID))        
+bs_age_lookup    <- with(md$BrainSeq, setNames(`Age Interval`, SampleID))  
+
+brainseq_tx_avg <- log2(exp + offset) %>%
+  rownames_to_column("tx_id") %>%
+  pivot_longer(-tx_id, names_to = "SampleID", values_to = "log2_exp") %>%
+  mutate(
+    region = bs_region_lookup[SampleID],
+    age    = bs_age_lookup[SampleID]
+  ) %>%
+  dplyr::filter(!is.na(region), !is.na(age)) %>%
+  group_by(tx_id, region, age) %>%
+  summarise(mean_log2_exp = mean(log2_exp, na.rm = TRUE), .groups = "drop")
+
+brainseq_tx_avg_hip <- brainseq_tx_avg %>% 
+  dplyr::filter(region == "Subcortex") %>%
+  dplyr::select(tx_id, age, mean_log2_exp) %>%
+  pivot_wider(names_from = age, values_from = mean_log2_exp) %>%
+  column_to_rownames("tx_id") %>%
+  dplyr::select("13-15pcw", "16-18pcw", "19-24pcw","0-5mos",
+                "6-18mos","19mos-5yrs","6-11yrs",   everything()) %>%
+  as.matrix()
+
+brainseq_tx_avg_pfc <-  brainseq_tx_avg %>%         
+  dplyr::filter(region == "Cortex") %>%
+  dplyr::select(tx_id, age, mean_log2_exp) %>%
+  pivot_wider(names_from = age, values_from = mean_log2_exp) %>%
+  column_to_rownames("tx_id") %>%
+  dplyr::select("13-15pcw", "16-18pcw", "19-24pcw","0-5mos",
+                "6-18mos","19mos-5yrs","6-11yrs",   everything()) %>%
+  as.matrix()
+
+
+write.csv(brainseq_tx_avg_pfc, file = file.path(paths$bulk$formatted$brainseq$dir, "BrainSeq/BrainSeq-pfc-exp.csv"))
+
+
+
+write.csv(brainseq_tx_avg_hip, file = file.path(paths$bulk$formatted$brainseq$dir, "BrainSeq/BrainSeq-hip-exp.csv"))
+```
+
+
+## GTEx
+
+```{r}
+
+gtex_trans = read.gct("/home/neuro/Documents/BrainData/Bulk/GTEx/GTEx_Analysis_2017-06-05_v8_RSEMv1.3.0_transcript_tpm.gct.gz")
+colnames(gtex_trans ) <- gsub("\\.", "-", colnames(gtex_trans))
+
+gtex_trans %<>%
+  dplyr::select(contains(md$GTEx$SampleID))
+
+
+
+
+
+offset <- 0.05
+
+gtex_log <- log2(gtex_trans + offset)
+
+region_lookup <- with(md$GTEx, setNames(`Structure Acronym`, SampleID))
+regions_vec <- region_lookup[colnames(gtex_log)]
+
+# drop samples with no region annotation
+keep <- !is.na(regions_vec)
+gtex_log <- gtex_log[, keep, drop = FALSE]
+regions_vec <- regions_vec[keep]
+
+unique_regions <- unique(regions_vec)
+
+gtex_tx_avg_matrix <- sapply(unique_regions, function(r) {
+  cols <- names(regions_vec)[regions_vec == r]
+  rowMeans(gtex_log[, cols, drop = FALSE], na.rm = TRUE)
+})
+
+
+write.csv(gtex_tx_avg_matrix, file = file.path(paths$bulk$formatted$gtex$dir, "GTEx/GTEx-tx-exp.csv"))
+# gtex_tx_avg_matrix: transcripts x regions, ready to use directly
+```

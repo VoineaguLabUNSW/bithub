@@ -432,6 +432,9 @@ def parse_metadata(dataset, order_entries: Dict[str, List[str]], category_limit:
                         if groups := order_entry.get('groups', None):
                             attrs['groupSizes'] = list(map(lambda x: x['size'], groups))
                             attrs['groupLabels'] = list(map(lambda x: x['label'], groups))
+                        colors = order_entry.get('color', None)
+                        if colors:                                    
+                             attrs['colors'] = colors  
                     groups = None
                     yield h, column, groups, attrs, column_types.get(h, None)
 

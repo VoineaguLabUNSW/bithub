@@ -381,8 +381,8 @@
                     {d.name}
                   </th>
                   <td class="px-6 py-4">
-                    <a class="underline text-primary-600 mr-4" href={d.matrix_url}>Expression</a>
-                    <a class="underline text-primary-600" href={d.meta_url}>Metadata</a>
+                    <a class="underline text-primary-600 mr-4" href={$metadata.url + '/' + d.matrix_name}>Expression</a>
+                    <a class="underline text-primary-600" href={$metadata.url + '/' + d.meta_name}>Metadata</a>
                   </td>
                   <td class="px-6 py-4">
                     {Number(d.samples || 0).toLocaleString()}
@@ -410,8 +410,8 @@
                     {d.name}
                   </th>
                   <td class="px-6 py-4">
-                    <a class="underline text-primary-600 mr-4" href={d.matrix_url}>Expression</a>
-                    <a class="underline text-primary-600" href={d.meta_url}>Metadata</a>
+                    <a class="underline text-primary-600 mr-4" href={$metadata.url + '/' + d.matrix_name}>Expression</a>
+                    <a class="underline text-primary-600" href={$metadata.url + '/' + d.meta_name}>Metadata</a>
                   </td>
                   <td class="px-6 py-4">
                     {Number(d.samples || 0).toLocaleString()}

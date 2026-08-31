@@ -6,6 +6,7 @@
     import CustomView from '../../lib/components/customview.svelte';
     import DropdownFile from '../../lib/components/dropdownfile.svelte'
     import { base } from '$app/paths';
+    import { page } from '$app/stores';
     import { findMatchesSorted } from "../../lib/utils/hdf5";
     import { asCSV } from '../../lib/stores/custom'
     import { createParam, createIntParam, createListParam } from '../../lib/stores/param';
@@ -75,7 +76,7 @@
 <div class='m-12 mt-4'>
     <div class='pb-4'>
         <Breadcrumb aria-label="Home breadcrumbs">
-            <BreadcrumbItem href="{base}" home>Home</BreadcrumbItem>
+            <BreadcrumbItem href={`${base}${$page.url.search}`} home>Home</BreadcrumbItem>
             <BreadcrumbItem>Search</BreadcrumbItem>
         </Breadcrumb>
     </div>

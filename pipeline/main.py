@@ -1,5 +1,5 @@
-import tempfile, os, sys, csv, gzip, zlib, contextlib, itertools, re, array, io, shutil, datetime, json, struct, hashlib, math, collections.abc, logging
-import oyaml, h5py, tqdm, boto3, numpy as np
+import tempfile, os, time, http.server, csv, gzip, zlib, contextlib, itertools, re, io, shutil, datetime, json, hashlib, math, collections.abc, logging, argparse, subprocess, webbrowser, threading
+import oyaml, h5py, tqdm, boto3, RangeHTTPServer, numpy as np
 import data_pb2
 
 from typing import Callable, Iterable, Tuple, Dict, List
@@ -14,16 +14,17 @@ CATEGORY_LIMIT = None
 
 class AnnotationException(Exception):
     pass
+
+class CORSRequestHandler(RangeHTTPServer.RangeRequestHandler):
+    def end_headers(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        super().end_headers()
     
 def safe_access_nested(data, indices, default=None):
     for index in indices:
         if not isinstance(data, collections.abc.Sequence) or not abs(index) < len(data): return default
         data = data[index]
     return data
-
-def manage_deploy_local(asset_paths):
-    '''Return local URL mapping - local server MUST support range requests'''
-    return {os.path.basename(p): os.path.join('http://localhost:5501', os.path.relpath(p, '../')) for p in asset_paths}
 
 def calc_s3_etag(path, multipart_threshold, multipart_chunksize):
     '''Calculate hash, used to avoid re-deploying identical files'''
@@ -34,22 +35,20 @@ def calc_s3_etag(path, multipart_threshold, multipart_chunksize):
         while (chunk := f.read(multipart_chunksize)):
             chunks_hashes.append(hashlib.md5(chunk).digest())
         return hashlib.md5(b''.join(chunks_hashes)).hexdigest() + '-' + str(len(chunks_hashes))
-      
-def manage_deploy_cloudfront(asset_paths, cloudfront_url=None, chunk_size=8388608, prefix='bithub'):
+            
+def sync_s3(asset_paths, chunk_size=8388608, bucket='bithub-bucket', prefix='bithub/'):
     '''Upload list of files and return URL mapping'''
     s3 = boto3.client('s3')
     for path, name in zip(asset_paths, map(os.path.basename, asset_paths)):
-        name = prefix + '/' + name
+        name = prefix + name
         s3_hash = None
         with contextlib.suppress(s3.exceptions.ClientError):
-            s3_head = s3.head_object(Bucket='bithub-bucket', Key=name)
+            s3_head = s3.head_object(Bucket=bucket, Key=name)
             s3_hash = s3_head.get('ETag')[1:-1]
             
         if not s3_hash or calc_s3_etag(path, chunk_size, chunk_size) != s3_hash:
-            s3.upload_file(path, 'bithub-bucket', name, ExtraArgs={'CacheControl': 'max-age=3600'},
+            s3.upload_file(path, bucket, name, ExtraArgs={'CacheControl': 'max-age=3600'},
                            Config=boto3.s3.transfer.TransferConfig(multipart_threshold=chunk_size, multipart_chunksize=chunk_size))
-
-    return {n: f'https://{cloudfront_url}/{prefix}/{n}' for n in map(os.path.basename, asset_paths)}
 
 def pad_elipses(string, length=20):
     '''Transform strings to constant length in a presentable way'''
@@ -225,7 +224,7 @@ def iterate_csv_sorted(path: str, strip_numeric: bool=False, comment: str=None, 
                             writer.writerow(row)
 
             # Fast out-of-memory sort
-            os.system(f'(head -n 1 {pre_sort_path} && tail -n +2 {pre_sort_path} | sort) | tr -d \'\\r\' > {sort_path}')
+            subprocess.run(f'(head -n 1 {pre_sort_path} && tail -n +2 {pre_sort_path} | sort) | tr -d \'\\r\' > {sort_path}', shell=True)
             if (pre_sort_path != path): os.remove(pre_sort_path)
 
             if create_cache: 
@@ -554,11 +553,7 @@ def test_compressed_ranges():
                 for i, v in enumerate(row.values):
                     assert v == data[i]
 
-def run():
-    if len(sys.argv) != 2 or sys.argv[1] in ('-h', '--help'): 
-        print("Error: First argument should be input.yaml path, see example")
-        exit(1)
-        
+def create(yaml_path, output_path):
     with patch('builtins.open', open_with_progress):
         test_parallel_iteration()
         test_accumulate_iteration()
@@ -570,21 +565,20 @@ def run():
         
         # Read file locations and metadata from input YAML
         inputObj = None
-        with open(sys.argv[1], 'r') as stream:
+        with open(yaml_path, 'r') as stream:
             try:
                 inputObj = oyaml.safe_load(stream)    
             except oyaml.YAMLError as e:
                 raise Exception('Error reading YAML input') from e
-            
-        OUTPUT_FOLDER = inputObj['output_external']
-        OUTPUT_RESOURCES = inputObj['output_resources']
-        EXPRESSION_PATH = os.path.join(OUTPUT_FOLDER, 'expression.bin')
+        
+        EXPRESSION_PATH = os.path.join(output_path, 'expression.bin')
+        HDF5_PATH = os.path.join(output_path, 'out.hdf5')
 
-        for p in [OUTPUT_FOLDER, OUTPUT_RESOURCES, LOCAL_TMP]:
+        for p in [output_path, LOCAL_TMP]:
             os.makedirs(p, exist_ok=True)
             
         log_num, log_path = 0, None
-        while os.path.exists(log_path := os.path.join(OUTPUT_FOLDER, f'warnings{("." + str(log_num)) if log_num else ""}.log')): 
+        while os.path.exists(log_path := os.path.join(output_path, f'warnings{("." + str(log_num)) if log_num else ""}.log')): 
             log_num += 1
 
         logging.basicConfig(filename=log_path,
@@ -592,19 +586,12 @@ def run():
                             format='%(asctime)s,bithub,%(levelname)s\t%(message)s',
                             datefmt='%H:%M:%S',
                             level=logging.INFO)
-        
-        def deploy(paths):
-            return manage_deploy_local(paths) if inputObj['deploy_local'] else manage_deploy_cloudfront(paths, inputObj['deploy_url'])
-
-        if inputObj.get('deploy_only', False):
-            deploy([os.path.join(OUTPUT_FOLDER, p) for p in os.listdir(OUTPUT_FOLDER)])
-            exit(0)
 
         # Load gene mappings/annotations into memory
         gene_to_gene, transcript_to_transcript, transcript_to_gene = get_ncbi_annotator(inputObj.get('ncbi_gene_info', None), inputObj.get('ncbi_gtf'), inputObj.get('genenames_alias', None))
         all_ranges = []
 
-        with h5py.File(os.path.join(OUTPUT_FOLDER, 'out.hdf5'), 'w') as root, open(os.path.join(OUTPUT_FOLDER, 'errors.tsv'), 'w') as f_err:
+        with h5py.File(HDF5_PATH, 'w') as root, open(os.path.join(output_path, 'errors.tsv'), 'w') as f_err:
             with context_closer() as contexts:
                 contexts.append(write_compressed_ranges(EXPRESSION_PATH))
                 writer, teller = contexts[-1].__enter__()
@@ -843,9 +830,6 @@ def run():
                     with contextlib.suppress(KeyError):
                         p_pg_root[d_id] = root['metadata'][d_id]
 
-            asset_urls = deploy([EXPRESSION_PATH])
-            expression_url = asset_urls.get(os.path.basename(EXPRESSION_PATH), '')
-
             for d in inputObj['datasets']:
                 meta_root = root['metadata'][d['id']]
                 matrix_meta_root = meta_root.create_group('matrices')
@@ -853,12 +837,10 @@ def run():
                 all_logs = {}
                 [filter_name, filter_categories] = ['', []]
                 for matrix in d['matrices']:
-                    name, shape = matrix['name'], (len(annots_written), d['_internal_sample_count'])
+                    name = matrix['name']
                     ranges, _, _, logs, logs_filter_enum, pvalue_ranges = matrix['_internal']
         
                     curr_matrix_meta_root = matrix_meta_root.create_dataset(name, data=ranges, compression='gzip', compression_opts=9)
-                    curr_matrix_meta_root.attrs.create('path', expression_url)
-                    curr_matrix_meta_root.attrs.create('shape', shape)
                     remote_range_datasets.append([curr_matrix_meta_root.name, '/data/' + d['id'], 'RowData'])
                     
                     curr_matrix_pvalue_root = matrix_meta_root.create_dataset(name + '_pvalues', data=pvalue_ranges, compression='gzip', compression_opts=9)
@@ -901,24 +883,20 @@ def run():
             root.attrs.create('remote', remote_range_datasets)
 
         # Upload remaining files to release
-        asset_paths = [os.path.join(OUTPUT_FOLDER, 'out.hdf5')]
+        asset_paths = [EXPRESSION_PATH, HDF5_PATH]
         for d in inputObj['datasets']: 
             m = d['matrices'][0]
             meta_path = os.path.join(d['dir'], d['meta'])
             matrix_path = os.path.join(d['dir'], m['path'])
-            matrix_dst = os.path.join(OUTPUT_FOLDER, get_matrix_name(d, m) + '.csv.gz')
+            matrix_dst = os.path.join(output_path, get_matrix_name(d, m) + '.csv.gz')
 
-            asset_paths.extend([os.path.join(OUTPUT_FOLDER, d['meta']), matrix_dst])
-            shutil.copy2(meta_path, OUTPUT_FOLDER)
-            os.system(f'gzip -c {matrix_path} > {matrix_dst}')
-        
-        asset_urls = deploy(asset_paths)
+            asset_paths.extend([os.path.join(output_path, d['meta']), matrix_dst])
+            shutil.copy2(meta_path, output_path)
+            subprocess.run(f'gzip -c {matrix_path} > {matrix_dst}', shell=True)
 
         # Write metadata.csv (TODO: currently only includes first matrix)
-        with open(os.path.join(OUTPUT_RESOURCES, 'metadata.json'), 'w') as f:
+        with open(os.path.join(output_path, 'metadata.json'), 'w') as f:
             meta_json = {
-                "data_url": asset_urls.get('out.hdf5', ''),
-                "bin_url": expression_url,
                 "count": total_written,
                 "last_updated": datetime.date.today().strftime("%B %Y"),
                 "meta_files": []
@@ -927,11 +905,64 @@ def run():
                 m = d['matrices'][0]
                 meta_json['meta_files'].append({
                     'name': d['id'], 
-                    'meta_url': asset_urls.get(d['meta'], ''), 
-                    'matrix_url': asset_urls.get(get_matrix_name(d, m) + '.csv.gz', ''),
+                    'meta_name': d['meta'], 
+                    'matrix_name': get_matrix_name(d, m) + '.csv.gz',
                     'samples': d['_internal_sample_count']
                 })
             json.dump(meta_json, f, indent=2)
 
 if __name__ == '__main__':
-    run()
+    parser = argparse.ArgumentParser(
+        prog='bithub-cli',
+        description='Transforms YAML file into static site with precomputed plots')
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    create_parser = subparsers.add_parser("create", help="Create new output folder")
+    create_parser.add_argument("yaml")
+    create_parser.add_argument("output")
+
+    serve_parser = subparsers.add_parser("serve", help="Serve output folder locally for testing")
+    serve_parser.add_argument('output')
+    serve_parser.add_argument('-p', '--port', type=int, default=5501)
+    serve_parser.add_argument('-v', '--viewer', default='https://voineagulabunsw.github.io/bithub', help='Base URL to launch viewer')
+
+    upload_parser = subparsers.add_parser("upload", help="Upload to S3, internally passes AWS_PROFILE and AWS_REGION")
+    upload_parser.add_argument("output")
+    upload_parser.add_argument("--bucket", "-b", default="bithub-bucket", help="S3 bucket name")
+    upload_parser.add_argument("--prefix", "-p", default="bithub/", help="Prefix all files")
+    args = parser.parse_args()
+    if args.command == "create":
+        create(args.yaml, args.output)
+    elif args.command == "serve":
+        metadata_url = f'http://localhost:{args.port}/metadata.json'
+        print(f'Serving source {metadata_url}...')
+        httpd = http.server.HTTPServer(('localhost', args.port), CORSRequestHandler)
+        def start_server():
+            os.chdir(args.output)
+            httpd.serve_forever()
+        server_thread = threading.Thread(target=start_server, daemon=False)
+        server_thread.start()
+        try:
+            webbrowser.open_new(f'{args.viewer}?source={metadata_url}')
+            while True: time.sleep(1)
+        except KeyboardInterrupt:
+            httpd.shutdown()
+            server_thread.join()
+
+    elif args.command == "upload":
+        asset_paths = [os.path.join(args.output, 'expression.bin'), os.path.join(args.output, 'out.hdf5'), os.path.join(args.output, "metadata.json")]
+        meta_json = {}
+        with open(os.path.join(args.output, "metadata.json")) as f:
+            meta_json = json.load(f)
+            for mf in meta_json["meta_files"]:
+                asset_paths.append(os.path.join(args.output, mf["meta_name"]))
+                asset_paths.append(os.path.join(args.output, mf["matrix_name"]))
+
+        for p in asset_paths:
+            if not os.path.exists(p):
+                raise FileNotFoundError("File referred to in metadata.json missing", p)
+            
+        sync_s3(asset_paths, bucket=args.bucket, prefix=args.prefix)
+        print(f'Data successfully written to bucket')
+        

@@ -24,11 +24,6 @@ async function getHDF5(url, setProgress) {
     return new hdf5.File(buffer.buffer, '');
 }
 
-async function getJSON(url) {
-    const req = await fetch(url);
-    return await req.json();
-}
-
 /**
  * Awaitable lazy expression data store for given HDF5 url
  * @param {string} url 
@@ -38,20 +33,19 @@ function createCore(url) {
     const progress = writable(0);
     const row = writable(undefined);
 
-    const metadata = asyncReadable(
-        undefined, 
-        async () => {
-            try { return {value: await getJSON(url)}; } 
-            catch(e) { console.log(e); return {error: e}; }
+    const metadata = asyncDerived(url,
+        async ($url) => {
+            try { return {url: $url.slice(0, $url.lastIndexOf('/')), value: await (await fetch($url)).json()}; }
+            catch(e) { console.log(e); return {error: `Unable to load source ${$url}: (${e})`}; }
         }
-    );
+    ); 
 
     const data = asyncDerived(
         metadata,
         async ($metadata) => {
             try {
                 const rowStreams = {}
-                const obj = await getHDF5($metadata.value.data_url, progress.set);
+                const obj = await getHDF5($metadata.url + '/out.hdf5', progress.set);
                 for(let i=0; i<obj.attrs.remote.length; i+=3) {
                     rowStreams[obj.attrs.remote[i+0]] = {
                         attrs: obj.get(obj.attrs.remote[i+0]).attrs, 
@@ -94,7 +88,7 @@ function createCore(url) {
 
         // Perform single combined request
         const controller = new AbortController();
-        const response = await fetch($metadata.value.bin_url, {
+        const response = await fetch($metadata.url + '/expression.bin', {
             signal: controller.signal,
             headers: {'Range': 'bytes=' + `${requests[0].byteStart}-${requests[requests.length-1].byteEnd-1}`},
         });

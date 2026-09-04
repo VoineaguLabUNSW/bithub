@@ -7,7 +7,17 @@
     import { page } from '$app/stores';
     import { base } from '$app/paths';
     import Footer from '../lib/components/footer.svelte'
-    
+    import { dev } from '$app/environment';
+    import { SHOW_CHAT } from '$lib/config';
+
+    // Ask BITHub — the in-app route at /ask. It talks to a separate FastAPI
+    // service (see chatbot/README.md) that holds an Anthropic API key, so the
+    // entry point stays hidden in a production build by default: the public
+    // deploy must not advertise a chat that spends credits. `vite dev` always
+    // shows it; to show it in a build that ships alongside the backend
+    // process itself, opt in with VITE_SHOW_CHAT=true (see $lib/config).
+    const showChat = dev || SHOW_CHAT;
+
     const { metadata } = getContext('core')
 
     let inputElement = undefined;
@@ -74,6 +84,33 @@
         </label>
         <i class="fa-solid fa-arrow-turn-up text-3xl"></i>
     </div>
+
+    {#if showChat}
+        <div class="flex justify-center mt-4">
+            <!-- $page.url.search is carried through so ?source= survives the
+                 hop, exactly as the Card links below do: a visitor reading a
+                 non-default bundle must not be dropped onto a chat reading a
+                 different one. -->
+            <a href="{base}/ask{$page.url.search}"
+               class="group flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-white border
+                      border-primary-200 shadow-sm hover:shadow-md hover:border-primary-400 transition text-sm">
+                <span class="w-6 h-6 rounded-full bg-primary-500 text-white grid place-items-center text-[11px]">
+                    <i class="fa-solid fa-comment-dots"></i></span>
+                <span class="text-gray-700">Or ask
+                    <span class="text-primary-600 font-medium">BITHub</span>
+                    a question</span>
+                <i class="fa-solid fa-arrow-right text-[10px] text-primary-600"></i>
+                <!-- The 'dev' marker stays: locally it distinguishes a build
+                     that is talking to a chat backend from one that is not.
+                     No badge in production — the chat is a feature, not a
+                     caveat, and 'preview' read as a disclaimer on it. -->
+                {#if dev}
+                    <span class="text-[10px] uppercase tracking-wide text-gray-400 border-l border-gray-200 pl-2 ml-0.5"
+                    >dev</span>
+                {/if}
+            </a>
+        </div>
+    {/if}
 
     <div class="flex flex-wrap justify-center mt-10">
         <Card title='Learn more' href={`${base}/datasets${$page.url.search}`} icon="fas fa-graduation-cap" description='Brain Integrative Transcriptome Hub is a web resource that allows integrative exploration of large-scale transcriptiomic studies of the human post-mortem brain.'/>

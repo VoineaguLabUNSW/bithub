@@ -1,0 +1,14 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PassTheTwoAppRunnerRolesNoCondition",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": [
+        "arn:aws:iam::937485902913:role/AppRunnerECRAccessRole",
+        "arn:aws:iam::937485902913:role/BitHubChatInstanceRole"
+      ]
+    }
+  ]
+}

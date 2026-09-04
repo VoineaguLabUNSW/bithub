@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/>
+<title>Ask BITHub</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+<script>
+tailwind.config={theme:{extend:{colors:{primary:{DEFAULT:'#cf648a','50':'#fcf4f5','100':'#f9eaee',
+'200':'#f4d7e0','300':'#ebb6c7','400':'#df8fa9','500':'#cf648a','600':'#b94574','700':'#9b3560',
+'800':'#822f55','900':'#702b4c','950':'#3d1426'}}}}};
+</script>
+<style>
+ body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+ .blink{animation:blinker 1.3s cubic-bezier(.7,0,.3,1) infinite}@keyframes blinker{50%{opacity:0}}
+ .modebar{display:none!important}
+ .md p{margin:.5rem 0}.md p:first-child{margin-top:0}.md p:last-child{margin-bottom:0}
+ .md ul,.md ol{margin:.5rem 0 .5rem 1.25rem}.md ul{list-style:disc}.md ol{list-style:decimal}
+ .md li{margin:.15rem 0}.md strong{font-weight:600}
+ .md code{background:#f4f4f5;padding:.1rem .3rem;border-radius:.25rem;font-size:.9em}
+ /* Distinct sizes so section hierarchy is visible; h2 gets a rule under it,
+    matching the /ask route's chat-prose styling. */
+ .md h1,.md h2,.md h3,.md h4{font-weight:600;color:#111827}
+ .md h1{font-size:1rem;margin:1.25rem 0 .5rem}
+ .md h2{font-size:.9375rem;margin:1.25rem 0 .5rem;padding-bottom:.25rem;border-bottom:1px solid #f3f4f6}
+ .md h3{font-size:.875rem;margin:1rem 0 .375rem}
+ .md h4{font-size:.875rem;margin:.75rem 0 .25rem;color:#374151}
+ .md h1:first-child,.md h2:first-child,.md h3:first-child{margin-top:0}
+ .md table{width:100%;font-size:.875rem;margin:.75rem 0;border-collapse:collapse}
+ .md th{text-align:left;font-weight:500;color:#6b7280;font-size:.75rem;
+   text-transform:uppercase;letter-spacing:.03em;padding:.375rem .5rem;
+   border-bottom:1px solid #e5e7eb}
+ .md td{padding:.375rem .5rem;border-bottom:1px solid #f3f4f6}
+ .md blockquote{border-left:2px solid #eccdd8;padding-left:.75rem;margin:.5rem 0;
+   color:#4b5563;font-style:italic}
+ ::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:#d8d8de;border-radius:4px}
+</style></head>
+<body class="bg-gray-50 text-gray-900 h-screen flex flex-col">
+
+<header class="bg-white border-b border-gray-200 shrink-0">
+  <div class="max-w-[1100px] mx-auto px-6 py-3 flex items-center gap-4">
+    <a href="/" class="h-8 shrink-0"><svg viewBox="0 0 353.4 99.2" class="h-8 w-auto"><rect x="322.3" class="blink" width="31.1" height="99.2" fill="#cf648a"/><g fill="#111"><path d="M0,88V18.2h26.7c5,0,9.2,0.8,12.6,2.4c3.4,1.6,5.9,3.7,7.5,6.5c1.7,2.7,2.5,5.8,2.5,9.3c0,2.8-0.5,5.3-1.6,7.3 s-2.6,3.6-4.4,4.9c-1.8,1.2-3.9,2.1-6.2,2.7v0.7c2.5,0.1,4.9,0.9,7.1,2.3c2.3,1.4,4.2,3.3,5.6,5.8c1.5,2.5,2.2,5.5,2.2,9.1 c0,3.6-0.9,6.9-2.6,9.7s-4.4,5.1-7.9,6.8c-3.5,1.7-8,2.5-13.3,2.5H0z M12.6,47.9h12.5c2.2,0,4.1-0.4,5.9-1.2c1.7-0.8,3.1-2,4.1-3.4 c1-1.5,1.5-3.3,1.5-5.3c0-2.7-0.9-4.9-2.8-6.7c-1.9-1.8-4.7-2.6-8.4-2.6H12.6V47.9z M12.6,77.4h13.6c4.6,0,7.9-0.9,9.9-2.6 c2-1.8,3.1-4,3.1-6.8c0-2.1-0.5-3.9-1.5-5.6c-1-1.7-2.5-3-4.4-4c-1.9-1-4.1-1.4-6.8-1.4H12.6V77.4z"/><path d="M75.7,18.2V88H63.1V18.2H75.7z"/><path d="M86.4,28.8V18.2h55.7v10.6h-21.6V88H108V28.8H86.4z"/><path d="M152.8,88V18.2h12.6v29.6h32.4V18.2h12.7V88h-12.7V58.3h-32.4V88H152.8z"/><path d="M257.1,66V35.6h12.3V88h-12v-9.3h-0.5c-1.2,2.9-3.1,5.3-5.8,7.2c-2.7,1.9-6,2.8-9.9,2.8c-3.4,0-6.5-0.8-9.1-2.3 c-2.6-1.5-4.7-3.8-6.2-6.7c-1.5-2.9-2.2-6.5-2.2-10.7V35.6H236v31.4c0,3.3,0.9,6,2.7,7.9c1.8,2,4.2,2.9,7.2,2.9 c1.8,0,3.6-0.4,5.3-1.3c1.7-0.9,3.1-2.2,4.2-4C256.5,70.8,257.1,68.6,257.1,66z"/><path d="M282.6,88V18.2H295v26.1h0.5c0.6-1.3,1.5-2.6,2.7-4.1c1.2-1.4,2.7-2.7,4.7-3.7c2-1,4.5-1.6,7.6-1.6c4,0,7.7,1,11,3.1 c3.3,2.1,5.9,5.1,7.8,9.1c1.9,4,2.9,8.9,2.9,14.7c0,5.8-0.9,10.6-2.8,14.7c-1.9,4-4.5,7.1-7.7,9.2s-6.9,3.2-11,3.2 c-3,0-5.5-0.5-7.5-1.5c-2-1-3.6-2.2-4.8-3.6c-1.2-1.4-2.1-2.8-2.8-4h-0.7V88H282.6z M294.7,61.8c0,3.4,0.5,6.4,1.4,8.9 c1,2.5,2.4,4.5,4.2,5.9c1.8,1.4,4.1,2.1,6.7,2.1c2.7,0,5-0.7,6.9-2.2s3.2-3.5,4.2-6c0.9-2.6,1.4-5.5,1.4-8.7c0-3.2-0.5-6.1-1.4-8.7 c-0.9-2.5-2.3-4.5-4.2-5.9c-1.8-1.4-4.1-2.1-6.9-2.1c-2.6,0-4.9,0.7-6.7,2.1c-1.8,1.4-3.2,3.3-4.2,5.8S294.7,58.4,294.7,61.8z"/></g></svg></a>
+    <div class="border-l border-gray-200 pl-4">
+      <div class="font-semibold leading-tight">Ask BITHub</div>
+      <div class="text-xs text-gray-500" id="sub">connecting…</div>
+    </div>
+
+    <div class="flex items-center gap-2 ml-4 min-w-0">
+      <span class="text-xs text-gray-500 uppercase tracking-wide shrink-0">Datasets</span>
+      <div id="dsChips" class="flex flex-wrap items-center gap-1.5 min-w-0">
+        <span class="text-xs text-gray-400">loading…</span>
+      </div>
+    </div>
+    <a href="#" id="backLink" class="ml-auto text-sm text-gray-600 hover:text-primary-700">
+      <i class="fa-solid fa-arrow-left mr-1.5"></i>Back to BITHub</a>
+  </div>
+</header>
+
+<main id="thread" class="flex-1 overflow-y-auto">
+  <div class="max-w-[1100px] mx-auto px-6 py-6 space-y-5" id="threadInner">
+    <div id="empty" class="pt-8">
+      <div class="text-center mb-7">
+        <div class="w-14 h-14 mx-auto rounded-2xl bg-primary-500 text-white grid place-items-center text-xl mb-4">
+          <i class="fa-solid fa-comment-dots"></i></div>
+        <h1 class="text-2xl font-semibold">Ask about gene expression in the developing brain</h1>
+        <p class="text-gray-500 mt-2 text-[15px]">Answers are grounded in BrainSpan —
+          bulk RNA-seq from 524 post-mortem samples, 8 pcw to ~40 yrs.</p>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-2.5 max-w-[760px] mx-auto"><button data-q="How does SHANK3 expression change across brain development?" class="text-left text-sm px-4 py-3 rounded-xl bg-white border
+  border-gray-200 hover:border-primary-300 hover:bg-primary-50 shadow-sm transition text-gray-700">How does SHANK3 expression change across brain development?</button><button data-q="What metadata is available in BrainSpan, and how complete is it?" class="text-left text-sm px-4 py-3 rounded-xl bg-white border
+  border-gray-200 hover:border-primary-300 hover:bg-primary-50 shadow-sm transition text-gray-700">What metadata is available in BrainSpan, and how complete is it?</button><button data-q="Show me FOXP2 across brain regions" class="text-left text-sm px-4 py-3 rounded-xl bg-white border
+  border-gray-200 hover:border-primary-300 hover:bg-primary-50 shadow-sm transition text-gray-700">Show me FOXP2 across brain regions</button><button data-q="What is the range of PMI across samples?" class="text-left text-sm px-4 py-3 rounded-xl bg-white border
+  border-gray-200 hover:border-primary-300 hover:bg-primary-50 shadow-sm transition text-gray-700">What is the range of PMI across samples?</button></div>
+      <p id="scopeNote" class="text-center text-xs text-gray-400 mt-6"></p>
+    </div>
+  </div>
+</main>
+
+<footer class="bg-white border-t border-gray-200 shrink-0">
+  <div class="max-w-[1100px] mx-auto px-6 py-3">
+    <div class="flex items-end gap-2">
+      <textarea id="input" rows="1" placeholder="Ask about a gene, a region, or a developmental pattern…"
+        class="flex-1 resize-none rounded-lg border border-gray-300 px-3.5 py-2.5 text-[15px] max-h-40
+               focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"></textarea>
+      <button id="send" class="h-[42px] px-4 rounded-lg bg-primary-600 hover:bg-primary-700
+              disabled:bg-gray-300 text-white shadow-sm transition">
+        <i class="fa-solid fa-paper-plane"></i></button>
+    </div>
+    <div class="text-[11px] text-gray-400 mt-1.5 px-1">
+      Values are log<sub>2</sub>(RPKM+1). BITHub gene-view plots show z-scored values — the scales differ.
+    </div>
+  </div>
+</footer>
+
+<script>
+const API = location.origin;
+const $ = s => document.querySelector(s);
+const thread = $('#threadInner'), input = $('#input'), send = $('#send');
+let history = [], busy = false, figN = 0;
+
+const BITHUB_URL = localStorage.getItem('bithub_url') || 'http://localhost:5173';
+$('#backLink').href = BITHUB_URL;
+
+fetch(API + '/api/health').then(r=>r.json()).then(h=>{
+  $('#sub').innerHTML = `${h.dataset} · ${h.n_genes.toLocaleString()} genes · ${h.n_samples} samples
+    <span class="text-green-600 ml-1">● connected</span>`;
+}).catch(()=>{ $('#sub').innerHTML = '<span class="text-red-600">● backend unreachable</span>'; });
+
+// Dataset multi-select. Selecting two or more is how a user asks "does this
+// hold up in another cohort" — the backend answers those on the z-scored
+// scale, since BITHub mixes RPKM, TPM and CPM.
+// Defined here because the dataset fetch below uses both, and `const` is not
+// hoisted the way a function declaration is.
+const esc = s => String(s ?? '').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function el(tag, cls, html){ const n=document.createElement(tag);
+  if(cls) n.className=cls; if(html!==undefined) n.innerHTML=html; return n; }
+
+let selectedDatasets = [];
+const dsChips = $('#dsChips');
+
+function paintChips(list){
+  dsChips.innerHTML = '';
+  list.forEach(ds=>{
+    const on = selectedDatasets.includes(ds.id);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.disabled = !ds.available;
+    b.title = ds.available
+      ? `${ds.description} · ${ds.n_samples} samples · ${ds.unit}`
+      : `${ds.label} is not loaded into the chat service yet`;
+    b.className = 'text-xs px-2.5 py-1 rounded-full border transition ' + (
+      !ds.available
+        ? 'border-dashed border-gray-200 text-gray-300 cursor-not-allowed'
+        : on ? 'border-primary-500 bg-primary-500 text-white shadow-sm'
+             : 'border-gray-300 text-gray-600 hover:border-primary-400 hover:bg-primary-50');
+    b.innerHTML = (on ? '<i class="fa-solid fa-check mr-1 text-[9px]"></i>' : '')
+      + esc(ds.label);
+    if(ds.available) b.onclick = ()=>{
+      const i = selectedDatasets.indexOf(ds.id);
+      if(i >= 0){
+        if(selectedDatasets.length === 1) return;   // never leave zero selected
+        selectedDatasets.splice(i,1);
+      } else selectedDatasets.push(ds.id);
+      paintChips(list);
+    };
+    dsChips.appendChild(b);
+  });
+  const n = selectedDatasets.length;
+  dsChips.appendChild(el('span','text-[11px] text-gray-400 ml-1',
+    n > 1 ? `${n} selected — answers will compare them` : ''));
+}
+
+fetch(API + '/api/datasets').then(r=>r.json()).then(d=>{
+  selectedDatasets = d.default ? [d.default] : [];
+  paintChips(d.datasets);
+  // Scope comes from the service, never hardcoded: reading the published
+  // bundle exposes all eight datasets, reading local files exposes one.
+  const avail = d.datasets.filter(x=>x.available);
+  const note = $('#scopeNote');
+  if (note) note.textContent = avail.length > 1
+    ? avail.length + ' datasets available — select more than one to compare them. '
+      + 'Units differ (RPKM, TPM, CPM), so cross-dataset answers use z-scores.'
+    : (avail.length === 1
+        ? avail[0].label + ' only — the other BITHub datasets are not loaded '
+          + 'into this service.'
+        : '');
+}).catch(()=>{ dsChips.innerHTML = '<span class="text-xs text-red-600">unavailable</span>'; });
+
+input.addEventListener('input', ()=>{ input.style.height='auto';
+  input.style.height=Math.min(input.scrollHeight,160)+'px'; });
+input.addEventListener('keydown', e=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); ask(); }});
+send.onclick = ask;
+document.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{ input.value=b.dataset.q; ask(); });
+
+function addUser(text){
+  const w = el('div','flex justify-end');
+  w.appendChild(el('div','max-w-[75%] bg-primary-600 text-white rounded-2xl rounded-br-sm px-4 py-2.5 shadow-sm'))
+   .textContent = text;
+  thread.appendChild(w); scroll();
+}
+
+function bubbleShell(){
+  const w = el('div','flex gap-3');
+  w.appendChild(el('span','w-8 h-8 shrink-0 rounded-lg bg-primary-100 text-primary-700 grid place-items-center',
+    '<i class="fa-solid fa-dna text-sm"></i>'));
+  const body = el('div','max-w-[85%] min-w-0 space-y-3');
+  w.appendChild(body); thread.appendChild(w); return {w, body};
+}
+
+function fmtCell(v, format){
+  if(v === null || v === undefined || v === '') return '—';
+  if(typeof v === 'number'){
+    if(format === 'pct')  return (v*100).toFixed(1) + '%';
+    if(format === '2dp')  return v.toFixed(2);
+    if(format === '3dp')  return v.toFixed(3);
+    return String(v);
+  }
+  return esc(v);
+}
+
+function renderStackedBar(b){
+  // Proportion bar for part-of-whole results. Colours come from the backend so
+  // a covariate looks the same here and in the SvelteKit route.
+  const card = el('div','border border-gray-200 rounded-xl bg-white overflow-hidden shadow-sm');
+  const head = el('div','px-4 py-2.5 border-b border-gray-100');
+  head.appendChild(el('div','text-[11px] uppercase tracking-wide text-gray-500', esc(b.title||'')));
+  if(b.subtitle) head.appendChild(el('div','text-sm font-semibold text-gray-900 mt-0.5', esc(b.subtitle)));
+  card.appendChild(head);
+
+  const body = el('div','px-4 py-3');
+  const track = el('div','flex h-6 w-full rounded-md overflow-hidden');
+  track.setAttribute('role','img');
+  track.setAttribute('aria-label',(b.segments||[]).map(s=>s.label+' '+s.percent+'%').join(', '));
+  (b.segments||[]).forEach(s=>{
+    const seg = el('div','flex items-center justify-center overflow-hidden');
+    seg.style.cssText = 'flex:'+s.fraction+' 0 0;background-color:'+s.color;
+    seg.title = s.label+' \u2014 '+s.percent+'%';
+    if(s.percent >= 8) seg.appendChild(el('span','text-[10px] font-medium text-white/95 px-1 truncate', s.percent+'%'));
+    track.appendChild(seg);
+  });
+  body.appendChild(track);
+
+  const legend = el('div','flex flex-wrap gap-x-3 gap-y-1 mt-2.5');
+  (b.segments||[]).forEach(s=>{
+    const item = el('span','inline-flex items-center gap-1.5 text-[12px] text-gray-700');
+    if(s.components) item.title = s.components.map(c=>c.label+' '+(c.fraction*100).toFixed(2)+'%').join(', ');
+    const swatch = el('span','w-2.5 h-2.5 rounded-sm shrink-0');
+    swatch.style.backgroundColor = s.color;
+    item.appendChild(swatch);
+    item.appendChild(document.createTextNode(' '+s.label+' '));
+    item.appendChild(el('span','text-gray-500', s.percent+'%'));
+    if(s.components) item.appendChild(el('span','text-gray-400 text-[11px]','('+s.components.length+')'));
+    legend.appendChild(item);
+  });
+  body.appendChild(legend);
+  if(b.footnote) body.appendChild(el('div','text-[11px] text-gray-500 mt-2.5', esc(b.footnote)));
+  card.appendChild(body);
+  return card;
+}
+
+function renderTable(t){
+  const card = el('div','border border-gray-200 rounded-xl bg-white overflow-hidden shadow-sm');
+  if(t.title) card.appendChild(el('div',
+    'px-4 py-2.5 border-b border-gray-100 text-xs font-semibold text-gray-600 uppercase tracking-wide',
+    esc(t.title)));
+
+  const wrap = el('div','overflow-x-auto');
+  const tbl  = el('table','w-full text-sm');
+  const alignCls = a => a === 'right' ? 'text-right' : 'text-left';
+
+  tbl.appendChild(el('thead','bg-gray-50 text-gray-600 text-xs uppercase tracking-wide',
+    '<tr>' + t.columns.map(c =>
+      `<th class="px-4 py-2 font-medium ${alignCls(c.align)}">${esc(c.label)}</th>`
+    ).join('') + '</tr>'));
+
+  const tbody = el('tbody','divide-y divide-gray-100');
+  t.rows.forEach((row, i) => {
+    const hit = (i === t.highlight_row);
+    const tr = el('tr', hit ? 'bg-primary-50' : '');
+    row.forEach((cell, j) => {
+      const col = t.columns[j];
+      const last = (j === row.length - 1);
+      const note = (hit && last && t.highlight_note)
+        ? ` <span class="text-primary-700 text-xs font-medium">← ${esc(t.highlight_note)}</span>` : '';
+      tr.appendChild(el('td',
+        `px-4 py-2 ${alignCls(col.align)} ${hit ? 'font-medium text-primary-900' : 'text-gray-800'}
+         ${col.align === 'right' ? 'tabular-nums' : ''}`,
+        fmtCell(cell, col.format) + note));
+    });
+    tbody.appendChild(tr);
+  });
+  tbl.appendChild(tbody);
+  wrap.appendChild(tbl); card.appendChild(wrap);
+
+  if(t.footnote) card.appendChild(el('div',
+    'px-4 py-2 text-xs text-gray-500 border-t border-gray-100', esc(t.footnote)));
+  return card;
+}
+
+function thinking(){
+  const {w, body} = bubbleShell();
+  w.id = 'thinking';
+  body.appendChild(el('div','bg-gray-50 border border-gray-200 rounded-2xl rounded-bl-sm px-4 py-3',
+    `<div class="flex items-center gap-2 text-sm text-gray-500">
+       <span class="flex gap-1">
+         <span class="w-1.5 h-1.5 bg-primary-400 rounded-full animate-bounce"></span>
+         <span class="w-1.5 h-1.5 bg-primary-400 rounded-full animate-bounce" style="animation-delay:.15s"></span>
+         <span class="w-1.5 h-1.5 bg-primary-400 rounded-full animate-bounce" style="animation-delay:.3s"></span>
+       </span><span class="italic">querying BrainSpan…</span></div>`));
+  scroll();
+}
+
+function addAssistant(d){
+  const {body} = bubbleShell();
+
+  body.appendChild(el('div',
+    'md bg-gray-50 border border-gray-200 rounded-2xl rounded-bl-sm px-4 py-3 text-[15px] leading-relaxed',
+    DOMPurify.sanitize(marked.parse(d.response || ''))));
+
+  (d.tables || []).forEach(t=>{
+    if(t.type === 'stacked_bar') body.appendChild(renderStackedBar(t));
+    else if(t.columns)           body.appendChild(renderTable(t));
+  });
+
+  (d.figures || []).forEach(f=>{
+    const card = el('div','border border-gray-200 rounded-xl bg-white overflow-hidden shadow-sm');
+    const id = 'fig'+(++figN);
+    card.appendChild(el('div','', `<div id="${id}" style="height:340px"></div>`));
+    if(f.caption) card.appendChild(
+      el('div','px-4 py-2 text-xs text-gray-500 border-t border-gray-100', f.caption));
+    body.appendChild(card);
+    requestAnimationFrame(()=>Plotly.newPlot(id, f.plotly_data, f.plotly_layout,
+      {responsive:true, displaylogo:false, displayModeBar:false}));
+  });
+
+  const papers = d.literature && d.literature.papers;
+  if(papers && papers.length){
+    const card = el('div','border border-gray-200 rounded-xl bg-white shadow-sm');
+    card.appendChild(el('div',
+      'px-4 py-2.5 border-b border-gray-100 text-xs font-semibold text-gray-600 uppercase tracking-wide',
+      '<i class="fa-solid fa-book-open mr-1.5"></i>Literature'));
+    const list = el('div','divide-y divide-gray-100');
+    papers.forEach(p=>{
+      const authors = Array.isArray(p.authors) ? p.authors.join(', ') : (p.authors||'');
+      const url = p.url || (p.doi ? 'https://doi.org/'+p.doi : null);
+      const meta = [authors, p.journal, p.year].filter(Boolean).join(' · ');
+      const item = el('div','px-4 py-3');
+      const t = el('div','text-sm font-medium text-gray-900 leading-snug');
+      if(url){ const a=el('a','hover:text-primary-700'); a.href=url; a.target='_blank';
+               a.rel='noopener'; a.textContent=p.title||'(untitled)'; t.appendChild(a); }
+      else t.textContent = p.title||'(untitled)';
+      item.appendChild(t);
+      item.appendChild(el('div','text-xs text-gray-500 mt-1',
+        meta + (p.open_access ? ' · <span class="text-green-700">open access</span>' : '')));
+      list.appendChild(item);
+    });
+    card.appendChild(list); body.appendChild(card);
+  }
+
+  if(d.last_gene){
+    const row = el('div','flex flex-wrap gap-2 pt-0.5');
+    const a = el('a','text-sm px-3.5 py-2 rounded-lg bg-white border border-primary-300 text-primary-700 hover:bg-primary-50 shadow-sm transition',
+      `<i class="fa-solid fa-chart-column mr-1.5"></i>Open ${d.last_gene} in BITHub`);
+    a.href = `${BITHUB_URL}/search?terms=${encodeURIComponent(d.last_gene)}`;
+    a.target = '_blank'; a.rel = 'noopener';
+    row.appendChild(a); body.appendChild(row);
+  }
+
+  // Requested-but-unloaded datasets are shown, not swallowed — otherwise a
+  // user can believe an answer covers cohorts it never touched.
+  if(d.datasets_unavailable && d.datasets_unavailable.length){
+    body.appendChild(el('div',
+      'flex gap-2 text-[13px] bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-2.5',
+      '<i class="fa-solid fa-triangle-exclamation text-amber-500 mt-0.5"></i>' +
+      '<span class="text-amber-900">Not included: ' +
+      d.datasets_unavailable.map(u=>`<strong>${esc(u.dataset)}</strong> (${esc(u.reason)})`)
+        .join(', ') + '.</span>'));
+  }
+
+  if(d.tools_used && d.tools_used.length){
+    const ds = (d.datasets_used || []).join(' + ');
+    body.appendChild(el('div','text-[11px] text-gray-400 pt-0.5',
+      esc(ds ? ds + ' · ' : '') + 'grounded via ' +
+      [...new Set(d.tools_used)].join(', ') +
+      (d.elapsed_ms ? ` · ${(d.elapsed_ms/1000).toFixed(1)}s` : '')));
+  }
+  scroll();
+}
+
+function addError(msg){
+  const {body} = bubbleShell();
+  body.appendChild(el('div','bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-800',
+    `<i class="fa-solid fa-triangle-exclamation mr-1.5"></i>${msg}`));
+  scroll();
+}
+
+const scroll = () => $('#thread').scrollTop = $('#thread').scrollHeight;
+
+async function ask(){
+  const text = input.value.trim();
+  if(!text || busy) return;
+  const empty = $('#empty'); if(empty) empty.remove();
+  busy = true; send.disabled = true;
+  input.value=''; input.style.height='auto';
+  addUser(text); thinking();
+
+  try{
+    const res = await fetch(API + '/api/chat', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({message:text, history, datasets:selectedDatasets})
+    });
+    $('#thinking')?.remove();
+    if(!res.ok){
+      let detail; try{ detail = (await res.json()).detail; }catch{ detail = res.statusText; }
+      addError(`Request failed (${res.status}): ${detail}`);
+    } else {
+      const d = await res.json();
+      addAssistant(d);
+      history.push({role:'user', content:text});
+      history.push({role:'assistant', content:d.response});
+      if(history.length > 20) history = history.slice(-20);
+    }
+  } catch(e){
+    $('#thinking')?.remove();
+    addError('Could not reach the backend. Is uvicorn running on port 8000?');
+  } finally { busy=false; send.disabled=false; input.focus(); }
+}
+input.focus();
+</script>
+</body></html>

@@ -1,0 +1,37 @@
+# Production pins for the BITHub chat API.
+#
+# Differs from chatbot/requirements.txt in two deliberate ways:
+#
+# 1. requests and protobuf are DECLARED. remote_loader.py imports both
+#    (`import requests`, and data_pb2 needs protobuf), but requirements.txt
+#    lists neither — they arrive transitively today via anthropic and
+#    tooluniverse. Drop tooluniverse (see 2) and protobuf vanishes with it,
+#    so the container fails at import. Declare what you import.
+#
+# 2. tooluniverse is OMITTED. It backs exactly one function —
+#    search_literature() in data_loader.py — and it drags playwright (133 MB),
+#    onnxruntime (73 MB), sympy, scipy, nipype, openai and speech_recognition
+#    behind it: ~1.1 GB of site-packages for two REST calls to PubMed and
+#    EuropePMC. data_loader.get_tu() is lazily imported inside a try/except
+#    that returns a structured "literature search unavailable" payload, so its
+#    absence degrades that one tool and nothing else. Expression, variance
+#    partition and every figure/table tool are unaffected.
+#
+#    If literature search must work in production, the cheap fix is to replace
+#    get_tu() with direct calls to eutils.ncbi.nlm.nih.gov and
+#    www.ebi.ac.uk/europepmc — both are keyless JSON APIs. Re-adding
+#    tooluniverse instead roughly triples image size and cold-start time.
+
+fastapi==0.121.2
+uvicorn[standard]==0.38.0
+anthropic==0.75.0
+pandas==2.3.3
+numpy==2.3.4
+h5py==3.15.1
+requests==2.32.5
+protobuf==6.33.1
+python-dotenv==1.2.1
+
+# pyarrow is only read by the LOCAL-file path (parquet expression matrix) in
+# data_loader.py. Production runs the remote-bundle path (BITHUB_LOCAL_DATA
+# unset), which never touches parquet. Omitted: it is 126 MB.

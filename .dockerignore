@@ -1,0 +1,45 @@
+# Docker build context exclusions. Must live at the REPO ROOT — the build
+# context is the root (see deploy/Dockerfile), and Docker reads .dockerignore
+# only from the context root. A copy inside deploy/ is silently ignored.
+#
+# Without this file the build context is 5.3 GB: the 1.1 GB chatbot/.venv, the
+# frontend, and chatbot/.env (which holds a live ANTHROPIC_API_KEY) all get
+# baked into the image. Docker does NOT read .gitignore.
+
+.git
+.github
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.DS_Store
+
+# Secrets. The key belongs in Secrets Manager, injected as a runtime env var
+# by App Runner — never in an image layer. Layers survive deletion of the file
+# in a later step and are readable by anyone who can pull the image.
+**/.env
+**/.env.*
+!**/.env.example
+
+frontend/
+data-preprocessing/
+pipeline/output/
+pipeline/deployment/
+proto/
+tools/
+
+# **/ not just *: .dockerignore patterns are root-relative, so a bare *.md
+# leaves chatbot/README.md (57 KB) in the context.
+**/*.md
+**/*.png
+
+chatbot/cache/*.partial
+chatbot/test_*.py
+chatbot/this_script.py
+chatbot/check_key.py
+
+# NOT excluded, deliberately: chatbot/chat.html (22 KB).
+# main.py registers two routes that read it from disk at REQUEST time —
+# GET /standalone always, and GET / as a fallback when no frontend build is
+# mounted (which is the production case here). Excluding it makes both routes
+# raise FileNotFoundError -> HTTP 500. 22 KB is worth keeping for a
+# self-contained smoke-test page that needs no frontend build.

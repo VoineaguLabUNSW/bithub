@@ -24,6 +24,22 @@ jobs:
       - name: build
         env:
           BASE_PATH: '/${{ github.event.repository.name }}'
+          # Vite inlines these at BUILD time — they are not runtime config, so
+          # changing the App Runner URL requires re-running this workflow.
+          #
+          # Set CHAT_API_URL under Settings -> Secrets and variables -> Actions
+          # -> Variables to the App Runner service URL, scheme and host only:
+          #     https://xxxxxxxx.ap-southeast-2.awsapprunner.com
+          # A trailing slash or a path breaks the fetch and the CORS match.
+          #
+          # It is a variable rather than a secret because the URL is public the
+          # moment the site calls it, and secrets are masked in build logs.
+          VITE_CHAT_API: ${{ vars.CHAT_API_URL }}
+          # Gate the chat link on the URL being set. Without this the link can
+          # ship pointing at github.io/api/chat, which 404s — a visible feature
+          # that cannot work is worse than a hidden one. Renders 'true'/'false',
+          # which is what config.js compares against.
+          VITE_SHOW_CHAT: ${{ vars.CHAT_API_URL != '' }}
         run: |
           bun run build
 

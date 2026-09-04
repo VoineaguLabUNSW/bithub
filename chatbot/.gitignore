@@ -1,0 +1,18 @@
+.env
+data/
+__pycache__/
+*.pyc
+
+# The virtualenv itself, not just its .env — it is ~1.1 GB and would exceed
+# GitHub's file-size limits. Recreate it from requirements.txt instead.
+.venv/
+
+# Downloaded BITHub bundle index (~15 MB), re-fetched on demand.
+cache/
+
+# Editor/tooling temp files. These appear beside the file being edited and
+# would otherwise be picked up by `git add -A` — committing one alongside
+# .env.example is how a partially-written config ends up in history.
+*.operon-tmp-*
+*.swp
+*~

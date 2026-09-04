@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+anthropic
+pandas
+numpy
+pyarrow
+python-dotenv
+tooluniverse
+h5py

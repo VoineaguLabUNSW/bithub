@@ -1,0 +1,63 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ManageBitHubAppRunnerService",
+      "Effect": "Allow",
+      "Action": [
+        "apprunner:CreateService",
+        "apprunner:UpdateService",
+        "apprunner:DescribeService",
+        "apprunner:StartDeployment",
+        "apprunner:PauseService",
+        "apprunner:ResumeService",
+        "apprunner:TagResource",
+        "apprunner:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:apprunner:ap-southeast-2:937485902913:service/bithub-*"
+    },
+    {
+      "Sid": "ListRequiresAccountScope",
+      "Effect": "Allow",
+      "Action": [
+        "apprunner:CreateAutoScalingConfiguration",
+        "apprunner:DescribeAutoScalingConfiguration",
+        "apprunner:DescribeOperation",
+        "apprunner:ListAutoScalingConfigurations",
+        "apprunner:ListConnections",
+        "apprunner:ListOperations",
+        "apprunner:ListServices"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AppRunnerServiceLinkedRoleOnly",
+      "Effect": "Allow",
+      "Action": "iam:CreateServiceLinkedRole",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "iam:AWSServiceName": "apprunner.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "PassTheTwoAppRunnerRoles",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": [
+        "arn:aws:iam::937485902913:role/AppRunnerECRAccessRole",
+        "arn:aws:iam::937485902913:role/BitHubChatInstanceRole"
+      ],
+      "Condition": {
+        "StringEqualsIfExists": {
+          "iam:PassedToService": [
+            "apprunner.amazonaws.com",
+            "build.apprunner.amazonaws.com",
+            "tasks.apprunner.amazonaws.com"
+          ]
+        }
+      }
+    }
+  ]
+}

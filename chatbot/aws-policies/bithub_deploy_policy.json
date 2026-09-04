@@ -1,0 +1,33 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadWriteBitHubBundleObjects",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:AbortMultipartUpload",
+        "s3:ListMultipartUploadParts"
+      ],
+      "Resource": "arn:aws:s3:::bithub-bucket/bithub/*"
+    },
+    {
+      "Sid": "ListOwnPrefixOnly",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket",
+        "s3:ListBucketMultipartUploads"
+      ],
+      "Resource": "arn:aws:s3:::bithub-bucket",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "bithub/*",
+            "bithub"
+          ]
+        }
+      }
+    }
+  ]
+}

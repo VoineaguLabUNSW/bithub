@@ -3,6 +3,10 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: 'main'
+  # Manual trigger. Without this the only way to rebuild after changing
+  # CHAT_API_URL is "Re-run all jobs" on an old run, which reuses the original
+  # commit and actor — a fresh dispatch is unambiguous.
+  workflow_dispatch:
 
 jobs:
   build_site:
@@ -13,6 +17,26 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+
+      # Diagnostic: prove whether the build can SEE the variable before Vite
+      # inlines it. vars.* is empty (not an error) when the variable is missing,
+      # is a secret rather than a variable, or is scoped to an environment this
+      # job does not declare — all three look identical in the built bundle,
+      # so print it here instead of inferring it from the output.
+      - name: Check chat config visibility
+        run: |
+          if [ -n "${{ vars.CHAT_API_URL }}" ]; then
+            echo "CHAT_API_URL is visible: ${{ vars.CHAT_API_URL }}"
+            echo "VITE_SHOW_CHAT will be: ${{ vars.CHAT_API_URL != '' }}"
+          else
+            echo "CHAT_API_URL is EMPTY as seen by this job."
+            echo "The chat link will be compiled out. Check, in order:"
+            echo "  1. It is under the Variables tab, not Secrets."
+            echo "  2. It is repository-level, not scoped to the github-pages"
+            echo "     environment — this job declares no 'environment:', so"
+            echo "     environment-scoped variables are invisible to it."
+            echo "  3. The name is exactly CHAT_API_URL."
+          fi
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -42,6 +66,18 @@ jobs:
           VITE_SHOW_CHAT: ${{ vars.CHAT_API_URL != '' }}
         run: |
           bun run build
+
+      # Fail loudly if the gate did not make it into the bundle. Without this
+      # the deploy succeeds and the missing button looks like a frontend bug.
+      - name: Verify chat gate was inlined
+        if: ${{ vars.CHAT_API_URL != '' }}
+        run: |
+          if grep -rq "awsapprunner" build/_app/immutable/chunks/; then
+            echo "chat backend URL is present in the bundle"
+          else
+            echo "CHAT_API_URL was set but did not reach the bundle." >&2
+            exit 1
+          fi
 
       - name: Upload Artifacts
         uses: actions/upload-pages-artifact@v3

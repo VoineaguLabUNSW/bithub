@@ -18,24 +18,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      # Diagnostic: prove whether the build can SEE the variable before Vite
-      # inlines it. vars.* is empty (not an error) when the variable is missing,
-      # is a secret rather than a variable, or is scoped to an environment this
-      # job does not declare — all three look identical in the built bundle,
-      # so print it here instead of inferring it from the output.
-      - name: Check chat config visibility
+      # Report which source supplied the chat URL. The build no longer depends
+      # on the repository variable, so an empty vars.* is informational rather
+      # than a failure — but it is still worth printing, because it is the only
+      # place the distinction is visible: vars.* renders empty (not an error)
+      # when the variable is missing, is a secret rather than a variable, or is
+      # scoped to an environment this job does not declare.
+      - name: Report chat config source
         run: |
           if [ -n "${{ vars.CHAT_API_URL }}" ]; then
-            echo "CHAT_API_URL is visible: ${{ vars.CHAT_API_URL }}"
-            echo "VITE_SHOW_CHAT will be: ${{ vars.CHAT_API_URL != '' }}"
+            echo "Using repository variable CHAT_API_URL: ${{ vars.CHAT_API_URL }}"
           else
-            echo "CHAT_API_URL is EMPTY as seen by this job."
-            echo "The chat link will be compiled out. Check, in order:"
-            echo "  1. It is under the Variables tab, not Secrets."
-            echo "  2. It is repository-level, not scoped to the github-pages"
-            echo "     environment — this job declares no 'environment:', so"
-            echo "     environment-scoped variables are invisible to it."
-            echo "  3. The name is exactly CHAT_API_URL."
+            echo "CHAT_API_URL is empty as seen by this job; using the committed"
+            echo "default in the build step. To override it, add CHAT_API_URL"
+            echo "under Settings -> Secrets and variables -> Actions ->"
+            echo "Variables, at REPOSITORY level (this job declares no"
+            echo "'environment:', so environment-scoped variables are invisible)."
           fi
 
       - uses: oven-sh/setup-bun@v2
@@ -58,26 +56,51 @@ jobs:
           #
           # It is a variable rather than a secret because the URL is public the
           # moment the site calls it, and secrets are masked in build logs.
-          VITE_CHAT_API: ${{ vars.CHAT_API_URL }}
-          # Gate the chat link on the URL being set. Without this the link can
-          # ship pointing at github.io/api/chat, which 404s — a visible feature
-          # that cannot work is worse than a hidden one. Renders 'true'/'false',
-          # which is what config.js compares against.
-          VITE_SHOW_CHAT: ${{ vars.CHAT_API_URL != '' }}
+          #
+          # The literal is the committed DEFAULT, with the repository variable
+          # as an override. Deriving this from the variable alone failed three
+          # builds in a row: `vars.X` renders an empty string — not an error —
+          # when the variable is missing, is a secret rather than a variable, or
+          # is scoped to an environment this job does not declare. All three are
+          # indistinguishable in the built bundle, and each one silently
+          # compiled the chat link out while the deploy reported success.
+          # Committing the URL removes that whole class of failure: the site is
+          # public and so is this hostname, so there is nothing to protect here.
+          # To repoint the chat, set CHAT_API_URL (it wins) or edit this line.
+          VITE_CHAT_API: ${{ vars.CHAT_API_URL || 'https://ecqhnavk6e.ap-southeast-2.awsapprunner.com' }}
+          # Unconditionally true now that the URL above always has a value.
+          # This was previously gated on the variable being set, to avoid
+          # shipping a link to a backend that does not exist — a real risk when
+          # the URL came only from repository config. With the default committed
+          # the link can always reach a live service, so the gate is dead weight
+          # and was in fact the thing hiding the button. config.js compares
+          # against the STRING 'true', hence the quotes.
+          VITE_SHOW_CHAT: 'true'
         run: |
           bun run build
 
       # Fail loudly if the gate did not make it into the bundle. Without this
       # the deploy succeeds and the missing button looks like a frontend bug.
+      #
+      # No `if:` guard — the previous version only ran this when the variable
+      # was non-empty, so in exactly the case that was broken it was skipped.
+      # The URL now always has a value, so this must always hold.
       - name: Verify chat gate was inlined
-        if: ${{ vars.CHAT_API_URL != '' }}
         run: |
-          if grep -rq "awsapprunner" build/_app/immutable/chunks/; then
-            echo "chat backend URL is present in the bundle"
-          else
-            echo "CHAT_API_URL was set but did not reach the bundle." >&2
+          if ! grep -rq "awsapprunner" build/_app/immutable/chunks/; then
+            echo "The chat backend URL did not reach the bundle." >&2
             exit 1
           fi
+          # SHOW_CHAT must compile to true (minified !0), otherwise the link is
+          # dropped even though the URL is present — the exact failure that
+          # shipped three times. Match `=!1;export` rather than a specific
+          # minified name: the identifier is rollup-assigned and changes between
+          # builds, so pinning it would make this check silently stop working.
+          if grep -rq '=!1;export' build/_app/immutable/chunks/config.*.js; then
+            echo "SHOW_CHAT compiled to false: the chat link will not render." >&2
+            exit 1
+          fi
+          echo "chat URL inlined and SHOW_CHAT is true"
 
       - name: Upload Artifacts
         uses: actions/upload-pages-artifact@v3

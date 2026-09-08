@@ -1,0 +1,23 @@
+# Save as .dockerignore at the REPO ROOT (build context is the root).
+# Without this the 1.1 GB chatbot/.venv and the whole frontend go into the
+# build context and every build uploads them.
+
+.git
+.github
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.DS_Store
+**/.env
+frontend/
+data-preprocessing/
+pipeline/output/
+pipeline/deployment/
+proto/
+tools/
+*.md
+*.png
+chatbot/test_*.py
+chatbot/chat.html
+chatbot/this_script.py
+chatbot/check_key.py

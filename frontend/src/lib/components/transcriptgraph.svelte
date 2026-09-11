@@ -5,7 +5,7 @@
     import { getContext } from "svelte";
     import { derived } from 'svelte/store';
     import { getPlotEmpty, getTableDownloader } from '../utils/plot';
-    import {count, mean, sd, LOG_OFFSET} from '../utils/math';
+    import {mean, sd} from '../utils/math';
 
     export let filteredStore;
     export let heading;
@@ -16,9 +16,8 @@
     let datasetsSelect = writable();
     let transcriptSelect = writable();
     
-    let scaleSelect = writable({id: 'Log 2', name: 'Log 2'});
-    const scaleOpts = new Map([['', ['Linear', 'Log e', 'Log 2', 'Log 10'].map(l => ({id: l, name: l}))]])
-
+    // Transcript matrices are already log2-transformed upstream, so no scale
+    // selector is offered here - values are plotted as supplied.
     let normalizationSelect = writable({id: 'None', name: 'None'});
     const normalizationOpts = new Map([['', ['None', 'Z-Score (within transcript)', 'Z-Score (within category)'].map(l => ({id: l, name: l}))]])
     
@@ -50,7 +49,7 @@
         return () => expressionSub()
     })
 
-    const plotlyArgs = derived([expressionDataObj, transcriptSelect, scaleSelect, normalizationSelect, colorRange], ([$expressionDataObj, $transcriptSelect, $scaleSelect, $normalizationSelect, $colorRange], set) => {
+    const plotlyArgs = derived([expressionDataObj, transcriptSelect, normalizationSelect, colorRange], ([$expressionDataObj, $transcriptSelect, $normalizationSelect, $colorRange], set) => {
         if(!$expressionDataObj) set(getPlotEmpty('No data'));
         else if($expressionDataObj.expression.loading) set(getPlotEmpty('Loading'));
         else {
@@ -64,19 +63,8 @@
 
             let combinedHeading = heading + ` - ${ds} (${headingsY.length} Transcripts)`;
 
-            let range = [0, Math.max(...values)]
-            let colorscale = [[0, $colorRange[1]], [1, $colorRange[2]]]
             let modifiers = [];
-            if($scaleSelect.id !== 'Linear') {
-                modifiers.push($scaleSelect.id);
-                if($scaleSelect.id === 'Log e') values = values.map(v => Math.log(v + LOG_OFFSET))
-                if($scaleSelect.id === 'Log 2') values = values.map(v => Math.log2(v + LOG_OFFSET))
-                if($scaleSelect.id === 'Log 10') values = values.map(v => Math.log10(v + LOG_OFFSET))
-                const maxAbs = Math.max(...values.map(v => Math.abs(v)))
-                range = [-maxAbs, +maxAbs]
-                colorscale = [[0, $colorRange[0]], [0.5, $colorRange[1]], [1, $colorRange[2]]]
-            }
-            
+
             // Convert to 2D
             values = headingsY.map((_, i) => values.slice(i*headingsX.length, (i+1)*headingsX.length));
 
@@ -100,6 +88,13 @@
             }
 
             if (modifiers.length) combinedHeading += ` - ${modifiers.join("/")}`;
+
+            // Symmetric diverging colour axis, computed on the values actually
+            // plotted (i.e. after any z-score normalization).
+            const finiteAbs = values.flat().filter(v => Number.isFinite(v)).map(v => Math.abs(v));
+            const maxAbs = finiteAbs.length ? Math.max(...finiteAbs) : 0;
+            const range = maxAbs > 0 ? [-maxAbs, +maxAbs] : [-1, 1];
+            const colorscale = [[0, $colorRange[0]], [0.5, $colorRange[1]], [1, $colorRange[2]]];
 
             set({
                 plotData: [{
@@ -160,7 +155,6 @@
         <div class='w-48 flex flex-col items-stretch gap-3'>
             <Dropdown title='Dataset' selected={datasetsSelect} groups={$datasetOptsObj.datasetsOpts}/>
             <Dropdown title='Transcripts' selected={transcriptSelect} groups={$transcriptOptsObj?.transcriptOpts}/>
-            <Dropdown title='Scale' selected={scaleSelect} groups={scaleOpts}/>
             <Dropdown title='Normalization' selected={normalizationSelect} groups={normalizationOpts}/>
         </div>
     </span>

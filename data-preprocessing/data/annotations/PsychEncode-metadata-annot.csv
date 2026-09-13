@@ -32,12 +32,12 @@ structure_acronym,Structure Acronym,Yes,Sample charactertics
 ROW_ID,Row_ID,No,Sample charactertics
 ROW_VERSION,Row_version,No,Sample charactertics
 contributingStudy,ContributingStudy,No,Sample charactertics
-individualIDSource,individualIDSource,No,Phenotype
+individualIDSource,individualIDSource,Yes,Phenotype
 ageOnset,ageOnset,No,Phenotype
-causeDeath,Cause of Death,Yes,Phenotype
-brainWeight,Brain Weight,Yes,Phenotype
-height,Height,Yes,Phenotype
-weight,Weight,Yes,Phenotype
+causeDeath,Cause of Death,No,Phenotype
+brainWeight,Brain Weight,No,Phenotype
+height,Height,No,Phenotype
+weight,Weight,No,Phenotype
 ageBiopsy,ageBiopsy,No,Sample charactertics
 smellTestScore,smellTestScore,No,Sample charactertics
 smoker,smoker,No,Phenotype

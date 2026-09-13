@@ -18,11 +18,50 @@ suppressPackageStartupMessages({
   library(readr)
   library(purrr)
   library(stringr)
-  library(ggplot2)})
+  library(ggplot2)
+  library(tidyverse)
+  library(grid)
+  library(gridExtra)
+  library(EnsDb.Hsapiens.v86)})
 ```
 
 
-# Tables 
+```{r functions}
+
+bithub_anova <- function(y, g) {
+  y <- as.numeric(y)
+  g <- as.character(g)                 
+  keep <- !is.na(y) & !is.na(g)
+  y <- y[keep]; g <- g[keep]
+
+  out <- data.frame(statistic = NA_real_, p_value = NA_real_, label = NA_character_)
+  if (length(unique(g)) < 2L || length(y) <= length(unique(g))) return(out)
+
+  tab <- summary(stats::aov(y ~ factor(g)))[[1]]
+  out$statistic <- tab[1, "F value"]
+  out$p_value   <- tab[1, "Pr(>F)"]
+  out$label     <- bithub_label(out$statistic, out$p_value)
+  out
+}
+
+
+
+bithub_label <- function(f, p, variable = NULL) {
+  if (is.na(p) || is.na(f)) return(NA_character_)
+  p_disp <- if (p < 10e-12) "p<10e-12" else paste0("p=", formatC(p, digits = 2, format = "g"))
+  lab <- sprintf("%s, f=%s, ANOVA", p_disp, formatC(f, digits = 2, format = "g"))
+  if (is.null(variable)) lab else sprintf("%s (%s)", variable, lab)
+}
+
+
+bithub_anova_label <- function(y, g, variable = NULL) {
+  r <- bithub_anova(y, g)
+  if (is.na(r$label)) return(NA_character_)
+  if (is.null(variable)) r$label else sprintf("%s (%s)", variable, r$label)
+}
+
+
+```
 
 
 # Figures
@@ -84,7 +123,7 @@ summarise_regions = function(x, dataset){
 ```{r}
 age_interval_stats = list()
 directory = file.path(here::here("output"))
-pattern = "/home/neuro/Documents/Brain_integrative_transcriptome/update/bithub/data-preprocessing/output/"
+pattern = "/Users/arwanawaz/Documents/Papers/BITHub/Website/update_2/bithub/data-preprocessing/output/"
 ```
 
 ```{r}
@@ -94,9 +133,19 @@ for (f in directory){
         dataset = basename(j)
         dataset = gsub("\\-metadata.csv$", "", dataset)
         dataset = sub(".*/", "", dataset)   # catches any leftover path component
+        
+           if (names(read.csv(j, header = TRUE, check.names = FALSE, nrows =1))[1]
+               == "") {
+            ct_file = read.csv(j, header = TRUE, row.names = 1, check.names =
+                                 FALSE)
+        } else {
+            ct_file = read.csv(j, header = TRUE, check.names = FALSE)
+        }
 
-        ct_file = read.csv(j, header = TRUE, row.names = 1, check.names = FALSE)
         message("Now calculating statistics for ", dataset)
+       # ct_file = read.csv(j, header = TRUE, row.names = 1, check.names = FALSE)
+        #message("Now calculating statistics for ", dataset)
+        
 
         if (grepl("PsychENCODE", dataset, ignore.case = TRUE)) {
             stats = summarise_stats_single_sample(ct_file, dataset)
@@ -218,8 +267,16 @@ for (f in directory){
         dataset = basename(j)
         dataset = gsub("\\-metadata.csv$", "", dataset)
         dataset = sub(".*/", "", dataset)
+        
+              if (names(read.csv(j, header = TRUE, check.names = FALSE, nrows =1))[1]
+               == "") {
+            ct_file = read.csv(j, header = TRUE, row.names = 1, check.names =
+                                 FALSE)
+        } else {
+            ct_file = read.csv(j, header = TRUE, check.names = FALSE)
+        }
 
-        ct_file = read.csv(j, header = TRUE, row.names = 1, check.names = FALSE)
+      #  ct_file = read.csv(j, header = TRUE, row.names = 1, check.names = FALSE)
 
         if (!structure_col %in% colnames(ct_file) || !"Period" %in% colnames(ct_file)) {
             message("Skipping ", dataset, " -- missing structure or period column")
@@ -276,11 +333,276 @@ ggsave(plot= samples_per_dev,
          )
 ```
 
+```{r}
+samples_per_dev 
+```
+
 ## Figure 3c
+
+```{r fig.height=3, fig.width=8}
+brainseq_exp = read.csv(here::here("output/BrainSeq/BrainSeq-exp.csv"), check.names = FALSE, row.names = 1) %>% rownames_to_column("Gene_id") %>% 
+  dplyr::filter(Gene_id == "ENSG00000100226") %>% 
+   reshape2::melt() %>% 
+  dplyr::rename("SampleID" = variable) %>%
+  left_join(read.csv(here::here("output/BrainSeq/BrainSeq-metadata.csv"), check.names = FALSE, row.names = 1), by = "SampleID")
+bseq_stat  <- brainseq_exp %>% summarise(bithub_anova(value, Period))
+
+bseq_period = brainseq_exp %>%
+  mutate(Period = factor(Period, levels = c("Prenatal", "Postnatal"))) %>% 
+  ggplot(aes(x = Period, y = log2(value+0.05))) +  geom_violin(trim = FALSE, fill = "lightpink", alpha = 0.5) +
+  geom_boxplot(width = 0.1, fill = "white", color = "black") + theme_bw() + 
+  labs(subtitle = bithub_label(bseq_stat$statistic, bseq_stat$p_value))
+
+
+
+brainspan_exp = read.csv(here::here("output/BrainSpan/BrainSpan-exp.csv"), check.names = FALSE, row.names = 1) %>% rownames_to_column("Gene_id") %>% 
+  dplyr::filter(Gene_id == "ENSG00000100226") %>% 
+   reshape2::melt() %>% 
+  dplyr::rename("SampleID" = variable) %>%
+  left_join(read.csv(here::here("output/BrainSpan/BrainSpan-metadata.csv"), check.names = FALSE, row.names = 1), by = "SampleID") 
+
+
+bspan_stat  <- brainspan_exp %>% summarise(bithub_anova(value, Period))
+
+bspan_period = brainspan_exp %>%
+  mutate(Period = factor(Period, levels = c("Prenatal", "Postnatal"))) %>% 
+  ggplot(aes(x = Period, y = log2(value+0.05))) +  geom_violin(trim = FALSE, fill = "lightpink", alpha = 0.5) +
+  geom_boxplot(width = 0.1, fill = "white", color = "black") + theme_bw() + 
+  labs(subtitle = bithub_label(bspan_stat$statistic, bspan_stat$p_value))
+
+
+PsychEncode_exp =  read.csv(here::here("output/PsychENCODE/PsychEncode-exp.csv"), check.names = FALSE, row.names = 1) %>% rownames_to_column("Gene_id") %>% 
+  dplyr::filter(Gene_id == "ENSG00000100226") %>% 
+   reshape2::melt() %>% 
+  dplyr::rename("SampleID" = variable) %>%
+  left_join(read.csv(here::here("output/PsychENCODE/PsychEncode-metadata.csv"), check.names = FALSE), by = "SampleID") 
+
+pe_stat  <- PsychEncode_exp %>% summarise(bithub_anova(value, Period))
+
+pe_period = PsychEncode_exp %>%
+  mutate(Period = factor(Period, levels = c("Prenatal", "Postnatal"))) %>% 
+  ggplot(aes(x = Period, y = log2(value+0.05))) +  geom_violin(trim = FALSE, fill = "lightpink", alpha = 0.5) +
+  geom_boxplot(width = 0.1, fill = "white", color = "black") + theme_bw() + 
+  labs(subtitle = bithub_label(pe_stat$statistic, pe_stat$p_value))
+
+
+grid.arrange(bseq_period  ,bspan_period, pe_period , ncol=3  )
+```
+
+## Figure 3d 
+
+
+```{r fig.height=5, fig.width=15}
+
+bseq_stat  <- brainseq_exp %>% summarise(bithub_anova(value, `Age Interval`))
+
+
+brainseq_age = brainseq_exp %>%
+   mutate(`Age Interval` = factor(`Age Interval`, 
+                              levels = c("4-7pcw", "8-9pcw",
+                                         "10-12pcw", "13-15pcw", "16-18pcw",
+                                         "19-24pcw", "25-38pcw", "0-5mos",
+                                         "6-18mos", "19mos-5yrs", "6-11yrs",
+                                         "12-19yrs", "20-29yrs", "30-39yrs",
+                                         "40-49yrs", "50-59yrs", "60-69yrs",
+                                         "70-79yrs", "80-89yrs", "90-99yrs"))) %>%
+  ggplot(aes(x = `Age Interval`, y = log2(value+0.05))) +  geom_violin(trim = FALSE, fill = "lightpink", alpha = 0.5) +
+  geom_boxplot(width = 0.1, fill = "white", color = "black") + theme_bw() +   theme(axis.text.x = element_text(angle =90)) + 
+  labs(subtitle = bithub_label(bseq_stat$statistic, bseq_stat$p_value))
+
+bspan_stat  <- brainspan_exp %>% summarise(bithub_anova(value, `Age Interval`))
+
+brainspan_age = brainspan_exp %>% 
+  mutate(`Age Interval` = factor(`Age Interval`, 
+                              levels = c("4-7pcw", "8-9pcw",
+                                         "10-12pcw", "13-15pcw", "16-18pcw",
+                                         "19-24pcw", "25-38pcw", "0-5mos",
+                                         "6-18mos", "19mos-5yrs", "6-11yrs",
+                                         "12-19yrs", "20-29yrs", "30-39yrs",
+                                         "40-49yrs", "50-59yrs", "60-69yrs",
+                                         "70-79yrs", "80-89yrs", "90-99yrs"))) %>%
+  ggplot(aes(x = `Age Interval`, y = log2(value+0.05))) +  geom_violin(trim = FALSE, fill = "lightpink", alpha = 0.5) +
+  geom_boxplot(width = 0.1, fill = "white", color = "black") + theme_bw() +   theme(axis.text.x = element_text(angle =90)) + 
+  labs(subtitle = bithub_label(bspan_stat$statistic, bspan_stat$p_value))
+
+pe_stat  <- PsychEncode_exp %>% summarise(bithub_anova(value, `Age Interval`))
+
+PsychEncode_age =  PsychEncode_exp  %>%
+mutate(`Age Interval` = factor(`Age Interval`, 
+                              levels = c("4-7pcw", "8-9pcw",
+                                         "10-12pcw", "13-15pcw", "16-18pcw",
+                                         "19-24pcw", "25-38pcw", "0-5mos",
+                                         "6-18mos", "19mos-5yrs", "6-11yrs",
+                                         "12-19yrs", "20-29yrs", "30-39yrs",
+                                         "40-49yrs", "50-59yrs", "60-69yrs",
+                                         "70-79yrs", "80-89yrs", "90-99yrs"))) %>%
+  ggplot(aes(x = `Age Interval`, y = log2(value+0.05))) +  geom_violin(trim = FALSE, fill = "lightpink", alpha = 0.5) +
+  geom_boxplot(width = 0.1, fill = "white", color = "black") + theme_bw() +   theme(axis.text.x = element_text(angle =90)) +  labs(subtitle = bithub_label(pe_stat$statistic, pe_stat$p_value))
+
+grid.arrange(brainseq_age ,brainspan_age, PsychEncode_age, ncol=3  )
+```
 
 ## Figure 3e
 
+```{r fig.height = 3, fig.width=8}
+brainseq_var = read.csv(here::here("output/BrainSeq/BrainSeq_varPart.csv"), check.names = FALSE, row.names = 1) %>% 
+  rownames_to_column("Gene_id") %>% 
+  dplyr::filter(Gene_id == "ENSG00000100226") %>%
+  reshape2::melt() %>% 
+  ggplot(aes(x= variable, y = value)) + geom_bar(stat="identity") + theme_bw() +
+  theme(axis.text.x = element_text(angle =90)) + labs(x = "", y = "Fraction Variance Explained")
+
+brainspan_var = read.csv(here::here("output/BrainSpan/BrainSpan_varPart.csv"), check.names = FALSE, row.names = 1) %>% 
+  rownames_to_column("Gene_id") %>% 
+  dplyr::filter(Gene_id == "ENSG00000100226") %>%
+  reshape2::melt() %>% 
+  ggplot(aes(x= variable, y = value)) + geom_bar(stat="identity") + theme_bw() +
+  theme(axis.text.x = element_text(angle =90)) + labs(x = "", y = "Fraction Variance Explained")
+
+
+PsychEncode_var = read.csv(here::here("output/PsychENCODE/PsychENCODE_varPart.csv"), check.names = FALSE, row.names = 1) %>% 
+  rownames_to_column("Gene_id") %>% 
+  dplyr::filter(Gene_id == "ENSG00000100226") %>%
+  reshape2::melt() %>% 
+  ggplot(aes(x= variable, y = value)) + geom_bar(stat="identity") + theme_bw() +
+  theme(axis.text.x = element_text(angle =90)) + labs(x = "", y = "Fraction Variance Explained")
+
+grid.arrange(brainseq_var,brainspan_var, PsychEncode_var, ncol=3)
+```
+
+
 ## Figure 3f
+
+```{r}
+PsychEncode_individual_id = PsychEncode_exp %>%  
+  ggplot(aes(x =`individualIDSource`, y = log2(value + 0.05), fill = Period)) + geom_boxplot() + theme_bw() + theme(axis.text.x = element_text(angle =90)) 
+
+
+PsychEncode_individual_id
+```
+
 
 # Figure 4
 
+
+
+## Figure 4a
+
+```{r}
+gtex_exp = read.csv(here::here("output/GTEx/GTEx-exp.csv"), check.names = FALSE, row.names = 1) %>% rownames_to_column("Gene_id") %>% 
+  dplyr::filter(Gene_id == "ENSG00000109118") %>% 
+   reshape2::melt() %>% 
+  dplyr::rename("SampleID" = variable) %>%
+  left_join(read.csv(here::here("output/GTEx/GTEx-metadata.csv"), check.names = FALSE, row.names = 1), by = "SampleID") 
+
+hdbr_exp = read.csv(here::here("output/HDBR/HDBR-exp.csv"), check.names = FALSE, row.names = 1) %>% 
+  dplyr::filter(EnsemblID== "ENSG00000109118") %>% 
+   reshape2::melt() %>% 
+  dplyr::rename("SampleID" = variable) %>%
+  left_join(read.csv(here::here("output/HDBR/HDBR-metadata.csv"), check.names = FALSE), by = "SampleID")  
+```
+
+```{r}
+brainseq_regions_period = read.csv(here::here("output/BrainSeq/BrainSeq-exp.csv"), check.names = FALSE, row.names = 1) %>% rownames_to_column("Gene_id") %>% 
+  dplyr::filter(Gene_id == "ENSG00000109118") %>% 
+   reshape2::melt() %>% 
+  dplyr::rename("SampleID" = variable) %>%
+  left_join(read.csv(here::here("output/BrainSeq/BrainSeq-metadata.csv"), check.names = FALSE, row.names = 1), by = "SampleID") %>% 
+  mutate(Period = factor(Period, levels = c("Prenatal", "Postnatal"))) %>% 
+  ggplot(aes(x = Period, y = log2(value + 0.05), fill = Regions)) +
+  geom_boxplot()
+
+hdbr_regions_period = hdbr_exp %>%
+#  mutate(Period = factor(Period, levels = c("Prenatal", "Postnatal"))) %>% 
+  ggplot(aes(x = Period, y = log2(value + 0.05), fill = Regions)) +
+  geom_boxplot()
+
+brainspan_regions_period = read.csv(here::here("output/BrainSpan/BrainSpan-exp.csv"), check.names = FALSE, row.names = 1) %>% rownames_to_column("Gene_id") %>% 
+  dplyr::filter(Gene_id == "ENSG00000109118") %>% 
+   reshape2::melt() %>% 
+  dplyr::rename("SampleID" = variable) %>%
+  left_join(read.csv(here::here("output/BrainSpan/BrainSpan-metadata.csv"), check.names = FALSE, row.names = 1), by = "SampleID")  %>%
+  mutate(Period = factor(Period, levels = c("Prenatal", "Postnatal"))) %>% 
+  ggplot(aes(x = Period, y = log2(value + 0.05), fill = Regions)) +
+  geom_boxplot()
+  
+  
+gtex_regions_period = gtex_exp %>%
+  mutate(Period = factor(Period, levels = c("Prenatal", "Postnatal"))) %>% 
+  ggplot(aes(x = Period, y = log2(value + 0.05), fill = Regions)) +
+  geom_boxplot()
+
+
+grid.arrange(brainseq_regions_period ,hdbr_regions_period, 
+             brainspan_regions_period,gtex_regions_period, ncol =2, nrow=2 )
+
+```
+
+## Figure 4b
+
+```{r}
+gtex_regions_decon = gtex_exp %>%
+  ggplot(aes(x = `Proportion of Neurons (MultiBrain)`, y = log2(value + 0.05), color = Regions)) + geom_point()
+
+cor.test(gtex_exp$value,gtex_exp$`Proportion of Neurons (MultiBrain)`, method = "spearman" )
+
+  
+hdbr_regions_decon = hdbr_exp  %>%
+  ggplot(aes(x = `Proportion of Neurons (MultiBrain)`, y = log2(value + 0.05), color = Regions)) + geom_point()
+
+cor.test( hdbr_exp$value, hdbr_exp$`Proportion of Neurons (MultiBrain)`, method = "spearman" )
+
+
+grid.arrange(gtex_regions_decon,hdbr_regions_decon ,ncol =2)
+```
+
+## Figure 4c
+
+## Figure 4d
+
+```{r}
+txdf = transcripts(EnsDb.Hsapiens.v86, return.type="DataFrame")
+tx2gene = as.data.frame(txdf[,c("gene_id", "tx_id")]) %>% 
+  dplyr::filter(gene_id == "ENSG00000109118")
+```
+
+```{r}
+age_interval_order <- c(
+  "4-7pcw", "8-9pcw", "10-12pcw", "13-15pcw", "16-18pcw", "19-24pcw", "25-38pcw",
+  "0-5mos", "6-18mos", "19mos-5yrs", "6-11yrs", "12-19yrs", "20-29yrs", "30-39yrs",
+  "40-49yrs", "50-59yrs", "60-69yrs", "70-79yrs", "80-89yrs", "90-99yrs"
+)
+
+zsd  <- function(x) { s <- sqrt(mean((x - mean(x))^2)); if (s == 0) 1e-10 else s }
+zpop <- function(x) (x - mean(x)) / zsd(x)
+
+bseq_tx_pfc = read.csv(here::here("output/BrainSeq/BrainSeq-pfc-exp.csv"), row.names = 1, check.names = FALSE) %>% 
+  rownames_to_column("tx_id") %>% 
+  dplyr::filter(tx_id %in% tx2gene$tx_id) %>%
+   tidyr::pivot_longer(-tx_id, names_to = "category", values_to = "value") %>%
+  mutate(category = factor(category, levels = age_interval_order)) %>%
+  group_by(tx_id) %>%                   
+  mutate(z = zpop(value)) %>%
+  ungroup() %>% 
+   ggplot(aes(category, tx_id, fill = z)) + geom_tile() +scale_fill_gradient2(low ="#2166AC" , mid = "white", high =  "#B2182B",
+                     midpoint = 0) + theme(axis.text.x = element_text(angle = 90)) + ggtitle("DLPFC - BrainSeq")
+
+```
+
+```{r}
+bseq_tx_hip = read.csv(here::here("output/BrainSeq/BrainSeq-hip-exp.csv"), row.names = 1, check.names = FALSE) %>% 
+  rownames_to_column("tx_id") %>% 
+  dplyr::filter(tx_id %in% tx2gene$tx_id) %>%
+   tidyr::pivot_longer(-tx_id, names_to = "category", values_to = "value") %>%
+  mutate(category = factor(category, levels = age_interval_order)) %>%
+  group_by(tx_id) %>%                   
+  mutate(z = zpop(value)) %>%
+  ungroup() %>% 
+   ggplot(aes(category, tx_id, fill = z)) + geom_tile() + scale_fill_gradient2(low ="#2166AC" , mid = "white", high =  "#B2182B",
+                     midpoint = 0) + theme(axis.text.x = element_text(angle = 90)) + ggtitle("HIP - BrainSeq")
+```
+
+```{r fig.width=10, fig.height=5}
+grid.arrange(bseq_tx_pfc, bseq_tx_hip, ncol =2)
+
+```

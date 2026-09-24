@@ -21,26 +21,24 @@
     // Initial data parse
     const datasetsObj = derived(filteredStore, ($filteredStore, set) => {
         if(!$filteredStore) return;
-        const datasetAvail = $filteredStore.datasetIndicesResults.map(col_i => $filteredStore.headings[col_i]);
-        const datasetOptVals = datasetAvail.map(h => ({id: h, name: h}));
+        const datasetOptVals = $filteredStore.datasetIndicesResults.map(col_i => $filteredStore.headings[col_i]);
         const datasetOpts = new Map([['', datasetOptVals]]);
 
-        set({datasetOpts, $filteredStore})
-
-        if(!datasetAvail.includes(get(datasetSelect1)?.id)) datasetSelect1.set(datasetOptVals[0]);
-        if(!datasetAvail.includes(get(datasetSelect2)?.id)) datasetSelect2.set(datasetOptVals[1]);
-        
+        set(datasetOpts);
+        datasetSelect1.update(current => datasetOptVals.includes(current) ? current : datasetOptVals[0]);
+        datasetSelect2.update(current => datasetOptVals.includes(current) ? current : datasetOptVals[1]);
     });
 
     function createFilterObj(datasetSelect, filterSelect) {
         return derived([datasetSelect, data], ([datasetSelect, data], set) => {
             if(!datasetSelect || !data) return;
-            if(!data.value.get('metadata').keys.includes(datasetSelect.id)) {
-                filterSelect.set(undefined)
+            if(!data.value.get('metadata').keys.includes(datasetSelect)) {
+                // N.B. Custom datasets have no filter options
+                filterSelect.set('All')
                 set({ filterOpts: new Map([['', []]])})
             } else {
-                const {customFilterCategory, customFilterName} = data.value.get('metadata/' + datasetSelect.id + '/zscores').attrs;
-                const filterOptVals = customFilterCategory.map(h => ({id: datasetSelect.id + '|' + h, name: h}));
+                const {customFilterCategory, customFilterName} = data.value.get('metadata/' + datasetSelect + '/zscores').attrs;
+                const filterOptVals = customFilterCategory;
                 filterSelect.set(filterOptVals[0]);
                 set({title: customFilterName, filterOpts: new Map([['', filterOptVals]])})
             }
@@ -55,22 +53,16 @@
             set(getPlotEmpty('No data'));
             return
         }
-        let [ds1, fl1] = [$datasetSelect1.id, 'All']
-        if($filterSelect1) [ds1, fl1] = $filterSelect1.id.split('|', 2);
-        let [ds2, fl2] = [$datasetSelect2.id, 'All']
-        if($filterSelect2) [ds2, fl2] = $filterSelect2.id.split('|', 2);
-
-        if(ds1 !== $datasetSelect1.id || ds2 !== $datasetSelect2.id) return;
-
-        const xAll = fl1 !== 'All' ? $data.value.get('metadata/' + ds1 + '/zscores/' + fl1).value : $filteredStore.columns[$filteredStore.headings.indexOf(ds1)];
-        const yAll = fl2 !== 'All' ? $data.value.get('metadata/' + ds2 + '/zscores/' + fl2).value : $filteredStore.columns[$filteredStore.headings.indexOf(ds2)];
         
+        const xAll = $filterSelect1 !== 'All' ? $data.value.get('metadata/' + $datasetSelect1 + '/zscores/' + $filterSelect1).value : $filteredStore.columns[$filteredStore.headings.indexOf($datasetSelect1)];
+        const yAll = $filterSelect2 !== 'All' ? $data.value.get('metadata/' + $datasetSelect2 + '/zscores/' + $filterSelect2).value : $filteredStore.columns[$filteredStore.headings.indexOf($datasetSelect2)];
+
         const x = $filteredStore.results.map(row_i => xAll[row_i]);
         const y = $filteredStore.results.map(row_i => yAll[row_i]);
         
         const names = $filteredStore.results.map(row_i => withoutNullsStr($filteredStore.columns[1][row_i]));
-        let xName = ds1 + (fl1 == 'All' ? '' : ` (${fl1})`);
-        let yName = ds2 + (fl2 == 'All' ? '' : ` (${fl2})`);
+        let xName = $datasetSelect1 + ($filterSelect1 == 'All' ? '' : ` (${$filterSelect1})`);
+        let yName = $datasetSelect2 + ($filterSelect2 == 'All' ? '' : ` (${$filterSelect2})`);
 
         let extraMarkerArgs = {}
         if(names.length == 1) {
@@ -134,8 +126,8 @@
             Select from different datasets to compare z-scores for any number of search results.
         </p>
         <div class='w-48 flex flex-col items-stretch gap-3'>
-            <Dropdown title='Dataset 1' placeholder='No Datasets' selected={datasetSelect1} groups={$datasetsObj.datasetOpts}/>
-            <Dropdown title='Dataset 2' placeholder='No Datasets' selected={datasetSelect2} groups={$datasetsObj.datasetOpts}/>
+            <Dropdown title='Dataset 1' placeholder='No Datasets' selected={datasetSelect1} groups={$datasetsObj}/>
+            <Dropdown title='Dataset 2' placeholder='No Datasets' selected={datasetSelect2} groups={$datasetsObj}/>
             <hr>
             {#if $filterObj1?.title }
                 <Dropdown title={'Dataset 1 Subset (' + $filterObj1.title + ')'} selected={filterSelect1} groups={$filterObj1.filterOpts}/>

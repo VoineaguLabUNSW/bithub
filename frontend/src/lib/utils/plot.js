@@ -26,7 +26,7 @@ function getColumnDownloader(heading, data, xName, yName, zName) {
 
 function getTableDownloader(heading, headingsX, headingsY, values) {
     return () => {
-        const csv = createRowWriter(getFilenameFromHeading(heading, '.csv'), ',')
+        const csv = createRowWriter(getFilenameFromHeading(heading) + '.csv', ',')
         csv.write(['', ...headingsX])
         for(let [i, h] of headingsY.entries()) csv.write([h, ...values[i]])
         csv.close()

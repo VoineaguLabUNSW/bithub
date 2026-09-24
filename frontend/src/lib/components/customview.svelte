@@ -100,7 +100,7 @@
                     const rowIndex = $dataProcessed.result.index[$row]
                     if(rowIndex == -1) return;
                     const rowData = $dataProcessed.result.matrix[rowIndex+1]
-                    let ret = {data: {values: sampleMatches.map(m => rowData[m.searchIndex])}}
+                    let ret = {data: {values: sampleMatches.map(m => rowData[m.searchIndex])}, row: $row}
                     set(ret)
                 })
                 columnGetter = (colHeading) => {
@@ -162,7 +162,7 @@
         </Label>
 
         <div class='flex flex-col items-center'>
-            <Button type='submit' disabled={!$metadataProcessed?.result} on:click={() => {customs.set({...$customs, ...finaliseDataset($metadataProcessed, nameInputValue || $placeholderName)}); customModal.set('')}} color='light'>Add<i class='mx-2 fas fa-plus'/></Button>
+            <Button type='submit' disabled={!$metadataProcessed?.result} on:click={() => {customs.update(c => ({...c, ...finaliseDataset($metadataProcessed, nameInputValue || $placeholderName)})); customModal.set('')}} color='light'>Add<i class='mx-2 fas fa-plus'/></Button>
         </div>
     </form>
 </div>

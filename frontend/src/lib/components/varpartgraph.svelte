@@ -6,6 +6,7 @@
     import { derived } from 'svelte/store';
     import { getPlotEmpty, getPlotBar } from '../utils/plot';
 
+    export let currentRow;
     export let filteredStore;
     export let heading;
 
@@ -16,15 +17,15 @@
 
     const datasetOptsObj = derived([data, filteredStore], ([$data, $filteredStore], set) => {
         if(!$data || !$filteredStore) return;
-        const datasetOptVals = $filteredStore.datasetIndicesResults.map(col_i => $filteredStore.headings[col_i]).map(h => ({id: h, name: h}));
+        const datasetOptVals = $filteredStore.datasetIndicesResults.map(col_i => $filteredStore.headings[col_i]);
         const datasetsOpts = new Map([['', datasetOptVals]]);
         datasetsSelect.set(datasetOptVals[0]);
         set({$data, datasetsOpts});
     });
 
     const varianceDataObj = derived([datasetOptsObj, datasetsSelect], ([$datasetOptsObj, $datasetsSelect], set) => {
-        if(!$datasetOptsObj || !$datasetsSelect?.id) return;
-        const rowStream = $datasetOptsObj.$data.rowStreams['/metadata/' +  $datasetsSelect.id + '/variance_partition']
+        if(!$datasetOptsObj || !$datasetsSelect) return;
+        const rowStream = $datasetOptsObj.$data.rowStreams['/metadata/' +  $datasetsSelect + '/variance_partition']
         const headings = rowStream.attrs.heading;
         const expressionSub = rowStream.current.subscribe(varpart => {
             if(varpart) set({$datasetOptsObj, varpart, headings})
@@ -36,7 +37,7 @@
         if(!$varianceDataObj) set(getPlotEmpty('No data'));
         else if($varianceDataObj.varpart.loading) set(getPlotEmpty('Loading'));
         else if($varianceDataObj.varpart.error) set(getPlotEmpty($varianceDataObj.varpart.error));
-        else set(getPlotBar(heading + ` - ${$datasetsSelect?.id}`, $varianceDataObj.headings, $varianceDataObj.varpart.data.values, 'Metadata Variable', 'Fraction Variance Explained', $colorPrimary[0]));
+        else set(getPlotBar(heading + ` - ${$datasetsSelect}`, $varianceDataObj.headings, $varianceDataObj.varpart.data.values, 'Metadata Variable', 'Fraction Variance Explained', $colorPrimary[0]));
     })
 </script>
 

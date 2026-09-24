@@ -1,28 +1,6 @@
-import * as hdf5 from 'jsfive';
-import * as pako from 'pako';
-import { asyncDerived, asyncReadable, writable, derived, get } from "@square/svelte-store";
-import * as protobuf from '../../gen/data_pb'
 
-/**
- * Get HDF5 async
- * @param {string} url 
- * @returns {Object}
- */
-async function getHDF5(url, setProgress) {
-    const response = await fetch(url);
-    const length = response.headers.get('Content-Length');
-    const buffer = new Uint8Array(length);
-    let at = 0;
-    const reader = response.body.getReader();
-    for (; ;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer.set(value, at);
-        at += value.length;
-        setProgress(Math.floor(100 * (at / length)));
-    }
-    return new hdf5.File(buffer.buffer, '');
-}
+import { asyncDerived, asyncReadable, writable, derived, get } from "@square/svelte-store";
+import { createData, createMetadata, updateAllExpressionData, createReaders } from '../utils/readers';
 
 /**
  * Awaitable lazy expression data store for given HDF5 url
@@ -33,28 +11,13 @@ function createCore(url) {
     const progress = writable(0);
     const row = writable(undefined);
 
-    const metadata = asyncDerived(url,
-        async ($url) => {
-            try { return {url: $url.slice(0, $url.lastIndexOf('/')), value: await (await fetch($url)).json()}; }
-            catch(e) { console.log(e); return {error: `Unable to load source ${$url}: (${e})`}; }
-        }
-    ); 
+    const metadata = asyncDerived(url, createMetadata); 
 
     const data = asyncDerived(
         metadata,
         async ($metadata) => {
-            try {
-                const rowStreams = {}
-                const obj = await getHDF5($metadata.url + '/out.hdf5', progress.set);
-                for(let i=0; i<obj.attrs.remote.length; i+=3) {
-                    rowStreams[obj.attrs.remote[i+0]] = {
-                        attrs: obj.get(obj.attrs.remote[i+0]).attrs, 
-                        indexPath: obj.attrs.remote[i+1], 
-                        type: obj.attrs.remote[i+2], 
-                        current: writable(undefined)
-                    }
-                }                
-                return {value: obj, rowStreams: rowStreams};
+            try {             
+                return await createData($metadata.url + '/out.hdf5', progress.set, writable);
             } catch (e) {
                 console.log(e)
                 return {error: e};
@@ -67,68 +30,18 @@ function createCore(url) {
         let $data;
         let $metadata;
         if($row === undefined || !($data = get(data)) || !($metadata = get(metadata))) return
-        
-        // Determine requests
-        const requests = []
-        for(const [rangesPath, rowStream] of Object.entries($data.rowStreams)) {
-            const index = $data.value.get(rowStream.indexPath).value;
-            const indexedRow = index[$row];
-            if(indexedRow >= 0) {
-                rowStream.current.set({loading: true})
-                requests.push({
-                    rowStream,
-                    byteStart: $data.value.get(rangesPath).value[indexedRow*2],
-                    byteEnd: $data.value.get(rangesPath).value[indexedRow*2+1],
-                })
-            } else {
-                rowStream.current.set({emtpy: true})
-            }
-        }
-        requests.sort((a, b) => a.byteStart - b.byteStart)
+        await updateAllExpressionData($data, $metadata, $row);
+    });
 
-        // Perform single combined request
-        const controller = new AbortController();
-        const response = await fetch($metadata.url + '/expression.bin', {
-            signal: controller.signal,
-            headers: {'Range': 'bytes=' + `${requests[0].byteStart}-${requests[requests.length-1].byteEnd-1}`},
-        });
+    const customs = writable({});
 
-        // Attempt to stream outputs
-        if(response.status !== 206) {
-            controller.abort();
-            for(const rowStream of Object.values($data.rowStreams)) rowStream.current.set({error: 'Invalid response, 206 expected'});
-        } else {
-            const responseLen = response.headers.get('content-length');
-            if (responseLen != (requests[requests.length-1].byteEnd - requests[0].byteStart)) {
-                for(const rowStream of Object.values($data.rowStreams)) rowStream.current.set({error: 'Unexpected response length'})
-            }
-            let i=0;
-            let o = requests[0].byteStart
-            let receivedBytes=0;
-            let chunksAll = new Uint8Array(responseLen);
-            const reader = response.body.getReader();
-            for (; ;) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                chunksAll.set(value, receivedBytes)
-                receivedBytes += value.length
-                while(i<requests.length && ((requests[i].byteEnd-o) <= receivedBytes)) {
-                    const part = chunksAll.subarray(requests[i].byteStart-o, requests[i].byteEnd-o)
-                    const rowStream = requests[i].rowStream
-                    try {
-                        let unpacked = protobuf[rowStream.type].fromBinary(pako.inflate(part))
-                        rowStream.current.set({data: unpacked, row: $row});
-                    } catch(e) {
-                        console.log(e)
-                        rowStream.current.set({error: e});
-                    }
-                    ++i;
-                }
-            }
-        }
+    const readers = derived([data, customs], ([$data, $customs]) => {
+        const customReaders = {};
+        for(let cd of Object.values($customs)) customReaders[cd.name] = cd.metadataColumnReader;
+        return {...createReaders($data), ...customReaders};
     });
     
-    return { data, metadata, progress, row, customs: writable({})}
+    return { data, metadata, progress, row, readers, customs}
 }
 
 export { createCore };

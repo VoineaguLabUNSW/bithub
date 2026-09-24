@@ -61,7 +61,7 @@
             </button>
         </div>
         <div class="h-[calc(100vh-270px)]">
-            <MetadataGraph filteredStore={filteredBulk} heading={$geneInfo?.symbol} allowedPlotTypes={["Violin", "Box"]}/>
+            <MetadataGraph currentRow={currentRow} filteredStore={filteredBulk} heading={$geneInfo?.symbol} allowedPlotTypes={["Violin", "Box"]}/>
         </div>
     </TabItem>
     <TabItem disabled={$filteredVarpart.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>
@@ -73,7 +73,7 @@
             </button>
         </div>
         <div class="h-[calc(100vh-270px)]">
-            <VarpartGraph filteredStore={filteredVarpart} heading={$geneInfo?.symbol}/>
+            <VarpartGraph currentRow={currentRow} filteredStore={filteredVarpart} heading={$geneInfo?.symbol}/>
         </div>
     </TabItem>
     <TabItem disabled={$filteredSingleCell.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>
@@ -86,7 +86,7 @@
         </div>
 
         <div class="h-[calc(100vh-270px)]">
-            <MetadataGraph filteredStore={filteredSingleCell} heading={$geneInfo?.symbol} allowedPlotTypes={["Box", "Bar"]} allowSecondMetadataSelect={false}/>
+            <MetadataGraph currentRow={currentRow} filteredStore={filteredSingleCell} heading={$geneInfo?.symbol} allowedPlotTypes={["Box", "Bar"]} allowSecondMetadataSelect={false}/>
         </div>
     </TabItem>
     <TabItem disabled={$filteredTranscript.datasetIndicesResults.length === 0} inactiveClasses='p-4 disabled:text-gray-300'>
@@ -98,7 +98,7 @@
             </button>
         </div>
         <div class="h-[calc(100vh-270px)]">
-            <TranscriptGraph filteredStore={filteredTranscript} heading={$geneInfo?.symbol}/>
+            <TranscriptGraph currentRow={currentRow} filteredStore={filteredTranscript} heading={$geneInfo?.symbol}/>
         </div>
     </TabItem>
     <TabItem>
@@ -155,6 +155,6 @@
 <Popover triggeredBy="#ts-help" class="z-[9999] w-[700px] text-sm font-light text-gray-500 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400" placement="bottom-start">
     <div class="p-3 space-y-2">
         <h3 class="font-semibold text-gray-900 dark:text-white">Transcript Details</h3>
-        <p>Heatmap displaying transcript specific expression for the selected gene across different tissues (GTEx) or brain developmental stages (BrainSeq). Transcript expression values are log2-transformed and were calculated by averaging expression values for each transcript either per tissue across all tissues (for GTEx data) or per age interval (BrainSeq). Users have the option for row-wise or column-wise z-score normalisation. The colour scale is symmetric about zero and spans the range of the values currently plotted.</p>
+        <p>Heatmap displaying transcript specific expression for the selected gene across different tissues (GTEx) or brain developmental stages (BrainSeq). Transcript expression values were calculated by averaging expression values for each transcript either per tissue across all tissues (for GTEx data) or per age interval (BrainSeq). Users have the option for row-wise or column-wise z-score normalisation. The colour scale is symmetric about zero and spans the range of the values currently plotted.</p>
     </div>
 </Popover>

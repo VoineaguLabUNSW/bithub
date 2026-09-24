@@ -5,72 +5,65 @@
     import { getContext } from "svelte";
     import { derived } from 'svelte/store';
     import { getPlotEmpty, getTableDownloader } from '../utils/plot';
-    import {mean, sd} from '../utils/math';
+    import {count, mean, sd, LOG_OFFSET} from '../utils/math';
+    import { SupportedLogTypes } from '$lib/utils/create';
 
+    export let currentRow;
     export let filteredStore;
     export let heading;
 
-    const { data } = getContext('core');
+    const { data, readers } = getContext('core');
     const { colorRange } = getContext('displaySettings')
 
     let datasetsSelect = writable();
     let transcriptSelect = writable();
     
-    // Transcript matrices are already log2-transformed upstream, so no scale
-    // selector is offered here - values are plotted as supplied.
-    let normalizationSelect = writable({id: 'None', name: 'None'});
-    const normalizationOpts = new Map([['', ['None', 'Z-Score (within transcript)', 'Z-Score (within category)'].map(l => ({id: l, name: l}))]])
+    let normalizationSelect = writable('None');
+    const normalizationOpts = new Map([['', ['None', 'Z-Score (within transcript)', 'Z-Score (within category)']]])
     
     const datasetOptsObj = derived([data, filteredStore], ([$data, $filteredStore], set) => {
         if(!$data || !$filteredStore) return;
-        const datasetOptVals = $filteredStore.datasetIndicesResults.map(col_i => $filteredStore.headings[col_i]).map(h => ({id: h, name: h}));
+        const datasetOptVals = $filteredStore.datasetIndicesResults.map(col_i => $filteredStore.headings[col_i]);
         const datasetsOpts = new Map([['', datasetOptVals]]);
         datasetsSelect.set(datasetOptVals[0]);
-        set({$data, datasetsOpts});
+        set({datasetsOpts});
     });
 
-    const transcriptOptsObj = derived([datasetOptsObj, datasetsSelect], ([$datasetOptsObj, $datasetsSelect], set) => {
+    const transcriptOptsObj = derived([data, datasetOptsObj, datasetsSelect], ([$data, $datasetOptsObj, $datasetsSelect], set) => {
         if(!$datasetOptsObj || !$datasetsSelect) return;
-
-        const transcriptOptVals = $datasetOptsObj.$data.value.get('metadata/' + $datasetsSelect.name + '/transcripts').attrs.order.map(v => ({id: $datasetsSelect.id + '|' + v, name: v}))
+        const transcriptOptVals = $data.value.get('metadata/' + $datasetsSelect + '/transcripts').attrs.order
         const transcriptOpts = new Map([['', transcriptOptVals]]);
         transcriptSelect.set(transcriptOptVals[0]);
-        set({...$datasetOptsObj, $datasetsSelect, transcriptOpts})
+        set({transcriptOpts})
+    });
+
+    const expressionDataObj = derived([readers, datasetsSelect, transcriptSelect], 
+                                    ([$readers, $datasetsSelect, $transcriptSelect], set) => {
+        if(!$datasetsSelect || !$transcriptSelect) return;
+        const reader = $readers[$datasetsSelect];
+        const transcriptStore = reader.getMatrixStore['/metadata/' + $datasetsSelect + '/transcripts/' + $transcriptSelect]
+        return transcriptStore.current.subscribe(set);
     })
-
-    const expressionDataObj = derived([transcriptOptsObj, transcriptSelect], ([$transcriptOptsObj, $transcriptSelect], set) => {
-        if(!$transcriptOptsObj || !$transcriptSelect?.id) return;
-
-        const rowStream = $transcriptOptsObj.$data.rowStreams['/metadata/' +  $datasetsSelect.id + '/transcripts/' + $transcriptSelect.name]
-        const categories = rowStream.attrs.categories;
-        const expressionSub = rowStream.current.subscribe(expression => {
-            if(expression) set({...$transcriptOptsObj, expression, categories})
-        })
-        return () => expressionSub()
-    })
-
-    const plotlyArgs = derived([expressionDataObj, transcriptSelect, normalizationSelect, colorRange], ([$expressionDataObj, $transcriptSelect, $normalizationSelect, $colorRange], set) => {
-        if(!$expressionDataObj) set(getPlotEmpty('No data'));
-        else if($expressionDataObj.expression.loading) set(getPlotEmpty('Loading'));
+    
+    const plotlyArgs = derived([currentRow, data, expressionDataObj, datasetsSelect, transcriptSelect, normalizationSelect, colorRange], ([$currentRow, $data, $expressionDataObj, $datasetsSelect, $transcriptSelect, $normalizationSelect, $colorRange], set) => {
+        if(!$expressionDataObj || $expressionDataObj.row !== $currentRow) set(getPlotEmpty('No data'));
+        else if($expressionDataObj.loading) set(getPlotEmpty('Loading'));
         else {
-            // Prevent invalid combinations during updates
-            const [ds, ts] = $transcriptSelect.id.split('|', 2)
-            if(ds !== $expressionDataObj.$datasetsSelect.id) return
+            const headingsX = $data.rowStreams['/metadata/' +  $datasetsSelect + '/transcripts/' + $transcriptSelect].attrs.categories;
+            const headingsY = $expressionDataObj.data.stringValues
+            let values = $expressionDataObj.data.floatValues
 
-            const headingsX = $expressionDataObj.categories
-            const headingsY = $expressionDataObj.expression.data.stringValues
-            let values = $expressionDataObj.expression.data.floatValues
-
-            let combinedHeading = heading + ` - ${ds} (${headingsY.length} Transcripts)`;
-
-            let modifiers = [];
-
+            let combinedHeading = heading + ` - ${$datasetsSelect} (${headingsY.length} Transcripts)`;
+            
             // Convert to 2D
             values = headingsY.map((_, i) => values.slice(i*headingsX.length, (i+1)*headingsX.length));
 
-            if ($normalizationSelect.id != 'None') {
-                modifiers.push($normalizationSelect.id);
-                if ($normalizationSelect.id == 'Z-Score (within transcript)') {
+            // Transcript matrices are already log2-transformed upstream, so no scale
+            let modifiers = ['Log 2'];
+            
+            if ($normalizationSelect != 'None') {
+                modifiers.push($normalizationSelect);
+                if ($normalizationSelect == 'Z-Score (within transcript)') {
                     for(let i=0; i<values.length; ++i) {
                         const groupVals = values[i];
                         const valsMean = mean(groupVals);
@@ -89,10 +82,7 @@
 
             if (modifiers.length) combinedHeading += ` - ${modifiers.join("/")}`;
 
-            // Symmetric diverging colour axis, computed on the values actually
-            // plotted (i.e. after any z-score normalization).
-            const finiteAbs = values.flat().filter(v => Number.isFinite(v)).map(v => Math.abs(v));
-            const maxAbs = finiteAbs.length ? Math.max(...finiteAbs) : 0;
+            const maxAbs = Math.max(...(values.flat().filter(v => !Number.isNaN(v)) || [0]));
             const range = maxAbs > 0 ? [-maxAbs, +maxAbs] : [-1, 1];
             const colorscale = [[0, $colorRange[0]], [0.5, $colorRange[1]], [1, $colorRange[2]]];
 

@@ -1162,10 +1162,6 @@ pe.order = pe.annot %>%
                                           "DonorID",
                                           "Sex",
                                           "Ethnicity",
-                                          "Cause of Death",
-                                          "Brain Weight",
-                                          "Height",
-                                          "Weight",
                                           "Diagnosis",
                                           "Structure Acronym",
                                           "Regions",
@@ -1176,18 +1172,21 @@ pe.order = pe.annot %>%
                                           "Proportion of Microglia (MultiBrain)",
                                           "Proportion of Oligodendrocytes (MultiBrain)",
                                           "Proportion of Endothelia (MultiBrain)"
-                                          )))
-
-
+                                          ))) 
 
 ```
 
 ```{r pe-md}
 md %>%
-   DT::datatable(caption = "PsychENCODE Metadata after harmonizing column names, ages and structure acronyms")
+   DT::datatable(caption = "PsychENCODE Metadata after harmonizing column names, ages and structure acronyms") 
 
 md %<>%
    dplyr::select(contains(pe.order$BITColumnName))
+
+
+md  %<>% 
+  dplyr::distinct(SampleID, .keep_all = TRUE)
+  #dplyr::filter(SampleID %in% "HSB126")
 ```
 
 * Categorical values 

@@ -1,7 +1,6 @@
 import { withoutNulls } from "./hdf5";
-import { getZipped } from "./plot";
 import { LOG_OFFSET } from "./math";
-import { getPlotScatter, getPlotDistribution } from "./plot";
+import { getPlotScatter, getPlotDistribution, getPlotBar, getZipped } from "./plot";
 
 const SupportedCategoricalPlotTypes = ["Violin", "Box", "Bar"]
 const SupportedLogTypes = ['Linear', 'Log e', 'Log 2', 'Log 10']
@@ -64,7 +63,7 @@ function createPlotlyArgsFromMetadataOptions(heading, reader, expressionData, pv
         let zeroXCountsEntries = Object.entries(zeroXCounts);
         let x = orderX ? orderX.filter(v => v in zeroXCounts) : Object.keys(zeroXCounts);
         let y = x.map(x => { let curr = zeroXCounts[x]; return (curr[1]/curr[0]*100); });
-        set(getPlotBar(headingMain, x, y, headingX, headingY, colorPrimary[0]));
+        return getPlotBar(headingMain, x, y, headingX, headingY, colorPrimary[0]);
     } else {
         // Combine and apply custom filter if necessary
         let data = z ? getZipped({x, y, z, name: names}) : getZipped({x, y, name: names})

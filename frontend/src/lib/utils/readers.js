@@ -74,7 +74,6 @@ async function updateAllExpressionData(data, metadata, row) {
                 byteStart: data.value.get(rangesPath).value[indexedRow*2],
                 byteEnd: data.value.get(rangesPath).value[indexedRow*2+1],
             })
-            console.log(rangesPath, [row, indexedRow], '->', requests[requests.length-1])
         } else {
             rowStream.current.set({emtpy: true})
         }
@@ -110,12 +109,15 @@ async function updateAllExpressionData(data, metadata, row) {
             while(i<requests.length && ((requests[i].byteEnd-o) <= receivedBytes)) {
                 const part = chunksAll.subarray(requests[i].byteStart-o, requests[i].byteEnd-o)
                 const rowStream = requests[i].rowStream
-                try {
-                    let unpacked = protobuf[rowStream.type].fromBinary(pako.inflate(part))
-                    rowStream.current.set({data: unpacked, row: row});
-                } catch(e) {
-                    console.log(e)
-                    rowStream.current.set({error: e});
+                if (part.byteLength == 0) {
+                    rowStream.current.set({error: 'No data'});
+                } else {
+                    try {
+                        let unpacked = protobuf[rowStream.type].fromBinary(pako.inflate(part))
+                        rowStream.current.set({data: unpacked, row: row});
+                    } catch(e) {
+                        rowStream.current.set({error: e});
+                    }
                 }
                 ++i;
             }
